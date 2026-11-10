@@ -30,6 +30,7 @@ const ICON = {
   stats: '<path d="M5 20V11M12 20V4M19 20v-7"/>',
   gear: '<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3h0a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5h0a1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8v0a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/>',
   check: '<path d="M5 12.5l4.5 4.5L19 7"/>',
+  room: '<rect x="3" y="4" width="18" height="16" rx="3"/><path d="M3 9h18M8 2v4M16 2v4M7 13h4M7 16h7"/>',
   music: '<path d="M9 18V5l11-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="17" cy="16" r="3"/>',
   checkc: '<circle cx="12" cy="12" r="9"/><path d="M8 12.5l3 3 5-6"/>'
 };
@@ -78,6 +79,7 @@ async function loadAll() {
     S.staff = st.docs.map(d => ({ id: d.id, ...d.data() })).sort((a, b) => (a.order ?? 999) - (b.order ?? 999) || ko(a.name, b.name));
   } catch { S.staff = []; }
   const mine = S.staff.find(x => x.email && x.email === S.me.email); if (mine) S.me.name = mine.name;
+  R.notices = null; R.events = null; await loadRoom();
   // 가정 정보는 미리 받아 두면 인터넷이 끊겨도 볼 수 있어요
   S.myClasses.forEach(c => (S.kids[c] || []).forEach(k => { if (k.familyId && !S.fam[k.familyId]) loadFam(k.familyId); }));
 }
@@ -159,9 +161,11 @@ function classChips() {
   if (S.myClasses.length < 2) return '';
   return `<div class="seg" role="tablist">${S.myClasses.map(c => `<button role="tab" class="${c === S.cur ? 'on' : ''}" data-act="cls" data-id="${c}">${esc(S.classes[c].name)}</button>`).join('')}</div>`;
 }
-function nav(active) {
-  const t = (k, ic, label) => `<button class="tab ${active === k ? 'on' : ''}" data-act="go" data-to="${k}">${svg(ICON[ic])}${label}</button>`;
-  return `<nav class="nav" aria-label="메뉴">${t('home', 'home', '홈')}${t('attend', 'att', '출석')}${t('friends', 'kids', '친구들')}${t('worship', 'music', '예배')}${t('stats', 'stats', '통계')}</nav>`;
+// 각 화면은 nav('탭이름')으로 어느 탭이 켜질지만 알려 주고, 실제 메뉴는 paint()가 붙여요
+function nav(active) { S.navActive = active; return ''; }
+function navHtml(active) {
+  const t = (k, ic, label) => `<button class="tab ${active === k ? 'on' : ''}" data-act="go" data-to="${k}">${svg(ICON[ic])}<span>${label}</span></button>`;
+  return `<nav class="nav" aria-label="메뉴"><div class="brand"><img src="icon.svg" alt="" width="44" height="44"><span>조이코너</span></div>${t('home', 'home', '홈')}${t('attend', 'att', '출석')}${t('friends', 'kids', '친구들')}${t('worship', 'music', '예배')}${t('room', 'room', '교사실')}</nav>`;
 }
 const noClass = () => `<div class="center"><div class="big">아직 반이 없어요</div><div class="sub">${S.me.role === 'admin' ? '설정에서 시트 데이터를 가져오거나 교사를 등록해 주세요.' : '관리자에게 맡을 반을 정해 달라고 말해 주세요.'}</div>${S.me.role === 'admin' ? `<button class="cta" style="max-width:280px" data-act="go" data-to="settings">설정 열기</button>` : ''}</div>`;
 
@@ -176,13 +180,13 @@ const vPending = () => `<div class="center"><div class="big">아직 등록되지
 function vHome() {
   const c = S.cur; const name = S.me.name || S.user.displayName || '';
   const header = `<header class="hd"><div><div class="hello">안녕하세요, ${esc(name)} 선생님!</div><div class="sub">${new Date().getMonth() + 1}월 ${new Date().getDate()}일 ${DOW[new Date().getDay()]}요일</div></div><button class="iconbtn" data-act="go" data-to="settings" aria-label="설정">${svg(ICON.gear)}</button></header>`;
-  if (!c) return `<div class="scroll">${header}${noClass()}</div>`;
+  if (!c) return `<div class="scroll">${header}${noClass()}${versionCard()}</div>`;
   const cl = S.classes[c], kids = activeKids(c), faces = kids.slice(0, 3);
   const todayStr = ymd(new Date());
   const nextS = S.schedule.find(x => x.date >= todayStr && !x.noService) || S.schedule[S.schedule.length - 1];
   const diff = nextS ? Math.round((parseD(nextS.date) - parseD(todayStr)) / 86400000) : 99;
   const care = careList(c).slice(0, 6), bdays = upcomingBirthdays(c).slice(0, 4);
-  return `<div class="scroll">${header}${classChips()}
+  return `<div class="scroll cols">${header}${classChips()}
 <section class="card"><div class="rowtop"><div style="display:flex;padding-left:10px">${faces.map(k => `<span style="margin-left:-10px;border:3px solid #fff;border-radius:50%;display:block;line-height:0">${avatar(k, 46)}</span>`).join('')}</div><div><div class="big">${esc(cl.name)}</div><div class="sub">친구 ${kids.length}명</div></div></div>
 <div class="chips">${(() => { const cs = classStaff(c); const h = cs.homeroom.map(n => `<span class="chip">담임 ${esc(n)}</span>`).join('') + cs.assistants.map(n => `<span class="chip">${esc(n)}</span>`).join(''); return h || (S.me.role === 'admin' ? `<button class="chip dashed" data-act="go" data-to="settings">+ 교사 명단에서 정해 주세요</button>` : '<span class="chip">담임 미정</span>'); })()}</div>
 <button class="cta" data-act="go" data-to="attend">${svg(ICON.checkc, 28, 2.4)}출석 시작하기</button></section>
@@ -190,6 +194,8 @@ ${nextS ? `<section class="card"><div class="lbl"><span>${diff <= 7 ? '이번 �
 ${(() => { const me = S.me.name || ''; if (!me || !nextS) return ''; const L = { preacher: '성경이야기 설교', pray: '중보기도 인도', nation: '성전건축·나라 기도', chant: '챈트', dance: '율동', guitar: '기타·메트로놈' }; const m = Object.entries(L).filter(([k]) => hasName(nextS[k], me)).map(([, l]) => l); return m.length ? `<section class="card" style="border-color:#C62828"><div class="lbl"><span>${fmtMD(nextS.date)} 내 담당</span></div><div class="chips">${m.map(x => `<span class="chip">${x}</span>`).join('')}</div><button class="ghost" data-act="go" data-to="worship">주일 예배 보기</button></section>` : ''; })()}
 <section class="card"><div class="lbl"><span>돌봄이 필요해요</span></div>${care.length ? `<div class="carerow">${care.map(x => `<button class="carekid" data-act="kid" data-id="${x.k.id}">${avatar(x.k, 56)}<b>${esc(x.k.name)}</b><span class="tag">${x.n >= 2 ? x.n + '주 결석' : '장기결석'}</span></button>`).join('')}</div>` : `<div class="sub">지금은 걱정되는 친구가 없어요. 감사해요!</div>`}</section>
 <section class="card"><div class="lbl"><span>곧 생일이에요</span></div>${bdays.length ? bdays.map(x => `<div class="bday"><span class="d">${x.label}</span><span>${esc(x.k.name)}${x.days === 0 ? ' · 오늘!' : ''}</span></div>`).join('') : `<div class="sub">45일 안에 생일인 친구가 없어요.</div>`}</section>
+
+${homeNoticeCard()}${homeEventsCard()}${versionCard()}
 </div>${nav('home')}`;
 }
 
@@ -207,7 +213,7 @@ function vAttend() {
 <div class="story">${sch ? (sch.noService ? '이 주일은 조이코너 예배가 없어요' : '오늘의 이야기 · ' + esc(sch.story || '')) : ''}${S.pending ? ' · 인터넷이 연결되면 저절로 올라가요' : ''}</div>
 <div style="display:flex;align-items:center;justify-content:space-between;gap:8px"><p class="hint">한 번 누르면 출석, 다시 누르면 취소</p><button class="ghost" style="min-height:40px;padding:0 14px;font-size:13px;flex:none" data-act="clearAsk">다시 하기</button></div>
 <div class="grid">${kids.map(k => { const on = marks[k.id] === 'p'; return `<button class="kid ${on ? 'on' : ''}" data-act="toggle" data-id="${k.id}" aria-pressed="${on}"><span class="stamp">${svg(ICON.check, 18, 3)}</span>${avatar(k, 64)}<b class="nm">${esc(k.name)}</b><span class="st">${on ? '왔어요' : '아직'}</span></button>`; }).join('')}</div>
-<button class="addkid" data-act="addKid">+ 새로 온 친구 등록</button></div>${nav('attend')}`;
+<button class="addkid" data-act="addKid">+ 새로 온 친구 등록</button><button class="ghost" data-act="go" data-to="stats">출석 통계 보기</button></div>${nav('attend')}`;
 }
 function ensureAttWatch() {
   const want = S.route === 'attend' && S.cur ? `${S.cur}_${S.attDate}` : '';
@@ -243,7 +249,7 @@ function vFriends() {
   };
   return `<div class="scroll"><div class="ttl">친구들</div>${classChips()}
 <input class="search" id="q" type="search" placeholder="이름으로 찾기" autocomplete="off">
-<div class="list" id="klist">${kids.map(row).join('')}</div>
+<div class="list klist" id="klist">${kids.map(row).join('')}</div>
 ${arch.length ? (S.showArchived ? `<div class="lbl">함께하지 않는 친구</div><div class="list">${arch.map(row).join('')}</div>` : `<button class="ghost" data-act="showArch">함께하지 않는 친구 ${arch.length}명 보기</button>`) : ''}
 <button class="addkid" data-act="addKid">+ 새로 온 친구 등록</button></div>${nav('friends')}`;
 }
@@ -274,17 +280,19 @@ function vKid() {
   const ds = recorded(c).slice(-8);
   const p = (who, nm, cell, tel, role) => nm ? `<div class="person"><div><b>${esc(nm)}</b> <span class="sub">${role}</span>${cell ? `<div class="cell">${esc(/^\d?[A-Za-z]?\d+$/.test(cell) ? '셀 ' + cell : cell)}</div>` : ''}</div>${tel ? `<div class="contact"><a href="tel:${esc(tel)}">전화</a><a href="sms:${esc(tel)}">문자</a></div>` : ''}</div>` : '';
   const n = streak(c, k);
-  return `<div class="scroll"><div class="hd"><button class="back" data-act="back">← 친구들</button><button class="sec" data-act="editKid" style="min-height:44px">고치기</button></div>
+  return `<div class="scroll cols"><div class="hd"><button class="back" data-act="back">← 친구들</button><button class="sec" data-act="editKid" style="min-height:44px">고치기</button></div>
 <div class="rowtop"><div><div class="ttl">${esc(k.name)}</div><div class="sub">${esc(S.classes[c]?.name || '')} · ${k.birth ? k.birth.replace(/-/g, '.') + ' 생' : '생일 모름'}</div></div></div>
 <div class="chips">${n >= 2 ? `<span class="tag">${n}주째 결석</span>` : ''}${(k.flags || []).map(f => `<span class="tag g">${esc(f)}</span>`).join('')}${k.remark ? `<span class="chip sm">${esc(k.remark)}</span>` : ''}</div>
 ${k.note ? `<div class="note">${esc(k.note)}</div>` : ''}
 <div class="photos">${slot('main', 'main', '대표')}${slot('1', '', '추가1')}${slot('2', '', '추가2')}</div>
 <section class="card"><div class="lbl"><span>최근 출석</span></div>${ds.length ? `<div class="dots">${ds.map(d => { const v = S.att[c][d][k.id] === 'p' ? 'p' : 'a'; const dd = parseD(d); return `<div class="dot"><i class="${(k.since && d < k.since) ? '' : v}"></i>${dd.getMonth() + 1}/${dd.getDate()}</div>`; }).join('')}</div><div class="sub">초록은 왔어요, 분홍은 못 왔어요</div>` : `<div class="sub">아직 출석 기록이 없어요.</div>`}</section>
 <section class="card"><div class="lbl"><span>가정</span></div>${fam ? `${p('f', fam.father, fam.fatherCell, fam.fatherTel, '아버지')}${p('m', fam.mother, fam.motherCell, fam.motherTel, '어머니')}${(fam.siblings || []).length ? `<div class="chips">${fam.siblings.map(s => `<span class="chip sm">${esc(s.name)}${s.org ? ' · ' + esc(s.org) : ''}</span>`).join('')}</div>` : ''}${(!fam.father && !fam.mother) ? '<div class="sub">부모님 정보가 아직 없어요. 고치기에서 적어 주세요.</div>' : ''}` : `<div class="sub">불러오는 중…</div>`}</section>
+${(kd?.notes || []).some(x => x.kind === '기도제목') ? `<section class="card" style="border-color:#C62828"><div class="lbl"><span>기도 제목</span></div>${kd.notes.filter(x => x.kind === '기도제목').slice(0, 5).map(x => `<div class="note"><span style="white-space:pre-wrap">${esc(x.text)}</span><small><span>${esc(x.date || '')} · ${esc(x.byName || '')}</span></small></div>`).join('')}</section>` : ''}
 <section class="card"><div class="lbl"><span>돌봄 기록</span></div>
+<div class="chips">${NOTE_KINDS.map(t => `<button class="chip sm kindbtn ${S.noteKind === t ? 'on' : ''}" data-act="noteKind" data-id="${t}">${t}</button>`).join('')}</div>
 <textarea id="noteText" placeholder="심방, 통화, 기도제목, 아이의 변화 등을 적어 주세요"></textarea>
 <button class="sec" data-act="noteAdd">기록 남기기</button>
-${(kd?.notes || []).map(x => `<div class="note"><span style="white-space:pre-wrap">${esc(x.text)}</span><small><span>${esc(x.date || '')} · ${esc(x.byName || '')}</span>${(x.by === S.me.email || S.me.role === 'admin') ? `<button data-act="noteDel" data-id="${x.id}">지우기</button>` : ''}</small></div>`).join('')}</section></div>${nav('friends')}`;
+${(kd?.notes || []).map(x => `<div class="note">${x.kind ? `<span class="tag g" style="align-self:flex-start">${esc(x.kind)}</span>` : ''}<span style="white-space:pre-wrap">${esc(x.text)}</span><small><span>${esc(x.date || '')} · ${esc(x.byName || '')}</span>${(x.by === S.me.email || S.me.role === 'admin') ? `<button data-act="noteDel" data-id="${x.id}">지우기</button>` : ''}</small></div>`).join('')}</section></div>${nav('friends')}`;
 }
 
 /* ---------- 통계 ---------- */
@@ -294,7 +302,7 @@ function classAvg(c, w = 4) {
   return ds.reduce((s, d) => s + presentCount(c, d), 0) / ds.length / kids;
 }
 function vStats() {
-  const c = S.cur; if (!c) return `<div class="scroll">${noClass()}</div>${nav('stats')}`;
+  const c = S.cur; if (!c) return `<div class="scroll"><div class="ttl">교사실</div>${roomTabs('stats')}${noClass()}</div>${nav('room')}`;
   const kids = activeKids(c), total = kids.length, ds = recorded(c).slice(-8);
   const counts = ds.map(d => presentCount(c, d));
   const now = new Date(), mk = `${now.getFullYear()}-${pad(now.getMonth() + 1)}`;
@@ -304,25 +312,25 @@ function vStats() {
   const avgP = total && useDs.length ? Math.round(avgN / total * 100) : null;
   const care = careList(c).filter(x => x.n >= 2);
   const low = kids.map(k => ({ k, r: kidRate(c, k) })).filter(x => x.r !== null).sort((a, b) => a.r - b.r).slice(0, 5);
-  return `<div class="scroll"><div class="ttl">출석 통계</div>${classChips()}
+  return `<div class="scroll cols"><div class="ttl">교사실</div>${roomTabs('stats')}${classChips()}
 <section class="card"><div class="lbl"><span>${esc(S.classes[c].name)} 최근 ${ds.length}주 출석</span></div>${ds.length ? `<div class="chart">${counts.map((n, i) => `<div class="col"><b>${n}</b><i class="${i === counts.length - 1 ? 'cur' : ''}" style="height:${Math.max(4, Math.round(n / Math.max(total, 1) * 100))}px"></i></div>`).join('')}</div><div class="axis">${ds.map(d => { const x = parseD(d); return `<span>${x.getMonth() + 1}/${x.getDate()}</span>`; }).join('')}</div>` : `<div class="sub">출석을 기록하면 여기에 그래프가 나와요.</div>`}</section>
 <div class="twoc"><section class="card"><div class="lbl"><span>${mds.length ? '이번 달 평균' : '최근 4주 평균'}</span></div><div class="bigp">${avgP ?? '-'}<small>%</small></div><div class="s2">${total}명 중 평균 ${Math.round(avgN)}명</div></section>
 <section class="card"><div class="lbl"><span>돌봄 신호</span></div><div class="bigp">${care.length}<small>명</small></div><div class="s2">2주 이상 연속 결석</div></section></div>
 ${low.length ? `<section class="card"><div class="lbl"><span>출석이 적은 친구 (최근 8주)</span></div>${low.map(x => `<button class="hb" style="border:0;background:none;padding:6px 0;cursor:pointer;min-height:44px" data-act="kid" data-id="${x.k.id}"><span class="nm w">${esc(x.k.name)}</span><div class="tr"><i style="width:${Math.round(x.r * 100)}%"></i></div><span class="pc">${Math.round(x.r * 100)}%</span></button>`).join('')}</section>` : ''}
 ${S.myClasses.length > 1 ? `<section class="card"><div class="lbl"><span>반별 비교 (최근 4주 평균)</span></div>${S.myClasses.map(k => { const a = classAvg(k); return `<div class="hb"><span class="nm">${esc(S.classes[k].name)}</span><div class="tr"><i style="width:${a === null ? 0 : Math.round(a * 100)}%"></i></div><span class="pc">${a === null ? '-' : Math.round(a * 100) + '%'}</span></div>`; }).join('')}</section>` : ''}
-<div class="s2">* 비율은 지금 함께하는 친구 수를 기준으로 계산해요.</div></div>${nav('stats')}`;
+<div class="s2">* 비율은 지금 함께하는 친구 수를 기준으로 계산해요.</div></div>${nav('room')}`;
 }
 
 /* ---------- 설정 ---------- */
 function vSettings() {
   const admin = S.me.role === 'admin';
-  return `<div class="scroll"><div class="hd"><button class="back" data-act="back">← 홈</button></div><div class="ttl">설정</div>
+  return `<div class="scroll cols"><div class="hd"><button class="back" data-act="back">← 홈</button></div><div class="ttl">설정</div>
 <section class="card"><div class="lbl"><span>내 정보</span></div><div class="big" style="font-size:22px">${esc(S.me.name || S.user.displayName || '')}</div><div class="sub">${esc(S.user.email)} · ${S.me.owner ? '수퍼관리자' : S.me.director ? '디렉터' : admin ? '관리자' : '교사'}</div><button class="sec" data-act="logout">로그아웃</button></section>
 ${admin ? `
 ${vStaffList()}
 <section class="card"><div class="lbl"><span>시트 데이터 가져오기</span></div><div class="sub">처음에는 joycorner-import.json(전체), 업무 분담·설교 참고만 더할 때는 joycorner-extra.json을 골라 주세요. extra 파일은 아이 정보를 건드리지 않아요.</div><input type="file" id="impFile" accept="application/json,.json" class="in"><div class="pbar hide" id="impBar"><i></i></div><div class="sub" id="impMsg"></div><button class="sec" data-act="runImport">가져오기 시작</button></section>
 <section class="card"><div class="lbl"><span>출석 기록 내려받기</span></div><div class="sub">엑셀로 열 수 있는 파일(CSV)이에요. 백업용으로 좋아요.</div><div class="btns" style="flex-wrap:wrap">${S.myClasses.map(c => `<button class="ghost" data-act="csv" data-id="${c}">${esc(S.classes[c].name)}</button>`).join('')}</div></section>` : ''}
-<div class="s2" style="text-align:center">조이코너 노트 · 아이들의 얼굴과 정보는 로그인한 선생님에게만 보여요</div></div>${nav('home')}`;
+<div class="s2 full" style="text-align:center">조이코너 노트 ${APP_VERSION} · 아이들의 얼굴과 정보는 로그인한 선생님에게만 보여요<br>이 앱에는 카페24(주)가 제공한 Cafe24 동동 글꼴이 적용되어 있어요.</div></div>${nav('home')}`;
 }
 
 function vStaffList() {
@@ -343,7 +351,7 @@ ${total ? '' : '<div class="sub">아직 명단이 없어요. 시트 데이터를
 }
 
 /* ---------- 그리기 ---------- */
-const VIEWS = { home: vHome, attend: vAttend, friends: vFriends, kid: vKid, stats: vStats, settings: vSettings, worship: vWorship };
+const VIEWS = { home: vHome, attend: vAttend, friends: vFriends, kid: vKid, stats: vStats, settings: vSettings, worship: vWorship, room: vRoom, notice: vNotice };
 function paint() {
   if (S.phase === 'setup') { appEl.innerHTML = vSetup(); return; }
   if (S.phase === 'boot') { appEl.innerHTML = '<div class="center"><div class="sub">불러오는 중…</div></div>'; return; }
@@ -351,7 +359,9 @@ function paint() {
   if (S.phase === 'pending') { appEl.innerHTML = vPending(); return; }
   const sc = $('.scroll'), top = sc ? sc.scrollTop : 0, key = S.route + (S.arg || '') + S.cur;
   const sheetEl = $('#sheet');
-  appEl.innerHTML = (VIEWS[S.route] || vHome)();
+  S.navActive = 'home';
+  const view = (VIEWS[S.route] || vHome)();
+  appEl.innerHTML = `<main class="main">${view}</main>${navHtml(S.navActive)}`;
   if (sheetEl) appEl.appendChild(sheetEl);
   const sc2 = $('.scroll');
   if (sc2 && key === S.lastKey) sc2.scrollTop = top;
@@ -364,6 +374,7 @@ function route() {
   ensureAttWatch();
   if (S.route !== 'kid') S.kidFor = null;
   if (S.route === 'worship') loadWorship().then(() => { if (S.route === 'worship') paint(); });
+  if (['room', 'notice', 'stats', 'home'].includes(S.route)) loadRoom().then(() => { if (['room', 'notice', 'home'].includes(S.route)) paint(); });
   if (S.route === 'kid' && S.kidFor !== S.arg) { S.kidData = null; S.kidFor = S.arg; loadKid(S.arg).catch(() => { }); }
   paint();
 }
@@ -468,7 +479,7 @@ async function addKidSave() {
 async function addNote() {
   const text = val('noteText'); if (!text) return toast('내용을 적어 주세요');
   const k = findKid(S.arg); const ref = doc(collection(db, 'careNotes'));
-  const n = { childId: k.id, classId: k.classId, text, date: ymd(new Date()), by: S.me.email, byName: S.me.name || S.user.displayName || '' };
+  const n = { childId: k.id, classId: k.classId, text, kind: S.noteKind || '', date: ymd(new Date()), by: S.me.email, byName: S.me.name || S.user.displayName || '' };
   try { await setDoc(ref, { ...n, createdAt: serverTimestamp() }); S.kidData.notes.unshift({ id: ref.id, ...n }); paint(); toast('기록을 남겼어요'); } catch (e) { toast('저장하지 못했어요'); }
 }
 
@@ -483,7 +494,7 @@ function staffSheet(id) {
 <label class="fld">이름<input class="in" id="s_name" value="${esc(st.name)}"></label>
 <label class="fld">권한<select class="in" id="s_role" ${canManageRoles() ? '' : 'disabled'}><option value="teacher" ${!['admin', 'director'].includes(st.role) ? 'selected' : ''}>교사 (맡은 반만)</option><option value="admin" ${st.role === 'admin' ? 'selected' : ''}>관리자 (전체 내용 수정)</option>${S.me.owner || st.role === 'director' ? `<option value="director" ${st.role === 'director' ? 'selected' : ''}>디렉터 (조이코너 전체 관리 장)</option>` : ''}</select></label>
 <div class="s2">${S.me.owner ? '디렉터는 조이코너 전체를 맡고, 관리자도 지정할 수 있어요.' : canManageRoles() ? '관리자까지 정할 수 있어요. 디렉터는 수퍼관리자가 정해요.' : '권한은 수퍼관리자와 디렉터가 정해요.'}</div>
-<div class="fld">맡은 반</div>${cls.map(c => `<div class="two" style="align-items:center"><span style="font-family:Jua,sans-serif;font-size:18px">${esc(c.name)}</span><select class="in" id="s_cr_${c.id}"><option value="">맡지 않음</option><option value="담임" ${(st.classRole || {})[c.id] === '담임' ? 'selected' : ''}>담임</option><option value="보조" ${(st.classRole || {})[c.id] === '보조' ? 'selected' : ''}>보조</option></select></div>`).join('') || '<div class="s2">반은 데이터를 가져오면 생겨요.</div>'}
+<div class="fld">맡은 반</div>${cls.map(c => `<div class="two" style="align-items:center"><span style="font-size:18px">${esc(c.name)}</span><select class="in" id="s_cr_${c.id}"><option value="">맡지 않음</option><option value="담임" ${(st.classRole || {})[c.id] === '담임' ? 'selected' : ''}>담임</option><option value="보조" ${(st.classRole || {})[c.id] === '보조' ? 'selected' : ''}>보조</option></select></div>`).join('') || '<div class="s2">반은 데이터를 가져오면 생겨요.</div>'}
 <label class="fld">맡은 역할 (쉼표로 구분)<input class="in" id="s_duty" value="${esc((st.duties || []).join(', '))}" placeholder="예: 율동, 기도 인도"></label>
 <label class="fld">구글 계정 이메일 (나중에 넣어도 돼요)<input class="in" id="s_email" type="email" value="${esc(st.email || '')}" placeholder="example@gmail.com"></label>
 <div class="s2">이메일을 넣으면 그 구글 계정으로 로그인할 수 있어요. 지우면 로그인이 막혀요.</div>
@@ -598,14 +609,15 @@ async function loadComments(postId) {
 function vWorship() {
   if (!W.date) W.date = nextSunday();
   const d = W.date, dd = parseD(d);
-  const tabs = [['week', '이번 주'], ['sermon', '설교'], ['songs', '악보'], ['duty', '업무 분담']];
+  if (W.tab === 'duty') W.tab = 'week';
+  const tabs = [['week', '이번 주'], ['sermon', '설교'], ['songs', '악보']];
   const ready = Array.isArray(W.sermons) && Array.isArray(W.duties) && Array.isArray(W.stories) && W.songs[d];
   const head = `<div class="ttl">주일 예배</div>
 <div class="seg">${tabs.map(([k, l]) => `<button class="${W.tab === k ? 'on' : ''}" data-act="wtab" data-id="${k}">${l}</button>`).join('')}</div>
 ${W.tab === 'duty' ? '' : `<div class="weekbar"><button data-act="wweek" data-n="-7" aria-label="지난 주">◀</button><b>${dd.getFullYear() !== new Date().getFullYear() ? dd.getFullYear() + '년 ' : ''}${dd.getMonth() + 1}월 ${dd.getDate()}일 주일${d === nextSunday() ? ' · 이번 주' : ''}</b><button data-act="wweek" data-n="7" aria-label="다음 주">▶</button></div>`}`;
   let body = '<div class="sub">불러오는 중…</div>';
-  if (ready) body = W.tab === 'week' ? wWeek(d) : W.tab === 'sermon' ? wSermon(d) : W.tab === 'songs' ? wSongs(d) : wDuty();
-  return `<div class="scroll">${head}${body}</div>${nav('worship')}`;
+  if (ready) body = W.tab === 'week' ? wWeek(d) : W.tab === 'sermon' ? wSermon(d) : wSongs(d);
+  return `<div class="scroll ${W.tab === 'week' ? 'cols' : 'narrow'}">${head}${body}</div>${nav('worship')}`;
 }
 
 /* 이번 주 */
@@ -708,11 +720,11 @@ async function sermonStatus(d) {
   const patch = { status: d.s }; if (d.s === 'done') { patch.reviewedBy = myName(); patch.reviewedAt = new Date().toISOString(); }
   try { await updateDoc(doc(db, 'sermons', p.id), patch); Object.assign(p, patch); toast(d.s === 'done' ? '점검 완료로 표시했어요' : '점검을 요청했어요'); paint(); } catch (e) { toast('바꾸지 못했어요: ' + errMsg(e)); }
 }
-async function addComment(postId) {
+async function addComment(postId, type) {
   const el = document.getElementById('cm_' + postId), text = (el?.value || '').trim(); if (!text) return toast('댓글을 적어 주세요');
   const ref = doc(collection(db, 'comments'));
   const role = S.me.owner ? '' : S.me.director ? '디렉터' : '';
-  const c = { postId, postType: 'sermon', text, by: S.me.email, byName: myName(), role, at: new Date().toISOString() };
+  const c = { postId, postType: type || 'sermon', text, by: S.me.email, byName: myName(), role, at: new Date().toISOString() };
   try { await setDoc(ref, c); (W.comments[postId] ||= []).push({ id: ref.id, ...c }); paint(); } catch (e) { toast('댓글을 달지 못했어요: ' + errMsg(e)); }
 }
 async function delComment(id, postId) {
@@ -852,6 +864,269 @@ async function dutyDel() {
   try { await deleteDoc(doc(db, 'duties', id)); W.duties = W.duties.filter(y => y.id !== id); closeSheet(); toast('지웠어요'); paint(); } catch (e) { toast('지우지 못했어요: ' + errMsg(e)); }
 }
 
+/* ---------- 교사실 (공지 · 캘린더 · 업무 분담 · 조직도 · 통계) ---------- */
+const APP_VERSION = 'v5';
+const APP_DATE = '2026-11-10';
+const CHANGELOG = [
+  { v: 'v5', date: '11월 10일', items: ['카페24 동동 글꼴로 바꿨어요', '패드·컴퓨터에서는 왼쪽 메뉴와 여러 칸 화면으로 넓게 보여요', '교사실: 공지 게시판(링크·사진), 캘린더, 업무 분담 표, 조직도', '돌봄 기록에 종류(통화·문자·심방·기도제목·특이사항)를 붙일 수 있어요', '홈에서 지금 버전과 바뀐 점을 볼 수 있어요'] },
+  { v: 'v4', date: '11월 10일', items: ['출석 화면 위쪽을 줄였어요', '예배 탭: 이번 주 담당, 설교 올리기·댓글·점검, 주별 악보'] },
+  { v: 'v3', date: '11월 10일', items: ['디렉터 권한 (조이코너 전체 관리 장)'] },
+  { v: 'v2', date: '11월 10일', items: ['교사 명단을 먼저 만들고 구글 계정은 나중에 연결'] },
+  { v: 'v1', date: '11월 10일', items: ['출석, 친구들, 아이 카드, 통계, 시트 데이터 가져오기'] }
+];
+const R = { tab: 'notice', notices: null, events: null, month: null, day: null, editNotice: null, editEvent: null, dutyView: 'table', imgs: {} };
+const ROOM_TABS = [['notice', '공지'], ['cal', '캘린더'], ['duty', '업무 분담'], ['org', '조직도'], ['stats', '통계']];
+const roomTabs = active => `<div class="seg">${ROOM_TABS.map(([k, l]) => `<button class="${active === k ? 'on' : ''}" data-act="rtab" data-id="${k}">${l}</button>`).join('')}</div>`;
+const NOTE_KINDS = ['통화', '문자', '심방', '기도제목', '특이사항'];
+
+async function loadNotices() {
+  try { const s = await getDocs(collection(db, 'notices')); R.notices = s.docs.map(d => ({ id: d.id, ...d.data() })); } catch { R.notices = []; }
+}
+async function loadEvents() {
+  try { const s = await getDocs(collection(db, 'events')); R.events = s.docs.map(d => ({ id: d.id, ...d.data() })); } catch { R.events = []; }
+}
+async function loadDuties() {
+  if (Array.isArray(W.duties)) return;
+  try { const s = await getDocs(collection(db, 'duties')); W.duties = s.docs.map(d => ({ id: d.id, ...d.data() })).sort((a, b) => (a.order ?? 999) - (b.order ?? 999)); } catch { W.duties = []; }
+}
+async function loadRoom() {
+  const jobs = [];
+  if (R.notices === null) { R.notices = undefined; jobs.push(loadNotices()); }
+  if (R.events === null) { R.events = undefined; jobs.push(loadEvents()); }
+  if (W.duties === null) { W.duties = undefined; jobs.push((async () => { W.duties = null; await loadDuties(); })()); }
+  await Promise.all(jobs);
+}
+const sortedNotices = () => (R.notices || []).slice().sort((a, b) => (b.pinned ? 1 : 0) - (a.pinned ? 1 : 0) || ko(b.at || '', a.at || ''));
+
+function vRoom() {
+  const ready = Array.isArray(R.notices) && Array.isArray(R.events) && Array.isArray(W.duties);
+  const body = !ready ? '<div class="sub full">불러오는 중…</div>' : R.tab === 'cal' ? rCal() : R.tab === 'duty' ? rDuty() : R.tab === 'org' ? rOrg() : rNotices();
+  const cols = R.tab === 'notice' ? 'cols' : '';
+  return `<div class="scroll ${cols}"><div class="ttl">교사실</div>${roomTabs(R.tab)}${body}</div>${nav('room')}`;
+}
+
+/* 공지 */
+function rNotices() {
+  const list = sortedNotices(), admin = isAdminMe();
+  return `${admin ? '<button class="cta full" data-act="noticeNew">+ 공지 올리기</button>' : ''}
+${list.length ? list.map(n => `<button class="card tapcard ncard" data-act="noticeOpen" data-id="${n.id}">${n.thumb ? `<img class="nthumb" src="${n.thumb}" alt="">` : ''}<div class="lbl"><span>${n.pinned ? '📌 ' : ''}${esc(n.category || '공지')}${n.eventDate ? ' · ' + fmtMD(n.eventDate) : ''}</span><span class="s2">${esc((n.at || '').slice(5, 10).replace('-', '/'))}</span></div><div class="big" style="font-size:21px">${esc(n.title)}</div><div class="clamp">${esc(n.body || '')}</div><div class="s2">${esc(n.authorName || '')}${n.imgCount ? ` · 사진 ${n.imgCount}장` : ''}${n.links ? ' · 링크' : ''}</div></button>`).join('') : '<div class="sub full">아직 공지가 없어요.</div>'}`;
+}
+function vNotice() {
+  const n = (R.notices || []).find(x => x.id === S.arg);
+  if (!n) return `<div class="scroll"><button class="back" data-act="go" data-to="room">← 교사실</button><div class="sub">${Array.isArray(R.notices) ? '공지를 찾을 수 없어요.' : '불러오는 중…'}</div></div>${nav('room')}`;
+  const admin = isAdminMe();
+  for (let i = 0; i < (n.imgCount || 0); i++) {
+    const k = n.id + '_' + i;
+    if (!(k in R.imgs)) { R.imgs[k] = null; getDoc(doc(db, 'noticeImages', k)).then(s => { R.imgs[k] = s.exists() ? s.data().data : ''; if (S.route === 'notice') paint(); }).catch(() => { R.imgs[k] = ''; }); }
+  }
+  return `<div class="scroll narrow"><div class="hd"><button class="back" data-act="go" data-to="room">← 교사실</button>${admin ? `<button class="sec" style="min-height:44px" data-act="noticeEdit" data-id="${n.id}">고치기</button>` : ''}</div>
+<div class="chips"><span class="tag">${esc(n.category || '공지')}</span>${n.pinned ? '<span class="tag g">위에 고정</span>' : ''}</div>
+<div class="ttl">${esc(n.title)}</div><div class="sub">${esc(n.authorName || '')} · ${esc((n.at || '').slice(0, 10))}</div>
+${n.eventDate ? `<section class="card"><div class="lbl"><span>행사 날짜</span></div><div class="big" style="font-size:22px">${fmtMD(n.eventDate)} ${DOW[parseD(n.eventDate).getDay()]}요일${n.eventTime ? ' ' + esc(n.eventTime) : ''}</div><div class="btns"><a class="ghost alink" href="${gcalUrl({ title: n.title, date: n.eventDate, time: n.eventTime, memo: n.body })}" target="_blank" rel="noopener">구글 캘린더에 추가</a><button class="ghost" data-act="calGo" data-id="${n.eventDate}">앱 캘린더에서 보기</button></div></section>` : ''}
+${n.body ? `<div class="post">${linkify(n.body)}</div>` : ''}
+${n.links ? `<section class="card"><div class="lbl"><span>링크</span></div><div class="post">${linkify(n.links)}</div></section>` : ''}
+${Array.from({ length: n.imgCount || 0 }, (_, i) => { const u = R.imgs[n.id + '_' + i]; return u ? `<img class="score" src="${u}" alt="${esc(n.title)} 사진 ${i + 1}">` : '<div class="sub">사진 불러오는 중…</div>'; }).join('')}
+${commentBlock(n.id, 'notice')}</div>${nav('room')}`;
+}
+function commentBlock(postId, type) {
+  if (!(postId in W.comments)) { W.comments[postId] = null; loadComments(postId).then(() => paint()); }
+  const cm = W.comments[postId], admin = isAdminMe();
+  return `<section class="card"><div class="lbl"><span>댓글 ${cm ? cm.length : ''}</span></div>
+${cm === null ? '<div class="s2">불러오는 중…</div>' : cm.map(c => `<div class="note"><span style="white-space:pre-wrap">${linkify(c.text)}</span><small><span>${esc(c.byName || '')}${c.role ? ' · ' + esc(c.role) : ''} · ${esc((c.at || '').slice(5, 10).replace('-', '/'))}</span>${c.by === S.me.email || admin ? `<button data-act="cmDel" data-id="${c.id}" data-p="${postId}">지우기</button>` : ''}</small></div>`).join('')}
+<textarea id="cm_${postId}" placeholder="댓글을 남겨 주세요" style="min-height:64px"></textarea><button class="sec" data-act="cmAdd" data-id="${postId}" data-t="${type}">댓글 달기</button></section>`;
+}
+function noticeSheet(id) {
+  const n = id ? R.notices.find(x => x.id === id) : { category: '공지', title: '', body: '', links: '', eventDate: '', eventTime: '', pinned: false };
+  if (!n) return;
+  R.editNotice = id || null;
+  sheet(`<div class="ttl" style="font-size:24px">${id ? '공지 고치기' : '공지 올리기'}</div>
+<div class="two"><label class="fld">종류<select class="in" id="n_cat">${['공지', '행사', '자료', '기도'].map(c => `<option ${n.category === c ? 'selected' : ''}>${c}</option>`).join('')}</select></label><label class="chk" style="align-self:end"><input type="checkbox" id="n_pin" ${n.pinned ? 'checked' : ''}>맨 위에 고정</label></div>
+<label class="fld">제목<input class="in" id="n_title" value="${esc(n.title)}"></label>
+<label class="fld">내용<textarea id="n_body" style="min-height:180px">${esc(n.body || '')}</textarea></label>
+<label class="fld">링크 (한 줄에 하나씩)<textarea id="n_links" style="min-height:60px" placeholder="https://">${esc(n.links || '')}</textarea></label>
+<div class="two"><label class="fld">행사 날짜 (있으면)<input class="in" type="date" id="n_date" value="${esc(n.eventDate || '')}"></label><label class="fld">시간<input class="in" id="n_time" value="${esc(n.eventTime || '')}" placeholder="예: 13:30"></label></div>
+<label class="fld">사진 (최대 4장${id && n.imgCount ? ` · 지금 ${n.imgCount}장, 새로 고르면 바뀌어요` : ''})<input class="in" type="file" id="n_files" accept="image/*" multiple></label>
+<div class="sub" id="n_msg"></div>
+<div class="btns"><button class="pri" data-act="noticeSave">저장</button><button class="sec" data-act="sheetClose">취소</button></div>
+${id ? '<button class="ghost danger" data-act="noticeDel">공지 지우기</button>' : ''}`);
+}
+async function shrink(file, max, limit, q = 0.82) {
+  const bmp = await createImageBitmap(file, { imageOrientation: 'from-image' });
+  let url = '';
+  for (let i = 0; i < 7; i++) {
+    const k = Math.min(1, max / Math.max(bmp.width, bmp.height));
+    const c = document.createElement('canvas'); c.width = Math.round(bmp.width * k); c.height = Math.round(bmp.height * k);
+    const x = c.getContext('2d'); x.fillStyle = '#fff'; x.fillRect(0, 0, c.width, c.height); x.drawImage(bmp, 0, 0, c.width, c.height);
+    url = c.toDataURL('image/jpeg', q);
+    if (url.length < limit) return url;
+    max = Math.round(max * 0.85); q = Math.max(0.5, q - 0.06);
+  }
+  return url;
+}
+async function noticeSave() {
+  const id = R.editNotice, old = id ? R.notices.find(x => x.id === id) : null;
+  const title = val('n_title'); if (!title) return toast('제목을 적어 주세요');
+  const files = [...($('#n_files')?.files || [])].slice(0, 4);
+  const ref = id ? doc(db, 'notices', id) : doc(collection(db, 'notices'));
+  const data = { category: val('n_cat'), title, body: $('#n_body').value, links: $('#n_links').value.trim(), eventDate: val('n_date'), eventTime: val('n_time'), pinned: $('#n_pin').checked,
+    imgCount: old ? (old.imgCount || 0) : 0, thumb: old ? (old.thumb || '') : '', authorEmail: old ? old.authorEmail : S.me.email, authorName: old ? old.authorName : myName(), at: old ? old.at : new Date().toISOString() };
+  const msg = $('#n_msg');
+  try {
+    if (files.length) {
+      for (let i = 0; i < files.length; i++) {
+        msg.textContent = `사진 올리는 중… ${i + 1}/${files.length}`;
+        const url = await shrink(files[i], 1400, 800000);
+        await setDoc(doc(db, 'noticeImages', `${ref.id}_${i}`), { noticeId: ref.id, n: i, data: url });
+        R.imgs[`${ref.id}_${i}`] = url;
+        if (i === 0) data.thumb = await shrink(files[i], 360, 60000, 0.7);
+      }
+      for (let i = files.length; i < (old?.imgCount || 0); i++) { await deleteDoc(doc(db, 'noticeImages', `${ref.id}_${i}`)).catch(() => { }); delete R.imgs[`${ref.id}_${i}`]; }
+      data.imgCount = files.length;
+    }
+    await setDoc(ref, data);
+    if (old) Object.assign(old, data); else R.notices.push({ id: ref.id, ...data });
+    closeSheet(); toast('공지를 올렸어요'); go('notice/' + ref.id);
+  } catch (e) { msg.textContent = ''; toast('저장하지 못했어요: ' + errMsg(e)); }
+}
+async function noticeDel() {
+  const id = R.editNotice, n = R.notices.find(x => x.id === id); if (!n) return;
+  try {
+    for (let i = 0; i < (n.imgCount || 0); i++) await deleteDoc(doc(db, 'noticeImages', `${id}_${i}`)).catch(() => { });
+    await deleteDoc(doc(db, 'notices', id)); R.notices = R.notices.filter(x => x.id !== id); closeSheet(); toast('지웠어요'); go('room');
+  } catch (e) { toast('지우지 못했어요: ' + errMsg(e)); }
+}
+
+/* 캘린더 */
+function gcalUrl(e) {
+  const d = (e.date || '').replace(/-/g, '');
+  let dates;
+  const m = /^(\d{1,2}):(\d{2})/.exec(e.time || '');
+  if (m) { const st = `${d}T${pad(m[1])}${m[2]}00`; const end = new Date(parseD(e.date).getTime()); end.setHours(Number(m[1]) + 1, Number(m[2])); dates = `${st}/${ymd(end).replace(/-/g, '')}T${pad(end.getHours())}${pad(end.getMinutes())}00`; }
+  else dates = `${d}/${addDays(e.date, 1).replace(/-/g, '')}`;
+  const p = new URLSearchParams({ action: 'TEMPLATE', text: e.title || '', dates, details: (e.memo || '').slice(0, 500), location: e.place || '', ctz: 'Asia/Seoul' });
+  return 'https://calendar.google.com/calendar/render?' + p.toString();
+}
+function itemsOn(d) {
+  const out = [];
+  const s = schedFor(d);
+  if (s) out.push({ kind: 'sun', label: s.noService ? '조이코너 예배 없음' : (s.story || '주일 예배'), sub: s.preacher ? '설교 ' + s.preacher : '' });
+  (R.notices || []).filter(n => n.eventDate === d).forEach(n => out.push({ kind: 'evt', label: n.title, sub: n.eventTime || '', notice: n.id }));
+  (R.events || []).filter(e => e.date === d).forEach(e => out.push({ kind: e.kind === '회의' ? 'meet' : 'evt', label: e.title, sub: [e.time, e.place].filter(Boolean).join(' · '), event: e.id }));
+  const md = d.slice(5);
+  allKids().filter(k => (k.status || 'active') === 'active' && k.birth && k.birth.slice(5) === md).forEach(k => out.push({ kind: 'bday', label: k.name + ' 생일', sub: S.classes[k.classId]?.name || '', kid: k.id }));
+  return out;
+}
+function rCal() {
+  const today = ymd(new Date());
+  if (!R.month) R.month = today.slice(0, 7);
+  if (!R.day) R.day = today;
+  const [y, m] = R.month.split('-').map(Number);
+  const first = new Date(y, m - 1, 1), start = new Date(first); start.setDate(1 - first.getDay());
+  const cells = [];
+  for (let i = 0; i < 42; i++) { const d = new Date(start); d.setDate(start.getDate() + i); cells.push(ymd(d)); }
+  const weeks = cells[35].slice(0, 7) === R.month ? 6 : 5;
+  const day = itemsOn(R.day), dd = parseD(R.day);
+  const upcoming = [];
+  for (let i = 0; i < 21; i++) { const d = addDays(today, i); itemsOn(d).filter(x => x.kind !== 'sun').forEach(x => upcoming.push({ d, ...x })); }
+  const itemRow = (x, d) => `<button class="row calrow" data-act="${x.notice ? 'noticeOpen' : x.kid ? 'kid' : x.event ? 'eventEdit' : 'calDay'}" data-id="${x.notice || x.kid || x.event || d}"><i class="cdot ${x.kind}"></i><span class="grow"><span style="font-size:16px">${esc(x.label)}</span>${x.sub ? `<span class="sub">${esc(x.sub)}</span>` : ''}</span>${d ? `<span class="s2">${parseD(d).getMonth() + 1}/${parseD(d).getDate()}</span>` : ''}</button>`;
+  return `<div class="calwrap full"><section class="card cal"><div class="calhead"><button data-act="calMonth" data-n="-1" aria-label="지난 달">◀</button><b>${y}년 ${m}월</b><button data-act="calMonth" data-n="1" aria-label="다음 달">▶</button></div>
+<div class="cgrid">${'일월화수목금토'.split('').map((w, i) => `<span class="cw ${i === 0 ? 'sun' : ''}">${w}</span>`).join('')}
+${cells.slice(0, weeks * 7).map(d => { const it = itemsOn(d); const out = d.slice(0, 7) !== R.month; return `<button class="cday ${out ? 'out' : ''} ${d === today ? 'today' : ''} ${d === R.day ? 'sel' : ''} ${parseD(d).getDay() === 0 ? 'sun' : ''}" data-act="calDay" data-id="${d}"><span class="dn">${parseD(d).getDate()}</span><span class="dots">${it.slice(0, 4).map(x => `<i class="cdot ${x.kind}"></i>`).join('')}</span><span class="clab">${it.slice(0, 2).map(x => `<em class="${x.kind}">${esc(x.label)}</em>`).join('')}</span></button>`; }).join('')}</div>
+<div class="legend"><span><i class="cdot sun"></i>주일</span><span><i class="cdot evt"></i>행사</span><span><i class="cdot meet"></i>회의</span><span><i class="cdot bday"></i>생일</span></div></section>
+<div class="calside"><section class="card"><div class="lbl"><span>${dd.getMonth() + 1}월 ${dd.getDate()}일 ${DOW[dd.getDay()]}요일</span><button class="linkbtn" data-act="eventNew">+ 일정 추가</button></div>${day.length ? day.map(x => itemRow(x)).join('') : '<div class="sub">일정이 없어요.</div>'}</section>
+<section class="card"><div class="lbl"><span>다가오는 3주</span></div>${upcoming.length ? upcoming.slice(0, 12).map(x => itemRow(x, x.d)).join('') : '<div class="sub">다가오는 행사·생일이 없어요.</div>'}</section></div></div>`;
+}
+function eventSheet(id) {
+  const e = id ? R.events.find(x => x.id === id) : { title: '', date: R.day || ymd(new Date()), time: '', place: '', memo: '', kind: '행사' };
+  if (!e) return;
+  const can = !id || e.by === S.me.email || isAdminMe();
+  R.editEvent = id || null;
+  sheet(`<div class="ttl" style="font-size:24px">${id ? (can ? '일정 고치기' : '일정') : '일정 추가'}</div>
+<label class="fld">제목<input class="in" id="e2_title" value="${esc(e.title)}" ${can ? '' : 'disabled'}></label>
+<div class="two"><label class="fld">날짜<input class="in" type="date" id="e2_date" value="${esc(e.date)}" ${can ? '' : 'disabled'}></label><label class="fld">시간<input class="in" id="e2_time" value="${esc(e.time || '')}" placeholder="예: 13:30" ${can ? '' : 'disabled'}></label></div>
+<div class="two"><label class="fld">종류<select class="in" id="e2_kind" ${can ? '' : 'disabled'}>${['행사', '회의', '교육', '기타'].map(k => `<option ${e.kind === k ? 'selected' : ''}>${k}</option>`).join('')}</select></label><label class="fld">장소<input class="in" id="e2_place" value="${esc(e.place || '')}" ${can ? '' : 'disabled'}></label></div>
+<label class="fld">메모<textarea id="e2_memo" style="min-height:70px" ${can ? '' : 'disabled'}>${esc(e.memo || '')}</textarea></label>
+${id ? `<a class="ghost alink" href="${gcalUrl(e)}" target="_blank" rel="noopener">구글 캘린더에 추가</a>${e.byName ? `<div class="s2">올린 사람 · ${esc(e.byName)}</div>` : ''}` : ''}
+<div class="btns">${can ? '<button class="pri" data-act="eventSave">저장</button>' : ''}<button class="sec" data-act="sheetClose">${can ? '취소' : '닫기'}</button></div>
+${id && can ? '<button class="ghost danger" data-act="eventDel">일정 지우기</button>' : ''}`);
+}
+async function eventSave() {
+  const id = R.editEvent, old = id ? R.events.find(x => x.id === id) : null;
+  const title = val('e2_title'); if (!title) return toast('제목을 적어 주세요');
+  const data = { title, date: val('e2_date') || R.day, time: val('e2_time'), kind: val('e2_kind'), place: val('e2_place'), memo: $('#e2_memo').value.trim(), by: old ? old.by : S.me.email, byName: old ? old.byName : myName() };
+  const ref = id ? doc(db, 'events', id) : doc(collection(db, 'events'));
+  try { await setDoc(ref, data); if (old) Object.assign(old, data); else R.events.push({ id: ref.id, ...data }); R.day = data.date; R.month = data.date.slice(0, 7); closeSheet(); toast('저장했어요'); paint(); } catch (e) { toast('저장하지 못했어요: ' + errMsg(e)); }
+}
+async function eventDel() {
+  const id = R.editEvent;
+  try { await deleteDoc(doc(db, 'events', id)); R.events = R.events.filter(x => x.id !== id); closeSheet(); toast('지웠어요'); paint(); } catch (e) { toast('지우지 못했어요: ' + errMsg(e)); }
+}
+
+/* 업무 분담 (한눈에) */
+function rDuty() {
+  const me = myName(), list = W.duties, admin = isAdminMe();
+  const empty = list.filter(x => !(x.people || []).length);
+  const toggle = `<div class="seg full" style="max-width:420px"><button class="${R.dutyView === 'table' ? 'on' : ''}" data-act="dutyView" data-id="table">역할별 표</button><button class="${R.dutyView === 'people' ? 'on' : ''}" data-act="dutyView" data-id="people">사람별</button></div>`;
+  const top = `${empty.length ? `<div class="note full">담당이 비어 있는 자리 ${empty.length}곳 · ${empty.map(x => esc(x.role)).join(', ')}</div>` : ''}`;
+  if (R.dutyView === 'people') return toggle + top + dutyPeople();
+  const secs = ['예배 전', '예배 시', '예배 후'];
+  return `${toggle}${top}<div class="tablewrap full"><table class="dtable"><thead><tr><th class="hide-m">구분</th><th>역할</th><th>담당</th><th class="hide-m">비고</th></tr></thead>
+${secs.map(sec => { const l = list.filter(x => (x.section || '예배 시') === sec); if (!l.length) return ''; return `<tbody><tr class="secrow"><td colspan="4">${sec}</td></tr>${l.map(x => `<tr class="${admin ? 'click' : ''} ${(x.people || []).length ? '' : 'emptyrow'}" ${admin ? `data-act="dutyEdit" data-id="${x.id}"` : ''}><td class="area hide-m">${esc(x.area)}</td><td>${x.area !== x.role ? `<div class="desc show-m">${esc(x.area)}</div>` : ''}<b>${esc(x.role)}</b><div class="desc">${esc(x.desc || '')}</div>${x.note ? `<div class="desc show-m">※ ${esc(x.note)}</div>` : ''}</td><td>${(x.people || []).length ? x.people.map(n => `<span class="chip sm ${n === me ? 'mine' : ''}">${esc(n)}</span>`).join(' ') : '<span class="tag">담당 필요</span>'}</td><td class="hide-m desc">${esc(x.note || '')}</td></tr>`).join('')}</tbody>`; }).join('')}
+</table></div>${admin ? '<button class="sec full" data-act="dutyEdit">+ 역할 추가</button>' : ''}${list.length ? '' : '<div class="sub full">업무 분담이 아직 없어요. 설정에서 joycorner-extra.json을 가져와 주세요.</div>'}`;
+}
+function dutyPeople() {
+  const list = W.duties, me = myName();
+  const names = [...S.staff.map(x => x.name)];
+  list.forEach(x => (x.people || []).forEach(n => { if (!names.includes(n)) names.push(n); }));
+  const cards = names.map(n => {
+    const st = S.staff.find(x => x.name === n);
+    const roles = list.filter(x => (x.people || []).includes(n));
+    const cls = st ? Object.entries(st.classRole || {}).map(([c, r]) => `${S.classes[c]?.name || c} ${r}`) : [];
+    return `<section class="card pcard ${n === me ? 'mecard' : ''}"><div class="lbl"><span class="big" style="font-size:20px;color:#3B2A1E">${esc(n)}</span><span class="s2">${roles.length}개</span></div>
+${st && st.role !== 'teacher' ? `<span class="tag" style="align-self:flex-start">${roleLabel(st)}</span>` : ''}${cls.length ? `<div class="chips">${cls.map(c => `<span class="chip sm" style="background:#FDE3E1;color:#8E1B1B">${esc(c)}</span>`).join('')}</div>` : ''}
+${roles.length ? `<div class="chips">${roles.map(x => `<span class="chip sm">${esc(x.role)}</span>`).join('')}</div>` : '<div class="s2">맡은 역할 없음</div>'}</section>`;
+  });
+  return `<div class="pgrid full">${cards.join('')}</div>`;
+}
+
+/* 조직도 */
+function rOrg() {
+  const cls = Object.values(S.classes).sort((a, b) => a.age - b.age);
+  const dirs = S.staff.filter(x => x.role === 'director'), admins = S.staff.filter(x => x.role === 'admin');
+  const box = (title, lines, cls2 = '') => `<div class="obox ${cls2}"><b>${title}</b>${lines.filter(Boolean).map(l => `<span>${l}</span>`).join('')}</div>`;
+  const classBoxes = cls.map(c => { const cs = classStaff(c.id); const n = S.kids[c.id] ? activeKids(c.id).length : null; return box(esc(c.name), [cs.homeroom.length ? '담임 ' + cs.homeroom.map(esc).join(', ') : '담임 미정', cs.assistants.length ? '보조 ' + cs.assistants.map(esc).join(', ') : '', n !== null ? `아이 ${n}명` : '']); }).join('');
+  // 사역팀: 업무 분담의 '구분'으로 묶기
+  const teams = {};
+  (W.duties || []).forEach(x => { (teams[x.area] ||= []).push(x); });
+  const teamBoxes = Object.entries(teams).map(([area, l]) => box(esc(area), l.map(x => `${esc(x.role)} · ${(x.people || []).length ? x.people.map(esc).join(', ') : '<em class="need">담당 필요</em>'}`), 'team')).join('');
+  const rows = cls.map(c => { const cs = classStaff(c.id); const n = S.kids[c.id] ? activeKids(c.id).length : null; const a = S.kids[c.id] ? classAvg(c.id) : null; return `<tr><td><b>${esc(c.name)}</b></td><td>${cs.homeroom.map(esc).join(', ') || '-'}</td><td>${cs.assistants.map(esc).join(', ') || '-'}</td><td>${n ?? '-'}</td><td>${a === null ? '-' : Math.round(a * 100) + '%'}</td></tr>`; }).join('');
+  return `<section class="card full org"><div class="otop">${box('조이코너', [`교사 ${S.staff.length}명`, `아이 ${allKids().filter(k => (k.status || 'active') === 'active').length}명${S.me.role === 'admin' ? '' : ' (내 반)'}`], 'root')}</div>
+<div class="oline"></div><div class="otop">${box('디렉터', dirs.length ? dirs.map(x => esc(x.name)) : ['정해 주세요'], 'dir')}</div>
+${admins.length ? `<div class="oline"></div><div class="otop">${box('관리자', admins.map(x => esc(x.name)), 'adm')}</div>` : ''}
+<div class="oline"></div><div class="orow">${classBoxes}</div></section>
+<section class="card full"><div class="lbl"><span>반별 한눈에</span></div><div class="tablewrap"><table class="dtable"><thead><tr><th>반</th><th>담임</th><th>보조</th><th>아이</th><th>최근 4주 출석</th></tr></thead><tbody>${rows}</tbody></table></div></section>
+<section class="card full"><div class="lbl"><span>사역팀 (업무 분담 기준)</span></div><div class="orow teams">${teamBoxes || '<div class="sub">업무 분담을 가져오면 사역팀이 보여요.</div>'}</div></section>`;
+}
+
+/* 홈에 붙는 조각 */
+function homeNoticeCard() {
+  const l = sortedNotices().slice(0, 3);
+  if (!l.length) return '';
+  return `<section class="card"><div class="lbl"><span>공지</span><button class="linkbtn" data-act="rtab" data-id="notice">전체 보기</button></div>${l.map(n => `<button class="row calrow" data-act="noticeOpen" data-id="${n.id}"><span class="grow"><span style="font-size:16px">${n.pinned ? '📌 ' : ''}${esc(n.title)}</span><span class="sub">${esc(n.category || '공지')}${n.eventDate ? ' · ' + fmtMD(n.eventDate) : ''}</span></span></button>`).join('')}</section>`;
+}
+function homeEventsCard() {
+  const today = ymd(new Date()), out = [];
+  for (let i = 0; i < 14; i++) { const d = addDays(today, i); itemsOn(d).filter(x => x.kind === 'evt' || x.kind === 'meet').forEach(x => out.push({ d, ...x })); }
+  if (!out.length) return '';
+  return `<section class="card"><div class="lbl"><span>다가오는 일정 (2주)</span><button class="linkbtn" data-act="rtab" data-id="cal">캘린더</button></div>${out.slice(0, 5).map(x => `<div class="bday"><span class="d">${parseD(x.d).getMonth() + 1}/${parseD(x.d).getDate()}</span><span>${esc(x.label)}${x.sub ? ` <span class="s2">${esc(x.sub)}</span>` : ''}</span></div>`).join('')}</section>`;
+}
+function versionCard() {
+  return `<button class="vcard full" data-act="changelog"><span>조이코너 노트 <b>${APP_VERSION}</b> · ${parseD(APP_DATE).getMonth() + 1}월 ${parseD(APP_DATE).getDate()}일 업데이트</span><span class="linkbtn">바뀐 점 보기</span></button>`;
+}
+function changelogSheet() {
+  sheet(`<div class="ttl" style="font-size:24px">업데이트 기록</div>${CHANGELOG.map(c => `<section class="card"><div class="lbl"><span>${c.v} · ${c.date}</span>${c.v === APP_VERSION ? '<span class="tag g">지금 버전</span>' : ''}</div><ul class="ul">${c.items.map(i => `<li>${esc(i)}</li>`).join('')}</ul></section>`).join('')}<button class="sec" data-act="sheetClose">닫기</button><div class="s2" style="text-align:center">이 앱에는 카페24(주)가 제공한 Cafe24 동동 글꼴이 적용되어 있어요.</div>`);
+}
+
 /* ---------- 클릭 처리 ---------- */
 const ACT = {
   login: async () => { try { await signInWithPopup(auth, new GoogleAuthProvider()); } catch (e) { if (e.code !== 'auth/popup-closed-by-user') toast('로그인하지 못했어요: ' + (e.code || e.message)); } },
@@ -882,9 +1157,18 @@ const ACT = {
   wgo: async d => { W.date = d.id; W.tab = 'sermon'; paint(); await loadSongs(W.date); paint(); },
   schedEdit: schedSheet, schedSave,
   sermonNew: () => sermonSheet(null), sermonEdit: d => sermonSheet(d.id), sermonSave, sermonDel, sermonStatus,
-  cmAdd: d => addComment(d.id), cmDel: d => delComment(d.id, d.p),
+  cmAdd: d => addComment(d.id, d.t), cmDel: d => delComment(d.id, d.p),
   slSave, songNew: () => songSheet(null), songEdit: d => songSheet(d.id), songSave, songDel, songView: d => songView(d.id), songMove: d => songMove(d.id, Number(d.n)),
-  dutyEdit: d => dutySheet(d.id), dutySave, dutyDel
+  dutyEdit: d => dutySheet(d.id), dutySave, dutyDel,
+  rtab: d => { if (d.id === 'stats') return go('stats'); R.tab = d.id; if (S.route === 'room') paint(); else go('room'); },
+  noticeNew: () => noticeSheet(null), noticeOpen: d => go('notice/' + d.id), noticeEdit: d => noticeSheet(d.id), noticeSave, noticeDel,
+  calMonth: d => { const [y, m] = R.month.split('-').map(Number); const n = new Date(y, m - 1 + Number(d.n), 1); R.month = `${n.getFullYear()}-${pad(n.getMonth() + 1)}`; paint(); },
+  calDay: d => { R.day = d.id; R.month = d.id.slice(0, 7); paint(); },
+  calGo: d => { R.tab = 'cal'; R.day = d.id; R.month = d.id.slice(0, 7); go('room'); },
+  eventNew: () => eventSheet(null), eventEdit: d => eventSheet(d.id), eventSave, eventDel,
+  dutyView: d => { R.dutyView = d.id; paint(); },
+  changelog: changelogSheet,
+  noteKind: d => { S.noteKind = S.noteKind === d.id ? '' : d.id; document.querySelectorAll('.kindbtn').forEach(b => b.classList.toggle('on', b.dataset.id === S.noteKind)); }
 };
 appEl.addEventListener('click', e => {
   const t = e.target.closest('[data-act]'); if (!t) return;
