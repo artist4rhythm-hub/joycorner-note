@@ -115,7 +115,10 @@ function classStaff(c) {
   const l = S.staff.filter(x => (x.classes || []).includes(c));
   return { homeroom: l.filter(x => (x.classRole || {})[c] === '담임').map(x => x.name), assistants: l.filter(x => (x.classRole || {})[c] !== '담임').map(x => x.name) };
 }
-const roleLabel = st => st.role === 'admin' ? '관리자' : '교사';
+const roleLabel = st => st.role === 'director' ? '디렉터' : st.role === 'admin' ? '관리자' : '교사';
+const canManageRoles = () => !!(S.me.owner || S.me.director);
+// 내가 이 사람의 권한을 바꿀 수 있는가 (수퍼관리자 > 디렉터 > 관리자 > 교사)
+const canEditStaff = st => S.me.owner || (S.me.director ? st.role !== 'director' : !['admin', 'director'].includes(st.role));
 function upcomingBirthdays(c) {
   const today = new Date(); today.setHours(0, 0, 0, 0);
   return activeKids(c).filter(k => k.birth).map(k => {
@@ -312,7 +315,7 @@ ${S.myClasses.length > 1 ? `<section class="card"><div class="lbl"><span>반별 
 function vSettings() {
   const admin = S.me.role === 'admin';
   return `<div class="scroll"><div class="hd"><button class="back" data-act="back">← 홈</button></div><div class="ttl">설정</div>
-<section class="card"><div class="lbl"><span>내 정보</span></div><div class="big" style="font-size:22px">${esc(S.me.name || S.user.displayName || '')}</div><div class="sub">${esc(S.user.email)} · ${S.me.owner ? '수퍼관리자' : admin ? '관리자' : '교사'}</div><button class="sec" data-act="logout">로그아웃</button></section>
+<section class="card"><div class="lbl"><span>내 정보</span></div><div class="big" style="font-size:22px">${esc(S.me.name || S.user.displayName || '')}</div><div class="sub">${esc(S.user.email)} · ${S.me.owner ? '수퍼관리자' : S.me.director ? '디렉터' : admin ? '관리자' : '교사'}</div><button class="sec" data-act="logout">로그아웃</button></section>
 ${admin ? `
 ${vStaffList()}
 <section class="card"><div class="lbl"><span>시트 데이터 가져오기</span></div><div class="sub">안내서의 joycorner-import.json 파일을 골라 주세요. 처음 한 번만 하면 돼요.</div><input type="file" id="impFile" accept="application/json,.json" class="in"><div class="pbar hide" id="impBar"><i></i></div><div class="sub" id="impMsg"></div><button class="sec" data-act="runImport">가져오기 시작</button></section>
@@ -322,16 +325,17 @@ ${vStaffList()}
 
 function vStaffList() {
   const total = S.staff.length, linked = S.staff.filter(x => x.email).length;
-  const row = (st, c) => `<button class="row" data-act="staff" data-id="${st.id}"><span class="grow"><span class="nm">${esc(st.name)}${c ? ` <span class="tag ${(st.classRole || {})[c] === '담임' ? '' : 'g'}">${esc((st.classRole || {})[c] || '보조')}</span>` : ''}${st.role === 'admin' ? ' <span class="tag">관리자</span>' : ''}</span><span class="sub">${esc((st.duties || []).join(' · ') || '맡은 역할 없음')}</span></span><span class="chip sm" style="${st.email ? 'background:#DDF1E3;color:#1E6B3E' : ''}">${st.email ? '구글 연결됨' : '연결 전'}</span></button>`;
+  const row = (st, c) => `<button class="row" data-act="staff" data-id="${st.id}"><span class="grow"><span class="nm">${esc(st.name)}${c ? ` <span class="tag ${(st.classRole || {})[c] === '담임' ? '' : 'g'}">${esc((st.classRole || {})[c] || '보조')}</span>` : ''}${st.role === 'admin' || st.role === 'director' ? ` <span class="tag">${roleLabel(st)}</span>` : ''}</span><span class="sub">${esc((st.duties || []).join(' · ') || '맡은 역할 없음')}</span></span><span class="chip sm" style="${st.email ? 'background:#DDF1E3;color:#1E6B3E' : ''}">${st.email ? '구글 연결됨' : '연결 전'}</span></button>`;
   const cls = Object.values(S.classes).sort((a, b) => a.age - b.age);
   const groups = cls.map(cl => {
     const l = S.staff.filter(x => (x.classes || []).includes(cl.id)).sort((a, b) => ((a.classRole || {})[cl.id] === '담임' ? 0 : 1) - ((b.classRole || {})[cl.id] === '담임' ? 0 : 1));
     return l.length ? `<div class="lbl" style="margin-top:6px">${esc(cl.name)}</div><div class="list">${l.map(x => row(x, cl.id)).join('')}</div>` : '';
   }).join('');
-  const free = S.staff.filter(x => !(x.classes || []).length);
+  const dirs = S.staff.filter(x => x.role === 'director');
+  const free = S.staff.filter(x => !(x.classes || []).length && x.role !== 'director');
   return `<section class="card"><div class="lbl"><span>교사 명단</span><span class="s2">구글 연결 ${linked}/${total}</span></div>
-<div class="sub">명단을 먼저 만들어 두고, 구글 계정은 나중에 연결하면 돼요. 연결 전에는 수퍼관리자와 관리자가 모든 내용을 고쳐요. 관리자 지정은 수퍼관리자만 할 수 있어요.</div>
-${groups}${free.length ? `<div class="lbl" style="margin-top:6px">반 없음</div><div class="list">${free.map(x => row(x)).join('')}</div>` : ''}
+<div class="sub">명단을 먼저 만들어 두고, 구글 계정은 나중에 연결하면 돼요. 연결 전에는 수퍼관리자·디렉터·관리자가 모든 내용을 고쳐요. 디렉터는 수퍼관리자가, 관리자는 수퍼관리자와 디렉터가 정해요.</div>
+${dirs.length ? `<div class="lbl" style="margin-top:6px">디렉터 (조이코너 전체 관리)</div><div class="list">${dirs.map(x => row(x)).join('')}</div>` : ''}${groups}${free.length ? `<div class="lbl" style="margin-top:6px">반 없음</div><div class="list">${free.map(x => row(x)).join('')}</div>` : ''}
 ${total ? '' : '<div class="sub">아직 명단이 없어요. 시트 데이터를 가져오면 15명이 들어와요.</div>'}
 <button class="sec" data-act="staff">+ 교사 추가</button></section>`;
 }
@@ -469,13 +473,13 @@ async function addNote() {
 function staffSheet(id) {
   const st = id ? S.staff.find(x => x.id === id) : { name: '', role: 'teacher', classes: [], classRole: {}, duties: [], email: '' };
   if (!st) return;
-  if (st.role === 'admin' && !S.me.owner) return toast('관리자 정보는 수퍼관리자만 고칠 수 있어요');
+  if (id && !canEditStaff(st)) return toast(st.role === 'director' ? '디렉터 정보는 수퍼관리자만 고칠 수 있어요' : '관리자 정보는 수퍼관리자와 디렉터만 고칠 수 있어요');
   S.editStaff = id || null;
   const cls = Object.values(S.classes).sort((a, b) => a.age - b.age);
   sheet(`<div class="ttl" style="font-size:24px">${id ? esc(st.name) + ' 선생님' : '교사 추가'}</div>
 <label class="fld">이름<input class="in" id="s_name" value="${esc(st.name)}"></label>
-<label class="fld">권한<select class="in" id="s_role" ${S.me.owner ? '' : 'disabled'}><option value="teacher" ${st.role !== 'admin' ? 'selected' : ''}>교사 (맡은 반만)</option><option value="admin" ${st.role === 'admin' ? 'selected' : ''}>관리자 (전체 관리)</option></select></label>
-${S.me.owner ? '' : '<div class="s2">관리자 지정은 수퍼관리자만 할 수 있어요.</div>'}
+<label class="fld">권한<select class="in" id="s_role" ${canManageRoles() ? '' : 'disabled'}><option value="teacher" ${!['admin', 'director'].includes(st.role) ? 'selected' : ''}>교사 (맡은 반만)</option><option value="admin" ${st.role === 'admin' ? 'selected' : ''}>관리자 (전체 내용 수정)</option>${S.me.owner || st.role === 'director' ? `<option value="director" ${st.role === 'director' ? 'selected' : ''}>디렉터 (조이코너 전체 관리 장)</option>` : ''}</select></label>
+<div class="s2">${S.me.owner ? '디렉터는 조이코너 전체를 맡고, 관리자도 지정할 수 있어요.' : canManageRoles() ? '관리자까지 정할 수 있어요. 디렉터는 수퍼관리자가 정해요.' : '권한은 수퍼관리자와 디렉터가 정해요.'}</div>
 <div class="fld">맡은 반</div>${cls.map(c => `<div class="two" style="align-items:center"><span style="font-family:Jua,sans-serif;font-size:18px">${esc(c.name)}</span><select class="in" id="s_cr_${c.id}"><option value="">맡지 않음</option><option value="담임" ${(st.classRole || {})[c.id] === '담임' ? 'selected' : ''}>담임</option><option value="보조" ${(st.classRole || {})[c.id] === '보조' ? 'selected' : ''}>보조</option></select></div>`).join('') || '<div class="s2">반은 데이터를 가져오면 생겨요.</div>'}
 <label class="fld">맡은 역할 (쉼표로 구분)<input class="in" id="s_duty" value="${esc((st.duties || []).join(', '))}" placeholder="예: 율동, 기도 인도"></label>
 <label class="fld">구글 계정 이메일 (나중에 넣어도 돼요)<input class="in" id="s_email" type="email" value="${esc(st.email || '')}" placeholder="example@gmail.com"></label>
@@ -486,7 +490,8 @@ ${id ? '<button class="ghost danger" data-act="delStaffAsk">명단에서 빼기<
 async function saveStaff() {
   const id = S.editStaff, old = id ? S.staff.find(x => x.id === id) : {};
   const name = val('s_name'); if (!name) return toast('이름을 적어 주세요');
-  const role = S.me.owner ? val('s_role') : (old.role || 'teacher');
+  let role = canManageRoles() ? val('s_role') : (old.role || 'teacher');
+  if (role === 'director' && !S.me.owner) role = old.role || 'teacher';
   const classRole = {}, classes = [];
   Object.keys(S.classes).forEach(c => { const v = val('s_cr_' + c); if (v) { classRole[c] = v; classes.push(c); } });
   const duties = val('s_duty').split(',').map(x => x.trim()).filter(Boolean);
@@ -603,6 +608,7 @@ async function start(user) {
     }
     if (!snap.exists()) { S.phase = 'pending'; return route(); }
     S.me = { email, ...snap.data() };
+    if (S.me.role === 'director') { S.me.director = true; S.me.role = 'admin'; }
     if (email === OWNER_EMAIL.toLowerCase()) { S.me.role = 'admin'; S.me.owner = true; }
     await loadAll();
     S.phase = 'ready'; route();
