@@ -52,7 +52,7 @@ const S = {
   kids: {}, att: {}, fam: {}, schedule: [],
   attDate: ymd(sundayOnOrBefore(new Date())),
   watchKey: '', unsubAtt: null, pending: false,
-  kidFor: null, kidData: null, teachers: null, showArchived: false, lastKey: ''
+  kidFor: null, kidData: null, staff: [], editStaff: null, importOk: false, showArchived: false, lastKey: ''
 };
 const appEl = $('#app');
 
@@ -72,6 +72,11 @@ async function loadAll() {
   }));
   const sc = await getDocs(collection(db, 'schedule'));
   S.schedule = sc.docs.map(d => ({ id: d.id, ...d.data() })).sort((a, b) => ko(a.date, b.date));
+  try {
+    const st = await getDocs(collection(db, 'staff'));
+    S.staff = st.docs.map(d => ({ id: d.id, ...d.data() })).sort((a, b) => (a.order ?? 999) - (b.order ?? 999) || ko(a.name, b.name));
+  } catch { S.staff = []; }
+  const mine = S.staff.find(x => x.email && x.email === S.me.email); if (mine) S.me.name = mine.name;
   // 가정 정보는 미리 받아 두면 인터넷이 끊겨도 볼 수 있어요
   S.myClasses.forEach(c => (S.kids[c] || []).forEach(k => { if (k.familyId && !S.fam[k.familyId]) loadFam(k.familyId); }));
 }
@@ -106,6 +111,11 @@ function kidRate(c, kid, weeks = 8) {
   return ds.filter(d => S.att[c][d][kid.id] === 'p').length / ds.length;
 }
 const schedFor = d => S.schedule.find(x => x.date === d);
+function classStaff(c) {
+  const l = S.staff.filter(x => (x.classes || []).includes(c));
+  return { homeroom: l.filter(x => (x.classRole || {})[c] === '담임').map(x => x.name), assistants: l.filter(x => (x.classRole || {})[c] !== '담임').map(x => x.name) };
+}
+const roleLabel = st => st.role === 'admin' ? '관리자' : '교사';
 function upcomingBirthdays(c) {
   const today = new Date(); today.setHours(0, 0, 0, 0);
   return activeKids(c).filter(k => k.birth).map(k => {
@@ -151,7 +161,7 @@ const noClass = () => `<div class="center"><div class="big">아직 반이 없어
 
 /* ---------- 로그인/대기 ---------- */
 function vLogin() {
-  return `<div class="center"><span style="font-size:0">${avatar({ id: 'logo-a', name: 'a' }, 96)}</span><div class="hello">조이코너 노트</div><div class="sub">우리 친구들을 기억하고 돌보는<br>선생님 전용 앱이에요</div><button class="cta" style="max-width:300px" data-act="login">구글로 로그인</button></div>`;
+  return `<div class="center"><img src="icon.svg" alt="" width="96" height="96" style="border-radius:28px"><div class="hello">조이코너 노트</div><div class="sub">우리 친구들을 기억하고 돌보는<br>선생님 전용 앱이에요</div><button class="cta" style="max-width:300px" data-act="login">구글로 로그인</button></div>`;
 }
 const vSetup = () => `<div class="center"><div class="big">설정이 아직 안 끝났어요</div><div class="sub">firebase-config.js 파일에 파이어베이스 설정 값을 붙여넣어 주세요.<br>(안내서 2단계)</div></div>`;
 const vPending = () => `<div class="center"><div class="big">아직 등록되지 않았어요</div><div class="sub">${esc(S.user.email)}<br>이 이메일을 관리자에게 알려 주세요.<br>등록되면 바로 들어올 수 있어요.</div><button class="sec" data-act="logout">다른 계정으로 로그인</button><button class="ghost" data-act="reload">다시 확인하기</button></div>`;
@@ -168,7 +178,7 @@ function vHome() {
   const care = careList(c).slice(0, 6), bdays = upcomingBirthdays(c).slice(0, 4);
   return `<div class="scroll">${header}${classChips()}
 <section class="card"><div class="rowtop"><div style="display:flex;padding-left:10px">${faces.map(k => `<span style="margin-left:-10px;border:3px solid #fff;border-radius:50%;display:block;line-height:0">${avatar(k, 46)}</span>`).join('')}</div><div><div class="big">${esc(cl.name)}</div><div class="sub">친구 ${kids.length}명</div></div></div>
-<div class="chips"><span class="chip">담임 ${esc(cl.homeroom || '미정')}</span>${(cl.assistants || []).map(a => `<span class="chip">${esc(a)}</span>`).join('')}</div>
+<div class="chips">${(() => { const cs = classStaff(c); const h = cs.homeroom.map(n => `<span class="chip">담임 ${esc(n)}</span>`).join('') + cs.assistants.map(n => `<span class="chip">${esc(n)}</span>`).join(''); return h || (S.me.role === 'admin' ? `<button class="chip dashed" data-act="go" data-to="settings">+ 교사 명단에서 정해 주세요</button>` : '<span class="chip">담임 미정</span>'); })()}</div>
 <button class="cta" data-act="go" data-to="attend">${svg(ICON.checkc, 28, 2.4)}출석 시작하기</button></section>
 ${nextS ? `<section class="card"><div class="lbl"><span>${diff <= 7 ? '이번 주일' : '다음 주일'} · ${fmtMD(nextS.date)}</span></div><div class="big">${esc(nextS.story || (nextS.noService ? '조이코너 예배 없음' : '이야기 준비 중'))}</div><div class="meta">${nextS.preacher ? `<span>설교 ${esc(nextS.preacher)}</span>` : ''}${nextS.offering ? `<span>헌금기도 ${esc(nextS.offering)} 가정</span>` : ''}${nextS.pray ? `<span>중보기도 ${esc(nextS.pray)}</span>` : ''}</div></section>` : ''}
 <section class="card"><div class="lbl"><span>돌봄이 필요해요</span></div>${care.length ? `<div class="carerow">${care.map(x => `<button class="carekid" data-act="kid" data-id="${x.k.id}">${avatar(x.k, 56)}<b>${esc(x.k.name)}</b><span class="tag">${x.n >= 2 ? x.n + '주 결석' : '장기결석'}</span></button>`).join('')}</div>` : `<div class="sub">지금은 걱정되는 친구가 없어요. 감사해요!</div>`}</section>
@@ -302,16 +312,28 @@ ${S.myClasses.length > 1 ? `<section class="card"><div class="lbl"><span>반별 
 function vSettings() {
   const admin = S.me.role === 'admin';
   return `<div class="scroll"><div class="hd"><button class="back" data-act="back">← 홈</button></div><div class="ttl">설정</div>
-<section class="card"><div class="lbl"><span>내 정보</span></div><div class="big" style="font-size:22px">${esc(S.me.name || S.user.displayName || '')}</div><div class="sub">${esc(S.user.email)} · ${admin ? '관리자' : '교사'}</div><button class="sec" data-act="logout">로그아웃</button></section>
+<section class="card"><div class="lbl"><span>내 정보</span></div><div class="big" style="font-size:22px">${esc(S.me.name || S.user.displayName || '')}</div><div class="sub">${esc(S.user.email)} · ${S.me.owner ? '수퍼관리자' : admin ? '관리자' : '교사'}</div><button class="sec" data-act="logout">로그아웃</button></section>
 ${admin ? `
-<section class="card"><div class="lbl"><span>반과 담임 선생님</span></div><div class="sub">이름만 적어 두는 곳이에요. 로그인 권한과는 별개예요.</div>
-${Object.values(S.classes).sort((a, b) => a.age - b.age).map(cl => `<div class="fld">${esc(cl.name)}<div class="two"><input class="in" id="hr_${cl.id}" placeholder="담임" value="${esc(cl.homeroom || '')}"><input class="in" id="as_${cl.id}" placeholder="보조 (쉼표로 구분)" value="${esc((cl.assistants || []).join(', '))}"></div></div>`).join('') || '<div class="sub">먼저 데이터를 가져와 주세요.</div>'}
-<button class="sec" data-act="saveClasses">반 정보 저장</button></section>
-<section class="card"><div class="lbl"><span>로그인할 수 있는 교사</span></div>
-${S.teachers === null ? '<button class="sec" data-act="loadTeachers">교사 목록 불러오기</button>' : `${S.teachers.map(t => `<div class="person"><div><b>${esc(t.name || t.email)}</b> <span class="tag ${t.role === 'admin' ? '' : 'g'}">${t.role === 'admin' ? '관리자' : '교사'}</span><div class="cell">${esc(t.email)} · ${(t.classes || []).map(c => esc(S.classes[c]?.name || c)).join(', ') || '반 없음'}</div></div>${t.email !== S.user.email.toLowerCase() ? `<button class="ghost danger" style="min-height:40px;padding:0 12px" data-act="delTeacher" data-id="${esc(t.email)}">삭제</button>` : ''}</div>`).join('')}<button class="sec" data-act="addTeacher">+ 교사 등록</button>`}</section>
+${vStaffList()}
 <section class="card"><div class="lbl"><span>시트 데이터 가져오기</span></div><div class="sub">안내서의 joycorner-import.json 파일을 골라 주세요. 처음 한 번만 하면 돼요.</div><input type="file" id="impFile" accept="application/json,.json" class="in"><div class="pbar hide" id="impBar"><i></i></div><div class="sub" id="impMsg"></div><button class="sec" data-act="runImport">가져오기 시작</button></section>
 <section class="card"><div class="lbl"><span>출석 기록 내려받기</span></div><div class="sub">엑셀로 열 수 있는 파일(CSV)이에요. 백업용으로 좋아요.</div><div class="btns" style="flex-wrap:wrap">${S.myClasses.map(c => `<button class="ghost" data-act="csv" data-id="${c}">${esc(S.classes[c].name)}</button>`).join('')}</div></section>` : ''}
 <div class="s2" style="text-align:center">조이코너 노트 · 아이들의 얼굴과 정보는 로그인한 선생님에게만 보여요</div></div>${nav('home')}`;
+}
+
+function vStaffList() {
+  const total = S.staff.length, linked = S.staff.filter(x => x.email).length;
+  const row = (st, c) => `<button class="row" data-act="staff" data-id="${st.id}"><span class="grow"><span class="nm">${esc(st.name)}${c ? ` <span class="tag ${(st.classRole || {})[c] === '담임' ? '' : 'g'}">${esc((st.classRole || {})[c] || '보조')}</span>` : ''}${st.role === 'admin' ? ' <span class="tag">관리자</span>' : ''}</span><span class="sub">${esc((st.duties || []).join(' · ') || '맡은 역할 없음')}</span></span><span class="chip sm" style="${st.email ? 'background:#DDF1E3;color:#1E6B3E' : ''}">${st.email ? '구글 연결됨' : '연결 전'}</span></button>`;
+  const cls = Object.values(S.classes).sort((a, b) => a.age - b.age);
+  const groups = cls.map(cl => {
+    const l = S.staff.filter(x => (x.classes || []).includes(cl.id)).sort((a, b) => ((a.classRole || {})[cl.id] === '담임' ? 0 : 1) - ((b.classRole || {})[cl.id] === '담임' ? 0 : 1));
+    return l.length ? `<div class="lbl" style="margin-top:6px">${esc(cl.name)}</div><div class="list">${l.map(x => row(x, cl.id)).join('')}</div>` : '';
+  }).join('');
+  const free = S.staff.filter(x => !(x.classes || []).length);
+  return `<section class="card"><div class="lbl"><span>교사 명단</span><span class="s2">구글 연결 ${linked}/${total}</span></div>
+<div class="sub">명단을 먼저 만들어 두고, 구글 계정은 나중에 연결하면 돼요. 연결 전에는 수퍼관리자와 관리자가 모든 내용을 고쳐요. 관리자 지정은 수퍼관리자만 할 수 있어요.</div>
+${groups}${free.length ? `<div class="lbl" style="margin-top:6px">반 없음</div><div class="list">${free.map(x => row(x)).join('')}</div>` : ''}
+${total ? '' : '<div class="sub">아직 명단이 없어요. 시트 데이터를 가져오면 15명이 들어와요.</div>'}
+<button class="sec" data-act="staff">+ 교사 추가</button></section>`;
 }
 
 /* ---------- 그리기 ---------- */
@@ -444,36 +466,67 @@ async function addNote() {
 }
 
 /* ---------- 관리자 기능 ---------- */
-async function loadTeachers() {
-  try { const s = await getDocs(collection(db, 'teachers')); S.teachers = s.docs.map(d => ({ ...d.data(), email: d.id })).sort((a, b) => ko(a.name || a.email, b.name || b.email)); } catch { S.teachers = []; toast('교사 목록을 불러오지 못했어요'); }
-  paint();
+function staffSheet(id) {
+  const st = id ? S.staff.find(x => x.id === id) : { name: '', role: 'teacher', classes: [], classRole: {}, duties: [], email: '' };
+  if (!st) return;
+  if (st.role === 'admin' && !S.me.owner) return toast('관리자 정보는 수퍼관리자만 고칠 수 있어요');
+  S.editStaff = id || null;
+  const cls = Object.values(S.classes).sort((a, b) => a.age - b.age);
+  sheet(`<div class="ttl" style="font-size:24px">${id ? esc(st.name) + ' 선생님' : '교사 추가'}</div>
+<label class="fld">이름<input class="in" id="s_name" value="${esc(st.name)}"></label>
+<label class="fld">권한<select class="in" id="s_role" ${S.me.owner ? '' : 'disabled'}><option value="teacher" ${st.role !== 'admin' ? 'selected' : ''}>교사 (맡은 반만)</option><option value="admin" ${st.role === 'admin' ? 'selected' : ''}>관리자 (전체 관리)</option></select></label>
+${S.me.owner ? '' : '<div class="s2">관리자 지정은 수퍼관리자만 할 수 있어요.</div>'}
+<div class="fld">맡은 반</div>${cls.map(c => `<div class="two" style="align-items:center"><span style="font-family:Jua,sans-serif;font-size:18px">${esc(c.name)}</span><select class="in" id="s_cr_${c.id}"><option value="">맡지 않음</option><option value="담임" ${(st.classRole || {})[c.id] === '담임' ? 'selected' : ''}>담임</option><option value="보조" ${(st.classRole || {})[c.id] === '보조' ? 'selected' : ''}>보조</option></select></div>`).join('') || '<div class="s2">반은 데이터를 가져오면 생겨요.</div>'}
+<label class="fld">맡은 역할 (쉼표로 구분)<input class="in" id="s_duty" value="${esc((st.duties || []).join(', '))}" placeholder="예: 율동, 기도 인도"></label>
+<label class="fld">구글 계정 이메일 (나중에 넣어도 돼요)<input class="in" id="s_email" type="email" value="${esc(st.email || '')}" placeholder="example@gmail.com"></label>
+<div class="s2">이메일을 넣으면 그 구글 계정으로 로그인할 수 있어요. 지우면 로그인이 막혀요.</div>
+<div class="btns"><button class="pri" data-act="saveStaff">저장</button><button class="sec" data-act="sheetClose">취소</button></div>
+${id ? '<button class="ghost danger" data-act="delStaffAsk">명단에서 빼기</button>' : ''}`);
 }
-function addTeacherSheet() {
-  sheet(`<div class="ttl" style="font-size:24px">교사 등록</div><div class="sub">구글 계정 이메일로 로그인해요.</div>
-<label class="fld">이메일<input class="in" id="t_email" type="email" placeholder="example@gmail.com"></label><label class="fld">이름<input class="in" id="t_name"></label>
-<label class="fld">권한<select class="in" id="t_role"><option value="teacher">교사 (맡은 반만)</option><option value="admin">관리자 (전체)</option></select></label>
-<div class="fld">맡은 반</div>${Object.values(S.classes).sort((a, b) => a.age - b.age).map(c => `<label class="chk"><input type="checkbox" class="t_cls" value="${c.id}">${esc(c.name)}</label>`).join('')}
-<div class="btns"><button class="pri" data-act="saveTeacher">등록</button><button class="sec" data-act="sheetClose">취소</button></div>`);
-}
-async function saveTeacher() {
-  const email = val('t_email').toLowerCase(); if (!/^\S+@\S+\.\S+$/.test(email)) return toast('이메일을 확인해 주세요');
-  const t = { name: val('t_name'), role: val('t_role'), classes: [...document.querySelectorAll('.t_cls:checked')].map(x => x.value) };
-  try { await setDoc(doc(db, 'teachers', email), t); closeSheet(); toast('등록했어요'); await loadTeachers(); } catch (e) { toast('등록하지 못했어요'); }
-}
-async function saveClasses() {
+async function saveStaff() {
+  const id = S.editStaff, old = id ? S.staff.find(x => x.id === id) : {};
+  const name = val('s_name'); if (!name) return toast('이름을 적어 주세요');
+  const role = S.me.owner ? val('s_role') : (old.role || 'teacher');
+  const classRole = {}, classes = [];
+  Object.keys(S.classes).forEach(c => { const v = val('s_cr_' + c); if (v) { classRole[c] = v; classes.push(c); } });
+  const duties = val('s_duty').split(',').map(x => x.trim()).filter(Boolean);
+  const email = val('s_email').toLowerCase();
+  if (email && !/^\S+@\S+\.\S+$/.test(email)) return toast('이메일을 확인해 주세요');
+  if (email && S.staff.some(x => x.email === email && x.id !== id)) return toast('이 이메일은 다른 선생님에게 연결되어 있어요');
+  const owner = OWNER_EMAIL.toLowerCase();
+  const ref = id ? doc(db, 'staff', id) : doc(collection(db, 'staff'));
+  const data = { name, role, classes, classRole, duties, email, order: old.order ?? (Math.max(0, ...S.staff.map(x => x.order || 0)) + 1) };
+  const prev = old.email || '';
   try {
-    for (const cl of Object.values(S.classes)) {
-      const homeroom = val('hr_' + cl.id), assistants = val('as_' + cl.id).split(',').map(x => x.trim()).filter(Boolean);
-      await setDoc(doc(db, 'classes', cl.id), { homeroom, assistants }, { merge: true }); Object.assign(cl, { homeroom, assistants });
+    await setDoc(ref, data);
+    if (prev && prev !== email) {
+      if (prev === owner) await setDoc(doc(db, 'teachers', prev), { name: S.me.name || '', role: 'admin', classes: [] });
+      else await deleteDoc(doc(db, 'teachers', prev));
     }
-    toast('저장했어요');
-  } catch { toast('저장하지 못했어요'); }
+    if (email) await setDoc(doc(db, 'teachers', email), { staffId: ref.id, name, role: email === owner ? 'admin' : role, classes });
+    const i = S.staff.findIndex(x => x.id === ref.id);
+    if (i >= 0) S.staff[i] = { id: ref.id, ...data }; else S.staff.push({ id: ref.id, ...data });
+    closeSheet(); toast('저장했어요'); paint();
+  } catch (e) { toast('저장하지 못했어요: ' + (e.code === 'permission-denied' ? '권한이 없어요' : e.message)); }
+}
+async function delStaff() {
+  const id = S.editStaff, st = S.staff.find(x => x.id === id); if (!st) return;
+  try {
+    await deleteDoc(doc(db, 'staff', id));
+    if (st.email && st.email !== OWNER_EMAIL.toLowerCase()) await deleteDoc(doc(db, 'teachers', st.email));
+    S.staff = S.staff.filter(x => x.id !== id); closeSheet(); toast('명단에서 뺐어요'); paint();
+  } catch (e) { toast('지우지 못했어요: ' + (e.code === 'permission-denied' ? '권한이 없어요' : e.message)); }
 }
 async function runImport() {
   const f = $('#impFile')?.files[0]; if (!f) return toast('가져올 파일을 먼저 골라 주세요');
   let data; try { data = JSON.parse(await f.text()); } catch { return toast('파일을 읽을 수 없어요'); }
   if (!data.children || !data.classes) return toast('조이코너 가져오기 파일이 아니에요');
+  if (!S.importOk && allKids().length) {
+    return sheet(`<div class="ttl" style="font-size:22px">이미 아이들 정보가 있어요</div><div class="sub">다시 가져오면 아이·가정·출석·일정이 시트 내용으로 덮어써져요. 그동안 앱에서 고친 내용이 사라질 수 있어요. (교사 명단의 구글 연결은 그대로 남아요)</div><div class="btns"><button class="pri" data-act="importYes">그래도 가져오기</button><button class="sec" data-act="sheetClose">취소</button></div>`);
+  }
+  S.importOk = false;
   const ops = [];
+  for (const v of (data.staff || [])) { const { id, ...r } = v; ops.push([doc(db, 'staff', id), r, true]); }
   for (const [id, v] of Object.entries(data.classes)) ops.push([doc(db, 'classes', id), v]);
   for (const v of data.families) { const { id, ...r } = v; ops.push([doc(db, 'families', id), r]); }
   for (const v of data.children) { const { id, ...r } = v; ops.push([doc(db, 'children', id), { ...r, createdAt: serverTimestamp() }]); }
@@ -485,7 +538,7 @@ async function runImport() {
   const bar = $('#impBar'), fill = bar.firstElementChild, msg = $('#impMsg'); bar.classList.remove('hide');
   try {
     for (let i = 0; i < chunks.length; i++) {
-      const b = writeBatch(db); chunks[i].forEach(([r, d]) => b.set(r, d)); await b.commit();
+      const b = writeBatch(db); chunks[i].forEach(([r, d, m]) => (m ? b.set(r, d, { merge: true }) : b.set(r, d))); await b.commit();
       fill.style.width = Math.round((i + 1) / chunks.length * 100) + '%'; msg.textContent = `올리는 중… ${i + 1}/${chunks.length}`;
     }
     msg.textContent = '끝났어요! 화면을 새로 불러올게요.'; await loadAll(); route(); toast('가져오기가 끝났어요');
@@ -520,9 +573,11 @@ const ACT = {
   noteAdd: addNote,
   noteDel: async d => { try { await deleteDoc(doc(db, 'careNotes', d.id)); S.kidData.notes = S.kidData.notes.filter(x => x.id !== d.id); paint(); } catch { toast('지우지 못했어요'); } },
   showArch: () => { S.showArchived = true; paint(); },
-  loadTeachers, addTeacher: addTeacherSheet, saveTeacher,
-  delTeacher: async d => { try { await deleteDoc(doc(db, 'teachers', d.id)); await loadTeachers(); } catch { toast('지우지 못했어요'); } },
-  saveClasses, runImport, csv: d => downloadCsv(d.id)
+  staff: d => staffSheet(d.id), saveStaff,
+  delStaffAsk: () => { const st = S.staff.find(x => x.id === S.editStaff); sheet(`<div class="ttl" style="font-size:22px">${esc(st?.name || '')} 선생님을 명단에서 뺄까요?</div><div class="sub">구글 계정이 연결되어 있었다면 로그인도 막혀요.</div><div class="btns"><button class="pri" data-act="delStaff">네, 뺄게요</button><button class="sec" data-act="sheetClose">아니요</button></div>`); },
+  delStaff,
+  runImport, importYes: () => { S.importOk = true; closeSheet(); runImport(); },
+  csv: d => downloadCsv(d.id)
 };
 appEl.addEventListener('click', e => {
   const t = e.target.closest('[data-act]'); if (!t) return;
@@ -548,6 +603,7 @@ async function start(user) {
     }
     if (!snap.exists()) { S.phase = 'pending'; return route(); }
     S.me = { email, ...snap.data() };
+    if (email === OWNER_EMAIL.toLowerCase()) { S.me.role = 'admin'; S.me.owner = true; }
     await loadAll();
     S.phase = 'ready'; route();
   } catch (e) {
