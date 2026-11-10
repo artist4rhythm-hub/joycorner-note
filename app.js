@@ -30,6 +30,7 @@ const ICON = {
   stats: '<path d="M5 20V11M12 20V4M19 20v-7"/>',
   gear: '<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3h0a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5h0a1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8v0a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/>',
   check: '<path d="M5 12.5l4.5 4.5L19 7"/>',
+  music: '<path d="M9 18V5l11-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="17" cy="16" r="3"/>',
   checkc: '<circle cx="12" cy="12" r="9"/><path d="M8 12.5l3 3 5-6"/>'
 };
 const svg = (p, s = 24, w = 2) => `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="${w}" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${p}</svg>`;
@@ -111,6 +112,8 @@ function kidRate(c, kid, weeks = 8) {
   return ds.filter(d => S.att[c][d][kid.id] === 'p').length / ds.length;
 }
 const schedFor = d => S.schedule.find(x => x.date === d);
+// '김혜원, 김소명' 같은 칸에 이 이름이 정확히 들어 있는가 (현우 ≠ 김현우)
+const hasName = (str, name) => !!name && String(str || '').split(/[,\s·/()]+/).includes(name);
 function classStaff(c) {
   const l = S.staff.filter(x => (x.classes || []).includes(c));
   return { homeroom: l.filter(x => (x.classRole || {})[c] === '담임').map(x => x.name), assistants: l.filter(x => (x.classRole || {})[c] !== '담임').map(x => x.name) };
@@ -158,7 +161,7 @@ function classChips() {
 }
 function nav(active) {
   const t = (k, ic, label) => `<button class="tab ${active === k ? 'on' : ''}" data-act="go" data-to="${k}">${svg(ICON[ic])}${label}</button>`;
-  return `<nav class="nav" aria-label="메뉴">${t('home', 'home', '홈')}${t('attend', 'att', '출석')}${t('friends', 'kids', '친구들')}${t('stats', 'stats', '통계')}</nav>`;
+  return `<nav class="nav" aria-label="메뉴">${t('home', 'home', '홈')}${t('attend', 'att', '출석')}${t('friends', 'kids', '친구들')}${t('worship', 'music', '예배')}${t('stats', 'stats', '통계')}</nav>`;
 }
 const noClass = () => `<div class="center"><div class="big">아직 반이 없어요</div><div class="sub">${S.me.role === 'admin' ? '설정에서 시트 데이터를 가져오거나 교사를 등록해 주세요.' : '관리자에게 맡을 반을 정해 달라고 말해 주세요.'}</div>${S.me.role === 'admin' ? `<button class="cta" style="max-width:280px" data-act="go" data-to="settings">설정 열기</button>` : ''}</div>`;
 
@@ -184,6 +187,7 @@ function vHome() {
 <div class="chips">${(() => { const cs = classStaff(c); const h = cs.homeroom.map(n => `<span class="chip">담임 ${esc(n)}</span>`).join('') + cs.assistants.map(n => `<span class="chip">${esc(n)}</span>`).join(''); return h || (S.me.role === 'admin' ? `<button class="chip dashed" data-act="go" data-to="settings">+ 교사 명단에서 정해 주세요</button>` : '<span class="chip">담임 미정</span>'); })()}</div>
 <button class="cta" data-act="go" data-to="attend">${svg(ICON.checkc, 28, 2.4)}출석 시작하기</button></section>
 ${nextS ? `<section class="card"><div class="lbl"><span>${diff <= 7 ? '이번 주일' : '다음 주일'} · ${fmtMD(nextS.date)}</span></div><div class="big">${esc(nextS.story || (nextS.noService ? '조이코너 예배 없음' : '이야기 준비 중'))}</div><div class="meta">${nextS.preacher ? `<span>설교 ${esc(nextS.preacher)}</span>` : ''}${nextS.offering ? `<span>헌금기도 ${esc(nextS.offering)} 가정</span>` : ''}${nextS.pray ? `<span>중보기도 ${esc(nextS.pray)}</span>` : ''}</div></section>` : ''}
+${(() => { const me = S.me.name || ''; if (!me || !nextS) return ''; const L = { preacher: '성경이야기 설교', pray: '중보기도 인도', nation: '성전건축·나라 기도', chant: '챈트', dance: '율동', guitar: '기타·메트로놈' }; const m = Object.entries(L).filter(([k]) => hasName(nextS[k], me)).map(([, l]) => l); return m.length ? `<section class="card" style="border-color:#C62828"><div class="lbl"><span>${fmtMD(nextS.date)} 내 담당</span></div><div class="chips">${m.map(x => `<span class="chip">${x}</span>`).join('')}</div><button class="ghost" data-act="go" data-to="worship">주일 예배 보기</button></section>` : ''; })()}
 <section class="card"><div class="lbl"><span>돌봄이 필요해요</span></div>${care.length ? `<div class="carerow">${care.map(x => `<button class="carekid" data-act="kid" data-id="${x.k.id}">${avatar(x.k, 56)}<b>${esc(x.k.name)}</b><span class="tag">${x.n >= 2 ? x.n + '주 결석' : '장기결석'}</span></button>`).join('')}</div>` : `<div class="sub">지금은 걱정되는 친구가 없어요. 감사해요!</div>`}</section>
 <section class="card"><div class="lbl"><span>곧 생일이에요</span></div>${bdays.length ? bdays.map(x => `<div class="bday"><span class="d">${x.label}</span><span>${esc(x.k.name)}${x.days === 0 ? ' · 오늘!' : ''}</span></div>`).join('') : `<div class="sub">45일 안에 생일인 친구가 없어요.</div>`}</section>
 </div>${nav('home')}`;
@@ -196,14 +200,12 @@ function vAttend() {
   const n = kids.filter(k => marks[k.id] === 'p').length, pct = kids.length ? Math.round(n / kids.length * 100) : 0;
   const sch = schedFor(d), maxD = ymd(sundayOnOrBefore(new Date()));
   const dd = parseD(d);
-  return `<div class="ahead"><div class="top"><div class="ttl">${esc(S.classes[c].name)} 출석</div>
-<div class="date"><button data-act="week" data-n="-7" aria-label="지난 주">◀</button><span>${dd.getMonth() + 1}월 ${dd.getDate()}일 주일</span><button data-act="week" data-n="7" aria-label="다음 주" ${d >= maxD ? 'disabled' : ''}>▶</button></div></div>
-${classChips()}
-<div class="story">${sch ? (sch.noService ? '이 주일은 조이코너 예배가 없어요' : '오늘의 이야기 · ' + esc(sch.story || '')) : '&nbsp;'}</div>
-<div class="count"><div><span class="num">${n}</span><span class="tot">/ ${kids.length}명</span></div><div class="bar"><div class="fill" style="width:${pct}%"></div></div></div>
-<div style="display:flex;justify-content:space-between;align-items:center"><span class="save ${S.pending ? 'wait' : ''}">${S.pending ? '저장 기다리는 중 (인터넷이 되면 올라가요)' : '저장됨'}</span></div>
-<div class="btns"><button class="pri" data-act="allIn">${svg(ICON.checkc, 24, 2.4)}전원 출석</button><button class="sec" data-act="clearAsk">다시 하기</button></div></div>
-<div class="scroll" style="padding-top:6px"><p class="hint">친구 이름을 한 번 누르면 출석, 다시 누르면 취소예요.</p>
+  return `<div class="ahead"><div class="top"><div class="ttl" style="font-size:22px">${esc(S.classes[c].name)} <span class="cnt">${n}<small>/${kids.length}</small></span></div>
+<div class="date"><button data-act="week" data-n="-7" aria-label="지난 주">◀</button><span>${dd.getMonth() + 1}/${dd.getDate()} 주일</span><button data-act="week" data-n="7" aria-label="다음 주" ${d >= maxD ? 'disabled' : ''}>▶</button></div></div>
+<div class="row2"><div class="bar"><div class="fill" style="width:${pct}%"></div></div><span class="save ${S.pending ? 'wait' : ''}">${S.pending ? '대기 중' : '저장됨'}</span><button class="pri sm" data-act="allIn">${svg(ICON.checkc, 20, 2.4)}전원 출석</button></div></div>
+<div class="scroll" style="padding-top:8px">${classChips()}
+<div class="story">${sch ? (sch.noService ? '이 주일은 조이코너 예배가 없어요' : '오늘의 이야기 · ' + esc(sch.story || '')) : ''}${S.pending ? ' · 인터넷이 연결되면 저절로 올라가요' : ''}</div>
+<div style="display:flex;align-items:center;justify-content:space-between;gap:8px"><p class="hint">한 번 누르면 출석, 다시 누르면 취소</p><button class="ghost" style="min-height:40px;padding:0 14px;font-size:13px;flex:none" data-act="clearAsk">다시 하기</button></div>
 <div class="grid">${kids.map(k => { const on = marks[k.id] === 'p'; return `<button class="kid ${on ? 'on' : ''}" data-act="toggle" data-id="${k.id}" aria-pressed="${on}"><span class="stamp">${svg(ICON.check, 18, 3)}</span>${avatar(k, 64)}<b class="nm">${esc(k.name)}</b><span class="st">${on ? '왔어요' : '아직'}</span></button>`; }).join('')}</div>
 <button class="addkid" data-act="addKid">+ 새로 온 친구 등록</button></div>${nav('attend')}`;
 }
@@ -318,7 +320,7 @@ function vSettings() {
 <section class="card"><div class="lbl"><span>내 정보</span></div><div class="big" style="font-size:22px">${esc(S.me.name || S.user.displayName || '')}</div><div class="sub">${esc(S.user.email)} · ${S.me.owner ? '수퍼관리자' : S.me.director ? '디렉터' : admin ? '관리자' : '교사'}</div><button class="sec" data-act="logout">로그아웃</button></section>
 ${admin ? `
 ${vStaffList()}
-<section class="card"><div class="lbl"><span>시트 데이터 가져오기</span></div><div class="sub">안내서의 joycorner-import.json 파일을 골라 주세요. 처음 한 번만 하면 돼요.</div><input type="file" id="impFile" accept="application/json,.json" class="in"><div class="pbar hide" id="impBar"><i></i></div><div class="sub" id="impMsg"></div><button class="sec" data-act="runImport">가져오기 시작</button></section>
+<section class="card"><div class="lbl"><span>시트 데이터 가져오기</span></div><div class="sub">처음에는 joycorner-import.json(전체), 업무 분담·설교 참고만 더할 때는 joycorner-extra.json을 골라 주세요. extra 파일은 아이 정보를 건드리지 않아요.</div><input type="file" id="impFile" accept="application/json,.json" class="in"><div class="pbar hide" id="impBar"><i></i></div><div class="sub" id="impMsg"></div><button class="sec" data-act="runImport">가져오기 시작</button></section>
 <section class="card"><div class="lbl"><span>출석 기록 내려받기</span></div><div class="sub">엑셀로 열 수 있는 파일(CSV)이에요. 백업용으로 좋아요.</div><div class="btns" style="flex-wrap:wrap">${S.myClasses.map(c => `<button class="ghost" data-act="csv" data-id="${c}">${esc(S.classes[c].name)}</button>`).join('')}</div></section>` : ''}
 <div class="s2" style="text-align:center">조이코너 노트 · 아이들의 얼굴과 정보는 로그인한 선생님에게만 보여요</div></div>${nav('home')}`;
 }
@@ -341,7 +343,7 @@ ${total ? '' : '<div class="sub">아직 명단이 없어요. 시트 데이터를
 }
 
 /* ---------- 그리기 ---------- */
-const VIEWS = { home: vHome, attend: vAttend, friends: vFriends, kid: vKid, stats: vStats, settings: vSettings };
+const VIEWS = { home: vHome, attend: vAttend, friends: vFriends, kid: vKid, stats: vStats, settings: vSettings, worship: vWorship };
 function paint() {
   if (S.phase === 'setup') { appEl.innerHTML = vSetup(); return; }
   if (S.phase === 'boot') { appEl.innerHTML = '<div class="center"><div class="sub">불러오는 중…</div></div>'; return; }
@@ -361,6 +363,7 @@ function route() {
   if (S.phase !== 'ready') return paint();
   ensureAttWatch();
   if (S.route !== 'kid') S.kidFor = null;
+  if (S.route === 'worship') loadWorship().then(() => { if (S.route === 'worship') paint(); });
   if (S.route === 'kid' && S.kidFor !== S.arg) { S.kidData = null; S.kidFor = S.arg; loadKid(S.arg).catch(() => { }); }
   paint();
 }
@@ -525,19 +528,21 @@ async function delStaff() {
 async function runImport() {
   const f = $('#impFile')?.files[0]; if (!f) return toast('가져올 파일을 먼저 골라 주세요');
   let data; try { data = JSON.parse(await f.text()); } catch { return toast('파일을 읽을 수 없어요'); }
-  if (!data.children || !data.classes) return toast('조이코너 가져오기 파일이 아니에요');
-  if (!S.importOk && allKids().length) {
+  if (!data.children && !data.duties && !data.staff) return toast('조이코너 가져오기 파일이 아니에요');
+  if (data.children && !S.importOk && allKids().length) {
     return sheet(`<div class="ttl" style="font-size:22px">이미 아이들 정보가 있어요</div><div class="sub">다시 가져오면 아이·가정·출석·일정이 시트 내용으로 덮어써져요. 그동안 앱에서 고친 내용이 사라질 수 있어요. (교사 명단의 구글 연결은 그대로 남아요)</div><div class="btns"><button class="pri" data-act="importYes">그래도 가져오기</button><button class="sec" data-act="sheetClose">취소</button></div>`);
   }
   S.importOk = false;
   const ops = [];
   for (const v of (data.staff || [])) { const { id, ...r } = v; ops.push([doc(db, 'staff', id), r, true]); }
-  for (const [id, v] of Object.entries(data.classes)) ops.push([doc(db, 'classes', id), v]);
-  for (const v of data.families) { const { id, ...r } = v; ops.push([doc(db, 'families', id), r]); }
-  for (const v of data.children) { const { id, ...r } = v; ops.push([doc(db, 'children', id), { ...r, createdAt: serverTimestamp() }]); }
-  for (const [id, v] of Object.entries(data.attendance)) ops.push([doc(db, 'attendance', id), { ...v, updatedBy: 'import' }]);
-  for (const v of data.schedule) ops.push([doc(db, 'schedule', v.date), v]);
-  const photoOps = Object.entries(data.photos).map(([id, v]) => [doc(db, 'photos', id), v]);
+  for (const [id, v] of Object.entries(data.classes || {})) ops.push([doc(db, 'classes', id), v]);
+  for (const v of (data.families || [])) { const { id, ...r } = v; ops.push([doc(db, 'families', id), r]); }
+  for (const v of (data.children || [])) { const { id, ...r } = v; ops.push([doc(db, 'children', id), { ...r, createdAt: serverTimestamp() }]); }
+  for (const [id, v] of Object.entries(data.attendance || {})) ops.push([doc(db, 'attendance', id), { ...v, updatedBy: 'import' }]);
+  for (const v of (data.schedule || [])) ops.push([doc(db, 'schedule', v.date), v]);
+  for (const v of (data.duties || [])) { const { id, ...r } = v; ops.push([doc(db, 'duties', id), r]); }
+  for (const v of (data.stories || [])) { const { id, ...r } = v; ops.push([doc(db, 'stories', id), r]); }
+  const photoOps = Object.entries(data.photos || {}).map(([id, v]) => [doc(db, 'photos', id), v]);
   const chunks = []; for (let i = 0; i < ops.length; i += 150) chunks.push(ops.slice(i, i + 150));
   for (let i = 0; i < photoOps.length; i += 15) chunks.push(photoOps.slice(i, i + 15));
   const bar = $('#impBar'), fill = bar.firstElementChild, msg = $('#impMsg'); bar.classList.remove('hide');
@@ -546,7 +551,7 @@ async function runImport() {
       const b = writeBatch(db); chunks[i].forEach(([r, d, m]) => (m ? b.set(r, d, { merge: true }) : b.set(r, d))); await b.commit();
       fill.style.width = Math.round((i + 1) / chunks.length * 100) + '%'; msg.textContent = `올리는 중… ${i + 1}/${chunks.length}`;
     }
-    msg.textContent = '끝났어요! 화면을 새로 불러올게요.'; await loadAll(); route(); toast('가져오기가 끝났어요');
+    msg.textContent = '끝났어요! 화면을 새로 불러올게요.'; W.duties = null; W.stories = null; await loadAll(); route(); toast('가져오기가 끝났어요');
   } catch (e) { msg.textContent = '중간에 멈췄어요: ' + (e.code === 'permission-denied' ? '권한 문제예요. 규칙을 확인해 주세요' : e.message); }
 }
 function downloadCsv(c) {
@@ -555,6 +560,296 @@ function downloadCsv(c) {
   const csv = '﻿' + rows.map(r => r.map(x => `"${String(x).replace(/"/g, '""')}"`).join(',')).join('\r\n');
   const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
   a.download = `조이코너_${S.classes[c].name}_출석.csv`; document.body.appendChild(a); a.click(); a.remove();
+}
+
+/* ---------- 주일 예배 (이번 주 · 설교 · 악보 · 업무 분담) ---------- */
+const W = { tab: 'week', date: null, sermons: null, songs: {}, setlist: {}, comments: {}, duties: null, stories: null, pages: {}, editSermon: null, editSong: null, editDuty: null };
+const nextSunday = () => { const t = new Date(); const d = new Date(t.getFullYear(), t.getMonth(), t.getDate()); d.setDate(d.getDate() + ((7 - d.getDay()) % 7)); return ymd(d); };
+const linkify = s => esc(s).replace(/(https?:\/\/[^\s<]+)/g, '<a href="$1" target="_blank" rel="noopener">$1</a>');
+const isAdminMe = () => S.me.role === 'admin';
+const myName = () => S.me.name || S.user.displayName || '';
+const statusLabel = st => st === 'done' ? '점검 완료' : st === 'review' ? '점검 요청' : '작성 중';
+const errMsg = e => (e && e.code === 'permission-denied') ? '권한이 없어요 (구글 계정이 교사 명단에 연결되어 있어야 해요)' : (e && e.message) || '';
+
+async function loadWorship() {
+  if (!W.date) W.date = nextSunday();
+  const jobs = [];
+  if (W.sermons === null) { W.sermons = undefined; jobs.push(getDocs(collection(db, 'sermons')).then(s => { W.sermons = s.docs.map(d => ({ id: d.id, ...d.data() })); }).catch(() => { W.sermons = []; })); }
+  if (W.duties === null) { W.duties = undefined; jobs.push(getDocs(collection(db, 'duties')).then(s => { W.duties = s.docs.map(d => ({ id: d.id, ...d.data() })).sort((a, b) => (a.order ?? 999) - (b.order ?? 999)); }).catch(() => { W.duties = []; })); }
+  if (W.stories === null) { W.stories = undefined; jobs.push(getDocs(collection(db, 'stories')).then(s => { W.stories = s.docs.map(d => ({ id: d.id, ...d.data() })); }).catch(() => { W.stories = []; })); }
+  if (!W.songs[W.date]) jobs.push(loadSongs(W.date));
+  await Promise.all(jobs);
+}
+async function loadSongs(d) {
+  if (W.songs[d]) return;
+  try {
+    const [s, sl] = await Promise.all([getDocs(query(collection(db, 'songs'), where('date', '==', d))), getDoc(doc(db, 'setlists', d))]);
+    W.songs[d] = s.docs.map(x => ({ id: x.id, ...x.data() })).sort((a, b) => (a.order || 0) - (b.order || 0));
+    W.setlist[d] = sl.exists() ? sl.data() : { memo: '' };
+  } catch { W.songs[d] = []; W.setlist[d] = { memo: '' }; }
+}
+async function loadComments(postId) {
+  try {
+    const s = await getDocs(query(collection(db, 'comments'), where('postId', '==', postId)));
+    W.comments[postId] = s.docs.map(d => ({ id: d.id, ...d.data() })).sort((a, b) => ko(a.at || '', b.at || ''));
+  } catch { W.comments[postId] = []; }
+}
+
+function vWorship() {
+  if (!W.date) W.date = nextSunday();
+  const d = W.date, dd = parseD(d);
+  const tabs = [['week', '이번 주'], ['sermon', '설교'], ['songs', '악보'], ['duty', '업무 분담']];
+  const ready = Array.isArray(W.sermons) && Array.isArray(W.duties) && Array.isArray(W.stories) && W.songs[d];
+  const head = `<div class="ttl">주일 예배</div>
+<div class="seg">${tabs.map(([k, l]) => `<button class="${W.tab === k ? 'on' : ''}" data-act="wtab" data-id="${k}">${l}</button>`).join('')}</div>
+${W.tab === 'duty' ? '' : `<div class="weekbar"><button data-act="wweek" data-n="-7" aria-label="지난 주">◀</button><b>${dd.getFullYear() !== new Date().getFullYear() ? dd.getFullYear() + '년 ' : ''}${dd.getMonth() + 1}월 ${dd.getDate()}일 주일${d === nextSunday() ? ' · 이번 주' : ''}</b><button data-act="wweek" data-n="7" aria-label="다음 주">▶</button></div>`}`;
+  let body = '<div class="sub">불러오는 중…</div>';
+  if (ready) body = W.tab === 'week' ? wWeek(d) : W.tab === 'sermon' ? wSermon(d) : W.tab === 'songs' ? wSongs(d) : wDuty();
+  return `<div class="scroll">${head}${body}</div>${nav('worship')}`;
+}
+
+/* 이번 주 */
+function wWeek(d) {
+  const s = schedFor(d) || {}, me = myName();
+  const rows = [['성경이야기', s.story], ['설교', s.preacher], ['중보기도 인도', s.pray], ['성전건축·나라 기도', s.nation], ['챈트', [s.chant, s.verse].filter(Boolean).join(' · ')], ['율동', s.dance], ['기타·메트로놈', s.guitar], ['헌금기도', s.offering ? s.offering + ' 가정' : '']];
+  const sermons = W.sermons.filter(x => x.date === d), songs = W.songs[d] || [];
+  return `${s.noService ? '<div class="note">이 주일은 조이코너 예배가 없어요</div>' : ''}
+<section class="card"><div class="lbl"><span>이번 주 담당</span>${isAdminMe() ? '<button class="linkbtn" data-act="schedEdit">고치기</button>' : ''}</div>
+${rows.map(([k, v]) => `<div class="kv"><span>${k}</span><b class="${hasName(v, me) ? 'mine' : ''}">${esc(v || '-')}</b></div>`).join('')}</section>
+<div class="twoc"><button class="card tapcard" data-act="wtab" data-id="sermon"><div class="lbl"><span>설교</span></div><div class="big" style="font-size:20px">${sermons.length ? statusLabel(sermons[0].status) : '아직 없음'}</div><div class="s2">${sermons.length ? esc(sermons[0].authorName || '') + ' 선생님' : '올리기 →'}</div></button>
+<button class="card tapcard" data-act="wtab" data-id="songs"><div class="lbl"><span>악보</span></div><div class="big" style="font-size:20px">${songs.length}곡</div><div class="s2">${songs.length ? '보기 →' : '올리기 →'}</div></button></div>`;
+}
+function schedSheet() {
+  const d = W.date, s = schedFor(d) || {};
+  const f = (id, label, v, ph = '') => `<label class="fld">${label}<input class="in" id="sc_${id}" value="${esc(v || '')}" placeholder="${ph}"></label>`;
+  sheet(`<div class="ttl" style="font-size:24px">${fmtMD(d)} 담당 고치기</div>
+${f('story', '성경이야기 제목', s.story)}${f('preacher', '설교', s.preacher)}
+<div class="two">${f('pray', '중보기도 인도', s.pray)}${f('nation', '성전건축·나라 기도', s.nation)}</div>
+<div class="two">${f('chant', '챈트 담당', s.chant, '쉼표로 구분')}${f('verse', '챈트 말씀', s.verse, '예: 시 84:11')}</div>
+<div class="two">${f('dance', '율동', s.dance)}${f('guitar', '기타·메트로놈', s.guitar)}</div>
+${f('offering', '헌금기도 (아이 이름)', s.offering)}
+<label class="chk"><input type="checkbox" id="sc_no" ${s.noService ? 'checked' : ''}>이 주일은 조이코너 예배 없음</label>
+<div class="btns"><button class="pri" data-act="schedSave">저장</button><button class="sec" data-act="sheetClose">취소</button></div>`);
+}
+async function schedSave() {
+  const d = W.date; const data = { date: d, noService: $('#sc_no').checked };
+  ['story', 'preacher', 'pray', 'nation', 'chant', 'verse', 'dance', 'guitar', 'offering'].forEach(k => { data[k] = val('sc_' + k); });
+  try {
+    await setDoc(doc(db, 'schedule', d), data, { merge: true });
+    const i = S.schedule.findIndex(x => x.date === d);
+    if (i >= 0) Object.assign(S.schedule[i], data); else { S.schedule.push({ id: d, ...data }); S.schedule.sort((a, b) => ko(a.date, b.date)); }
+    closeSheet(); toast('저장했어요'); paint();
+  } catch (e) { toast('저장하지 못했어요: ' + errMsg(e)); }
+}
+
+/* 설교 */
+function wSermon(d) {
+  const list = W.sermons.filter(x => x.date === d);
+  const s = schedFor(d) || {};
+  const title = (list[0] && list[0].title) || s.story || '';
+  const story = title ? W.stories.find(x => x.title && (x.title === title || title.includes(x.title) || x.title.includes(title))) : null;
+  const past = W.sermons.filter(x => x.date !== d).sort((a, b) => ko(b.date, a.date)).slice(0, 30);
+  return `${list.map(sermonCard).join('') || `<section class="card"><div class="sub">${s.story ? `이번 주 이야기 <b>${esc(s.story)}</b>${s.preacher ? ' · ' + esc(s.preacher) : ''}<br>` : ''}아직 올라온 설교가 없어요.</div></section>`}
+${list.some(x => x.authorEmail === S.me.email) ? '' : '<button class="cta" data-act="sermonNew">설교 올리기</button>'}
+${story && (story.notes || story.links) ? `<section class="card"><div class="lbl"><span>설교 참고 · 표준 순서 ${story.no}번</span></div>${story.notes ? `<div class="post">${linkify(story.notes)}</div>` : ''}${story.links ? `<div class="lbl"><span>참고 설교 영상</span></div><div class="post">${linkify(story.links)}</div>` : ''}</section>` : ''}
+${past.length ? `<section class="card"><div class="lbl"><span>지난 설교</span></div><div class="list">${past.map(p => `<button class="row" data-act="wgo" data-id="${p.date}" style="min-height:56px"><span class="grow"><span class="nm" style="font-size:17px">${esc(p.title || '제목 없음')}</span><span class="sub">${fmtMD(p.date)} · ${esc(p.authorName || '')}</span></span><span class="tag ${p.status === 'done' ? 'g' : ''}">${statusLabel(p.status)}</span></button>`).join('')}</div></section>` : ''}`;
+}
+function sermonCard(p) {
+  const mine = p.authorEmail === S.me.email, admin = isAdminMe();
+  if (!(p.id in W.comments)) { W.comments[p.id] = null; loadComments(p.id).then(() => { if (S.route === 'worship') paint(); }); }
+  const cm = W.comments[p.id];
+  const chk = [['room', '참여룸'], ['activity', '활동'], ['drama', '연극']].filter(([k]) => p.check && p.check[k]).map(([, l]) => `<span class="chip sm">${l}</span>`).join('');
+  return `<section class="card"><div class="lbl"><span>${esc(p.authorName || '')} 선생님</span><span class="tag ${p.status === 'done' ? 'g' : ''}">${statusLabel(p.status)}</span></div>
+<div class="big">${esc(p.title || '제목 없음')}</div>${p.passage ? `<div class="sub">본문 · ${esc(p.passage)}</div>` : ''}
+${chk ? `<div class="chips">${chk}</div>` : ''}
+${p.script ? `<div class="lbl"><span>대본</span></div><div class="post">${linkify(p.script)}</div>` : ''}
+${p.quiz ? `<div class="lbl"><span>O/X 퀴즈</span></div><div class="post">${linkify(p.quiz)}</div>` : ''}
+${p.links ? `<div class="lbl"><span>자료 (PPT·그림·영상)</span></div><div class="post">${linkify(p.links)}</div>` : ''}
+${mine || admin ? `<div class="btns" style="flex-wrap:wrap"><button class="ghost" data-act="sermonEdit" data-id="${p.id}">고치기</button>${mine && p.status === 'draft' ? `<button class="ghost" data-act="sermonStatus" data-id="${p.id}" data-s="review">점검 요청</button>` : ''}${admin && p.status !== 'done' ? `<button class="ghost" data-act="sermonStatus" data-id="${p.id}" data-s="done">점검 완료</button>` : ''}</div>` : ''}
+<div class="lbl" style="margin-top:4px"><span>댓글 ${cm ? cm.length : ''}</span></div>
+${cm === null ? '<div class="s2">불러오는 중…</div>' : cm.map(c => `<div class="note"><span style="white-space:pre-wrap">${linkify(c.text)}</span><small><span>${esc(c.byName || '')}${c.role ? ' · ' + esc(c.role) : ''} · ${esc((c.at || '').slice(5, 10).replace('-', '/'))}</span>${c.by === S.me.email || admin ? `<button data-act="cmDel" data-id="${c.id}" data-p="${p.id}">지우기</button>` : ''}</small></div>`).join('')}
+<textarea id="cm_${p.id}" placeholder="격려나 피드백을 남겨 주세요" style="min-height:64px"></textarea><button class="sec" data-act="cmAdd" data-id="${p.id}">댓글 달기</button></section>`;
+}
+function sermonSheet(id) {
+  const s = schedFor(W.date) || {};
+  const p = id ? W.sermons.find(x => x.id === id) : { date: W.date, title: s.story || '', passage: '', script: '', quiz: '', links: '', check: {} };
+  if (!p) return;
+  W.editSermon = id || null;
+  sheet(`<div class="ttl" style="font-size:24px">${id ? '설교 고치기' : '설교 올리기'}</div>
+<div class="two"><label class="fld">주일<input class="in" type="date" id="p_date" value="${esc(p.date)}"></label><label class="fld">본문<input class="in" id="p_passage" value="${esc(p.passage || '')}" placeholder="예: 삼상 17장"></label></div>
+<label class="fld">제목<input class="in" id="p_title" value="${esc(p.title || '')}"></label>
+<label class="fld">대본<textarea id="p_script" style="min-height:220px" placeholder="성경이야기 대본을 적어 주세요">${esc(p.script || '')}</textarea></label>
+<label class="fld">O/X 퀴즈<textarea id="p_quiz" placeholder="1. 다윗은 돌 다섯 개를 골랐어요. (O)">${esc(p.quiz || '')}</textarea></label>
+<label class="fld">자료 링크 (PPT·구글 드라이브·영상)<textarea id="p_links" style="min-height:60px" placeholder="https://...">${esc(p.links || '')}</textarea></label>
+<div class="fld">이번 설교에 들어가는 것</div><div class="chips">${[['room', '참여룸'], ['activity', '활동'], ['drama', '연극']].map(([k, l]) => `<label class="chk" style="min-height:40px;margin-right:8px"><input type="checkbox" id="p_${k}" ${p.check && p.check[k] ? 'checked' : ''}>${l}</label>`).join('')}</div>
+<div class="btns"><button class="pri" data-act="sermonSave">저장</button><button class="sec" data-act="sheetClose">취소</button></div>
+${id ? '<button class="ghost danger" data-act="sermonDel">설교 지우기</button>' : ''}`);
+}
+async function sermonSave() {
+  const id = W.editSermon, old = id ? W.sermons.find(x => x.id === id) : null;
+  const data = { date: val('p_date') || W.date, title: val('p_title'), passage: val('p_passage'), script: $('#p_script').value, quiz: $('#p_quiz').value, links: $('#p_links').value.trim(), check: { room: $('#p_room').checked, activity: $('#p_activity').checked, drama: $('#p_drama').checked } };
+  if (!data.title) return toast('제목을 적어 주세요');
+  const ref = id ? doc(db, 'sermons', id) : doc(collection(db, 'sermons'));
+  const full = id ? { ...old, ...data, updatedAt: new Date().toISOString() } : { ...data, status: 'draft', authorEmail: S.me.email, authorName: myName(), at: new Date().toISOString() };
+  delete full.id;
+  try {
+    await setDoc(ref, full);
+    if (old) Object.assign(old, full); else W.sermons.push({ id: ref.id, ...full });
+    W.date = data.date; await loadSongs(W.date);
+    closeSheet(); toast('저장했어요'); paint();
+  } catch (e) { toast('저장하지 못했어요: ' + errMsg(e)); }
+}
+async function sermonDel() {
+  const id = W.editSermon;
+  try { await deleteDoc(doc(db, 'sermons', id)); W.sermons = W.sermons.filter(x => x.id !== id); closeSheet(); toast('지웠어요'); paint(); } catch (e) { toast('지우지 못했어요: ' + errMsg(e)); }
+}
+async function sermonStatus(d) {
+  const p = W.sermons.find(x => x.id === d.id); if (!p) return;
+  const patch = { status: d.s }; if (d.s === 'done') { patch.reviewedBy = myName(); patch.reviewedAt = new Date().toISOString(); }
+  try { await updateDoc(doc(db, 'sermons', p.id), patch); Object.assign(p, patch); toast(d.s === 'done' ? '점검 완료로 표시했어요' : '점검을 요청했어요'); paint(); } catch (e) { toast('바꾸지 못했어요: ' + errMsg(e)); }
+}
+async function addComment(postId) {
+  const el = document.getElementById('cm_' + postId), text = (el?.value || '').trim(); if (!text) return toast('댓글을 적어 주세요');
+  const ref = doc(collection(db, 'comments'));
+  const role = S.me.owner ? '' : S.me.director ? '디렉터' : '';
+  const c = { postId, postType: 'sermon', text, by: S.me.email, byName: myName(), role, at: new Date().toISOString() };
+  try { await setDoc(ref, c); (W.comments[postId] ||= []).push({ id: ref.id, ...c }); paint(); } catch (e) { toast('댓글을 달지 못했어요: ' + errMsg(e)); }
+}
+async function delComment(id, postId) {
+  try { await deleteDoc(doc(db, 'comments', id)); W.comments[postId] = (W.comments[postId] || []).filter(x => x.id !== id); paint(); } catch (e) { toast('지우지 못했어요: ' + errMsg(e)); }
+}
+
+/* 악보 */
+function wSongs(d) {
+  const list = W.songs[d] || [], sl = W.setlist[d] || {};
+  return `<section class="card"><div class="lbl"><span>이번 주 악보 ${list.length}곡</span></div>
+${list.length ? `<div class="list">${list.map((g, i) => `<div class="songrow"><button class="row" data-act="songView" data-id="${g.id}"><span class="num2">${i + 1}</span><span class="grow"><span class="nm" style="font-size:18px">${esc(g.title)}</span><span class="sub">${[g.key ? '키 ' + g.key : '', g.pages ? `악보 ${g.pages}장` : '사진 없음', g.memo ? g.memo.split('\n')[0] : ''].filter(Boolean).map(esc).join(' · ')}</span></span></button><div class="mv"><button data-act="songMove" data-id="${g.id}" data-n="-1" aria-label="위로" ${i === 0 ? 'disabled' : ''}>▲</button><button data-act="songMove" data-id="${g.id}" data-n="1" aria-label="아래로" ${i === list.length - 1 ? 'disabled' : ''}>▼</button></div></div>`).join('')}</div>` : '<div class="sub">아직 올라온 악보가 없어요. 보통 6~10곡을 올려요.</div>'}
+<button class="cta" data-act="songNew">+ 곡 추가</button></section>
+<section class="card"><div class="lbl"><span>예배 순서 · 기록</span></div><textarea id="sl_memo" style="min-height:120px" placeholder="예: 여는 찬양 → 기도 → 챈트 → 율동 찬양 → 성경이야기 → 헌금 → 광고">${esc(sl.memo || '')}</textarea><button class="sec" data-act="slSave">기록 저장</button>${sl.byName ? `<div class="s2">마지막 저장 · ${esc(sl.byName)}</div>` : ''}</section>`;
+}
+async function slSave() {
+  const d = W.date, memo = $('#sl_memo').value;
+  try { const data = { date: d, memo, by: S.me.email, byName: myName(), at: new Date().toISOString() }; await setDoc(doc(db, 'setlists', d), data); W.setlist[d] = data; toast('기록을 저장했어요'); paint(); } catch (e) { toast('저장하지 못했어요: ' + errMsg(e)); }
+}
+function songSheet(id) {
+  const list = W.songs[W.date] || [], sg = id ? list.find(x => x.id === id) : { title: '', key: '', memo: '', link: '' };
+  if (!sg) return;
+  W.editSong = id || null;
+  sheet(`<div class="ttl" style="font-size:24px">${id ? '곡 고치기' : '곡 추가'} · ${fmtMD(W.date)}</div>
+<label class="fld">곡 제목<input class="in" id="g_title" value="${esc(sg.title)}"></label>
+<div class="two"><label class="fld">키<input class="in" id="g_key" value="${esc(sg.key || '')}" placeholder="예: G"></label><label class="fld">링크 (영상·PDF)<input class="in" id="g_link" value="${esc(sg.link || '')}" placeholder="https://"></label></div>
+<label class="fld">메모 (반복, 율동, 엔딩 등)<textarea id="g_memo" style="min-height:60px">${esc(sg.memo || '')}</textarea></label>
+<label class="fld">악보 사진 ${id && sg.pages ? `(지금 ${sg.pages}장 · 새로 고르면 바뀌어요)` : '(여러 장 고를 수 있어요)'}<input class="in" type="file" id="g_files" accept="image/*" multiple></label>
+<div class="sub" id="g_msg"></div>
+<div class="btns"><button class="pri" data-act="songSave">저장</button><button class="sec" data-act="sheetClose">취소</button></div>
+${id ? '<button class="ghost danger" data-act="songDel">곡 지우기</button>' : ''}`);
+}
+async function compressScore(file) {
+  const bmp = await createImageBitmap(file, { imageOrientation: 'from-image' });
+  let max = 1600, q = 0.8, url = '';
+  for (let i = 0; i < 7; i++) {
+    const k = Math.min(1, max / Math.max(bmp.width, bmp.height));
+    const c = document.createElement('canvas'); c.width = Math.round(bmp.width * k); c.height = Math.round(bmp.height * k);
+    const x = c.getContext('2d'); x.fillStyle = '#fff'; x.fillRect(0, 0, c.width, c.height); x.drawImage(bmp, 0, 0, c.width, c.height);
+    url = c.toDataURL('image/jpeg', q);
+    if (url.length < 900000) return url;
+    max = Math.round(max * 0.85); q = Math.max(0.5, q - 0.06);
+  }
+  return url;
+}
+async function songSave() {
+  const id = W.editSong, d = W.date, list = W.songs[d] || (W.songs[d] = []);
+  const title = val('g_title'); if (!title) return toast('곡 제목을 적어 주세요');
+  const files = [...($('#g_files')?.files || [])].slice(0, 6);
+  const ref = id ? doc(db, 'songs', id) : doc(collection(db, 'songs'));
+  const old = id ? list.find(x => x.id === id) : null;
+  const data = { date: d, title, key: val('g_key'), link: val('g_link'), memo: $('#g_memo').value.trim(), order: old ? old.order : (list.length ? Math.max(...list.map(x => x.order || 0)) + 1 : 1), pages: old ? (old.pages || 0) : 0, by: old?.by || S.me.email, byName: old?.byName || myName() };
+  const msg = $('#g_msg');
+  try {
+    if (files.length) {
+      for (let i = 0; i < files.length; i++) {
+        msg.textContent = `악보 올리는 중… ${i + 1}/${files.length}`;
+        const url = await compressScore(files[i]);
+        await setDoc(doc(db, 'scorePages', `${ref.id}_${i}`), { songId: ref.id, date: d, n: i, data: url });
+        W.pages[`${ref.id}_${i}`] = url;
+      }
+      for (let i = files.length; i < (old?.pages || 0); i++) { await deleteDoc(doc(db, 'scorePages', `${ref.id}_${i}`)).catch(() => { }); delete W.pages[`${ref.id}_${i}`]; }
+      data.pages = files.length;
+    }
+    await setDoc(ref, data);
+    if (old) Object.assign(old, data); else list.push({ id: ref.id, ...data });
+    list.sort((a, b) => a.order - b.order);
+    closeSheet(); toast('저장했어요'); paint();
+  } catch (e) { msg.textContent = ''; toast('저장하지 못했어요: ' + errMsg(e)); }
+}
+async function songDel() {
+  const id = W.editSong, d = W.date, sg = (W.songs[d] || []).find(x => x.id === id); if (!sg) return;
+  try {
+    for (let i = 0; i < (sg.pages || 0); i++) await deleteDoc(doc(db, 'scorePages', `${id}_${i}`)).catch(() => { });
+    await deleteDoc(doc(db, 'songs', id));
+    W.songs[d] = W.songs[d].filter(x => x.id !== id); closeSheet(); toast('지웠어요'); paint();
+  } catch (e) { toast('지우지 못했어요: ' + errMsg(e)); }
+}
+async function songMove(id, dir) {
+  const list = W.songs[W.date] || [], i = list.findIndex(x => x.id === id), j = i + dir;
+  if (i < 0 || j < 0 || j >= list.length) return;
+  [list[i], list[j]] = [list[j], list[i]];
+  const changed = [];
+  list.forEach((g, k) => { if (g.order !== k + 1) { g.order = k + 1; changed.push(g); } });
+  paint();
+  try { const b = writeBatch(db); changed.forEach(g => b.update(doc(db, 'songs', g.id), { order: g.order })); await b.commit(); } catch (e) { toast('순서를 저장하지 못했어요: ' + errMsg(e)); }
+}
+async function songView(id) {
+  const sg = (W.songs[W.date] || []).find(x => x.id === id); if (!sg) return;
+  const n = sg.pages || 0, idx = (W.songs[W.date] || []).indexOf(sg) + 1;
+  sheet(`<div class="hd"><div class="ttl" style="font-size:24px">${idx}. ${esc(sg.title)}</div><button class="sec" data-act="sheetClose" style="min-height:44px">닫기</button></div>
+${sg.key ? `<div class="chips"><span class="chip">키 ${esc(sg.key)}</span></div>` : ''}${sg.memo ? `<div class="note" style="white-space:pre-wrap">${linkify(sg.memo)}</div>` : ''}${sg.link ? `<div class="post">${linkify(sg.link)}</div>` : ''}
+${n ? Array.from({ length: n }, (_, i) => `<img class="score" id="pg_${i}" alt="${esc(sg.title)} 악보 ${i + 1}쪽" ${W.pages[id + '_' + i] ? `src="${W.pages[id + '_' + i]}"` : ''}>`).join('') : '<div class="sub">악보 사진이 없어요.</div>'}
+<div class="s2">두 손가락으로 벌리면 크게 볼 수 있어요.</div>
+<button class="ghost" data-act="songEdit" data-id="${id}">고치기</button>`);
+  for (let i = 0; i < n; i++) {
+    const k = id + '_' + i;
+    if (!W.pages[k]) { try { const s = await getDoc(doc(db, 'scorePages', k)); if (s.exists()) W.pages[k] = s.data().data; } catch { /* 없음 */ } }
+    const el = document.getElementById('pg_' + i); if (el && W.pages[k]) el.src = W.pages[k];
+  }
+}
+
+/* 업무 분담 */
+function wDuty() {
+  const me = myName(), list = W.duties, admin = isAdminMe();
+  const mine = list.filter(x => me && (x.people || []).includes(me));
+  const empty = list.filter(x => !(x.people || []).length);
+  const secs = ['예배 전', '예배 시', '예배 후'];
+  return `${mine.length ? `<section class="card" style="border-color:#C62828"><div class="lbl"><span>내가 맡은 일</span></div><div class="chips">${mine.map(x => `<span class="chip">${esc(x.role)}</span>`).join('')}</div></section>` : ''}
+${empty.length ? `<section class="card"><div class="lbl"><span>담당이 필요한 자리 ${empty.length}곳</span></div><div class="chips">${empty.map(x => `<span class="tag">${esc(x.role)}</span>`).join(' ')}</div></section>` : ''}
+${secs.map(sec => { const l = list.filter(x => (x.section || '예배 시') === sec); if (!l.length) return ''; return `<div class="ttl" style="font-size:20px;margin-top:4px">${sec}</div>${l.map(x => `<button class="card tapcard duty" data-act="dutyEdit" data-id="${x.id}" ${admin ? '' : 'disabled'}><div class="lbl"><span>${esc(x.area)}${x.area !== x.role ? ' · ' + esc(x.role) : ''}</span>${(x.people || []).length ? '' : '<span class="tag">담당 필요</span>'}</div><div style="font-size:14px">${esc(x.desc || '')}</div>${(x.people || []).length ? `<div class="chips">${x.people.map(n => `<span class="chip sm ${n === me ? 'mine' : ''}">${esc(n)}</span>`).join('')}</div>` : ''}${x.note ? `<div class="s2" style="white-space:pre-wrap">※ ${esc(x.note)}</div>` : ''}</button>`).join('')}`; }).join('')}
+${admin ? '<button class="sec" data-act="dutyEdit">+ 역할 추가</button>' : ''}
+${list.length ? '' : '<div class="sub">업무 분담이 아직 없어요. 설정에서 joycorner-extra.json을 가져와 주세요.</div>'}`;
+}
+function dutySheet(id) {
+  if (!isAdminMe()) return;
+  const x = id ? W.duties.find(y => y.id === id) : { section: '예배 시', area: '', role: '', desc: '', people: [], note: '' };
+  if (!x) return;
+  W.editDuty = id || null;
+  sheet(`<div class="ttl" style="font-size:24px">${id ? '역할 고치기' : '역할 추가'}</div>
+<div class="two"><label class="fld">언제<select class="in" id="u_sec">${['예배 전', '예배 시', '예배 후'].map(s => `<option ${x.section === s ? 'selected' : ''}>${s}</option>`).join('')}</select></label><label class="fld">구분<input class="in" id="u_area" value="${esc(x.area)}" placeholder="예: 환영"></label></div>
+<label class="fld">역할<input class="in" id="u_role" value="${esc(x.role)}" placeholder="예: 입장 (이름표)"></label>
+<label class="fld">하는 일<textarea id="u_desc">${esc(x.desc || '')}</textarea></label>
+<label class="fld">담당 (쉼표로 구분)<input class="in" id="u_people" value="${esc((x.people || []).join(', '))}"></label>
+<label class="fld">비고<textarea id="u_note" style="min-height:60px">${esc(x.note || '')}</textarea></label>
+<div class="btns"><button class="pri" data-act="dutySave">저장</button><button class="sec" data-act="sheetClose">취소</button></div>
+${id ? '<button class="ghost danger" data-act="dutyDel">역할 지우기</button>' : ''}`);
+}
+async function dutySave() {
+  const id = W.editDuty, old = id ? W.duties.find(y => y.id === id) : null;
+  const role = val('u_role'); if (!role) return toast('역할을 적어 주세요');
+  const data = { section: val('u_sec'), area: val('u_area') || role, role, desc: $('#u_desc').value.trim(), people: val('u_people').split(',').map(x => x.trim()).filter(Boolean), note: $('#u_note').value.trim(), order: old ? old.order : Math.max(0, ...W.duties.map(y => y.order || 0)) + 1 };
+  const ref = id ? doc(db, 'duties', id) : doc(collection(db, 'duties'));
+  try { await setDoc(ref, data); if (old) Object.assign(old, data); else W.duties.push({ id: ref.id, ...data }); W.duties.sort((a, b) => (a.order ?? 999) - (b.order ?? 999)); closeSheet(); toast('저장했어요'); paint(); } catch (e) { toast('저장하지 못했어요: ' + errMsg(e)); }
+}
+async function dutyDel() {
+  const id = W.editDuty;
+  try { await deleteDoc(doc(db, 'duties', id)); W.duties = W.duties.filter(y => y.id !== id); closeSheet(); toast('지웠어요'); paint(); } catch (e) { toast('지우지 못했어요: ' + errMsg(e)); }
 }
 
 /* ---------- 클릭 처리 ---------- */
@@ -582,7 +877,14 @@ const ACT = {
   delStaffAsk: () => { const st = S.staff.find(x => x.id === S.editStaff); sheet(`<div class="ttl" style="font-size:22px">${esc(st?.name || '')} 선생님을 명단에서 뺄까요?</div><div class="sub">구글 계정이 연결되어 있었다면 로그인도 막혀요.</div><div class="btns"><button class="pri" data-act="delStaff">네, 뺄게요</button><button class="sec" data-act="sheetClose">아니요</button></div>`); },
   delStaff,
   runImport, importYes: () => { S.importOk = true; closeSheet(); runImport(); },
-  csv: d => downloadCsv(d.id)
+  csv: d => downloadCsv(d.id),
+  wtab: d => { W.tab = d.id; paint(); }, wweek: async d => { W.date = addDays(W.date, Number(d.n)); paint(); await loadSongs(W.date); paint(); },
+  wgo: async d => { W.date = d.id; W.tab = 'sermon'; paint(); await loadSongs(W.date); paint(); },
+  schedEdit: schedSheet, schedSave,
+  sermonNew: () => sermonSheet(null), sermonEdit: d => sermonSheet(d.id), sermonSave, sermonDel, sermonStatus,
+  cmAdd: d => addComment(d.id), cmDel: d => delComment(d.id, d.p),
+  slSave, songNew: () => songSheet(null), songEdit: d => songSheet(d.id), songSave, songDel, songView: d => songView(d.id), songMove: d => songMove(d.id, Number(d.n)),
+  dutyEdit: d => dutySheet(d.id), dutySave, dutyDel
 };
 appEl.addEventListener('click', e => {
   const t = e.target.closest('[data-act]'); if (!t) return;
