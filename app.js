@@ -141,7 +141,7 @@ function classChips() {
 function nav(active) { S.navActive = active; return ''; }
 function navHtml(active) {
   const t = (k, ic, label) => `<button class="tab ${active === k ? 'on' : ''}" data-act="go" data-to="${k}">${svg(ICON[ic])}<span>${label}</span></button>`;
-  return `<nav class="nav" aria-label="메뉴"><div class="brand"><img src="icon-192.png" alt="조이코너" width="52" height="52"></div>${t('home', 'home', '홈')}${t('attend', 'att', '출석')}${t('friends', 'kids', '친구들')}${t('worship', 'music', '예배')}${t('room', 'room', '교사실')}<button class="tab deskonly ${active === 'help' ? 'on' : ''}" data-act="go" data-to="help">${svg('<circle cx="12" cy="12" r="9"/><path d="M9.6 9.4a2.5 2.5 0 0 1 4.8.9c0 1.7-2.4 2.1-2.4 3.7M12 16.9v.1"/>')}<span>도우미</span></button></nav>`;
+  return `<nav class="nav" aria-label="메뉴"><div class="brand"><img src="icon-192.png" alt="조이코너" width="52" height="52"><small class="railv">${APP_VERSION}</small></div>${t('home', 'home', '홈')}${t('attend', 'att', '출석')}${t('friends', 'kids', '친구들')}${t('worship', 'music', '예배')}${t('room', 'room', '교사실')}<button class="tab deskonly ${active === 'help' ? 'on' : ''}" data-act="go" data-to="help">${svg('<circle cx="12" cy="12" r="9"/><path d="M9.6 9.4a2.5 2.5 0 0 1 4.8.9c0 1.7-2.4 2.1-2.4 3.7M12 16.9v.1"/>')}<span>도우미</span></button></nav>`;
 }
 const noClass = () => `<div class="center"><div class="big">아직 반이 없어요</div><div class="sub">${S.me.role === 'admin' ? '설정에서 시트 데이터를 가져오거나 교사를 등록해 주세요.' : '관리자에게 맡을 반을 정해 달라고 말해 주세요.'}</div>${S.me.role === 'admin' ? `<button class="cta" style="max-width:280px" data-act="go" data-to="settings">설정 열기</button>` : ''}</div>`;
 
@@ -155,7 +155,7 @@ const vPending = () => `<div class="center"><div class="big">아직 등록되지
 /* ---------- 홈 ---------- */
 function vHome() {
   const c = S.cur; const name = S.me.name || S.user.displayName || '';
-  const header = `<header class="hd"><div><div class="hello">안녕하세요, ${esc(name)} 선생님!</div><div class="sub">${new Date().getMonth() + 1}월 ${new Date().getDate()}일 ${DOW[new Date().getDay()]}요일</div></div><div class="btns"><button class="iconbtn" data-act="go" data-to="help" aria-label="도우미">${svg('<circle cx="12" cy="12" r="9"/><path d="M9.6 9.4a2.5 2.5 0 0 1 4.8.9c0 1.7-2.4 2.1-2.4 3.7M12 16.9v.1"/>')}</button><button class="iconbtn" data-act="go" data-to="settings" aria-label="설정">${svg(ICON.gear)}</button></div></header>${welcomeLine()}`;
+  const header = `<header class="hd"><div><div class="hello">안녕하세요, ${esc(name)} 선생님!</div><div class="sub">${new Date().getMonth() + 1}월 ${new Date().getDate()}일 ${DOW[new Date().getDay()]}요일 <button class="vpill" data-act="changelog" aria-label="업데이트 기록">${APP_VERSION}</button></div></div><div class="btns"><button class="iconbtn" data-act="go" data-to="help" aria-label="도우미">${svg('<circle cx="12" cy="12" r="9"/><path d="M9.6 9.4a2.5 2.5 0 0 1 4.8.9c0 1.7-2.4 2.1-2.4 3.7M12 16.9v.1"/>')}</button><button class="iconbtn" data-act="go" data-to="settings" aria-label="설정">${svg(ICON.gear)}</button></div></header>${welcomeLine()}`;
   if (!c) return `<div class="scroll">${header}${noClass()}${versionCard()}</div>`;
   const cl = S.classes[c], kids = activeKids(c), faces = kids.slice(0, 3);
   const todayStr = ymd(new Date());
@@ -302,6 +302,7 @@ function vSettings() {
   const admin = S.me.role === 'admin';
   return `<div class="scroll cols"><div class="hd"><button class="back" data-act="back">← 홈</button></div><div class="ttl">설정</div>
 <section class="card"><div class="lbl"><span>내 정보</span></div><div class="big" style="font-size:22px">${esc(S.me.name || S.user.displayName || '')}</div><div class="sub">${esc(S.user.email)} · ${S.me.owner ? '수퍼관리자' : S.me.director ? '디렉터' : admin ? '시스템 관리자' : '교사'}</div><button class="sec" data-act="logout">로그아웃</button></section>
+<section class="card"><div class="lbl"><span>자료 내려받기</span><span class="s2">PDF · 엑셀</span></div><div class="sub">아이 명단 · 출석부 · 교사 명단 · 업무 분담 · 순서표 · 일정 · 주일 인원 · 찬양을 종류별로 받아요.${S.me.role === 'admin' ? ' 연간 일정 엑셀 일괄 입력도 여기서 해요.' : ''}</div><button class="sec" data-act="go" data-to="export">자료 내려받기 열기</button></section>
 ${gcalCard()}
 ${admin ? `
 ${gcalSettingsCard()}
@@ -726,9 +727,10 @@ async function dutyDel() {
 }
 
 /* ---------- 교사실 (공지 · 캘린더 · 업무 분담 · 조직도 · 통계) ---------- */
-const APP_VERSION = 'v11';
+const APP_VERSION = 'v12';
 const APP_DATE = '2026-11-11';
 const CHANGELOG = [
+  { v: 'v12', date: '11월 11일', items: ['자료 내려받기: 아이 명단 · 출석부 · 생일 달력 · 교사 명단 · 업무 분담 · 순서표 · 일정 · 주일 인원 · 찬양을 PDF나 엑셀로', '전체 자료를 엑셀 한 파일로 (관리자)', '연간 일정 한 번에 넣기: 엑셀 양식 내려받기 → 채워서 올리기 → 바뀌는 것 확인 → 적용', '홈 위쪽에 앱 버전 (누르면 업데이트 기록)', '일정에 "내용" 칸 (제목 바로 아래, 캘린더 목록에도 첫 줄이 보여요)'] },
   { v: 'v11', date: '11월 11일', items: ['카톡 교사방 기록 가져오기: 주일 찬양 5년치 · 주일 인원 · 올해 행사 (있는 값은 그대로, 빈칸만)', '교사실 → 통계: 주일 인원 막대 그래프 · 해마다 비교 · 이번 주 넣기', '예배 → 악보: 지난 찬양 찾기 (언제 · 몇 번 · 키 · 빠르기)', '곡마다 악기 · 빠르기(♩) 칸'] },
   { v: 'v10', date: '11월 11일', items: ['처음 여는 속도: 휴대폰에 남은 것으로 먼저 보여 주고 새 것은 뒤에서 받아요', '화면마다 필요한 것만 받아요 (출석 기록은 그 반만, 순서표는 연 달만)', '일정 넣기 창을 세로 화면에 맞게 정리 (시작 · 끝 한 줄씩)', '공휴일: 해마다 불러오기 · 대체·임시공휴일이 바뀌면 관리자에게 알림', '바깥 캘린더 가져오기 (관리자): .ics 파일 또는 구글 캘린더에서 바로 · 묶음째 지우기', '내 구글 캘린더 연결: 교사실 일정과 내 주일 순서가 "조이코너" 캘린더로'] },
   { v: 'v9', date: '11월 11일', items: ['일정: 종일 또는 몇 시부터 몇 시까지', '순서표: 날짜 더하기 · 한 해 빈 주일 한 번에 만들기', '캘린더의 "예배 없음" 일정이 순서표·예배 탭에 함께 반영돼요', '주일 카드에 그날 일정이 함께 보여요', '눈 깜빡임: 두 번 → 다음, 세 번 → 이전'] },
@@ -1869,7 +1871,7 @@ function itemsOn(d) {
   const s = schedFor(d);
   if (s && !(s.noService && s.noServiceBy && (R.events || []).some(e => e.id === s.noServiceBy))) out.push({ d, kind: s.noService ? 'off' : 'sun', label: s.noService ? (s.noServiceNote || '조이코너 예배 없음') : (s.story || '주일 예배'), sub: s.noService ? '' : (s.preacher ? '설교 ' + s.preacher : '') });
   (R.notices || []).filter(n => n.eventDate === d).forEach(n => out.push({ d, kind: 'evt', label: n.title, sub: n.eventTime || '', notice: n.id }));
-  (R.events || []).filter(e => { const [a, b] = evSpan(e); return a <= d && d <= b; }).forEach(e => { const [a, b] = evSpan(e); out.push({ d, kind: e.kind === '예배 없음' ? 'off' : (KIND_CLASS[e.kind] || 'evt'), label: e.title, sub: [a !== b ? `${fmtShort(a)}–${fmtShort(b)}` : '', timeText(e), e.place].filter(Boolean).join(' · '), event: e.id, span: a !== b, first: d === a }); });
+  (R.events || []).filter(e => { const [a, b] = evSpan(e); return a <= d && d <= b; }).forEach(e => { const [a, b] = evSpan(e); out.push({ d, kind: e.kind === '예배 없음' ? 'off' : (KIND_CLASS[e.kind] || 'evt'), label: e.title, sub: [a !== b ? `${fmtShort(a)}–${fmtShort(b)}` : '', timeText(e), e.place, (e.memo || '').split('\n')[0].slice(0, 40)].filter(Boolean).join(' · '), event: e.id, span: a !== b, first: d === a }); });
   const md = d.slice(5);
   allKids().filter(k => (k.status || 'active') === 'active' && k.birth && k.birth.slice(5) === md).forEach(k => out.push({ d, kind: 'bday', label: k.name + ' 생일', sub: (S.classes[k.classId] || {}).name || '', kid: k.id }));
   S.staff.filter(st => st.birth && st.birth.slice(5) === md).forEach(st => out.push({ d, kind: 'bday', label: st.name + ' 선생님 생일', sub: '', staff: st.id }));
@@ -1887,6 +1889,7 @@ async function eventSheet(id, preset) {
   const kinds = ['행사', '회의', '교육', '부재', '기타'].concat(isAdminMe() ? ['예배 없음'] : []);
   sheet(`<div class="ttl" style="font-size:24px">${id ? '일정 고치기' : (e.kind === '부재' ? '부재 알리기' : '일정 추가')}</div>
 <label class="fld">제목<input class="in" id="e2_title" value="${esc(e.title)}" placeholder="예: 교사 리트릿"></label>
+<label class="fld">내용 <span class="s2">(준비물 · 순서 · 링크 등, 줄을 바꿔 써도 돼요)</span><textarea id="e2_memo" style="min-height:96px" placeholder="예: 13시 교회 앞 출발 · 회비 5,000원 · 개인 컵 챙기기">${esc(e.memo || '')}</textarea></label>
 <div class="fld">종류</div><div class="kindgrid">${kinds.map(k => `<label class="kindopt ${e.kind === k ? 'on' : ''}"><input type="radio" name="e2_kind" value="${k}" ${e.kind === k ? 'checked' : ''}><i class="cdot ${k === '예배 없음' ? 'off' : (KIND_CLASS[k] || 'evt')}"></i>${k}</label>`).join('')}</div>
 <div class="s2" id="e2_offnote" ${e.kind === '예배 없음' ? '' : 'hidden'}>이 기간의 주일은 순서표와 예배 탭에 "조이코너 예배 없음"으로 함께 바뀌어요.</div>
 <div class="timebox ${allDay ? 'allday' : ''}" id="e2_box">
@@ -1897,7 +1900,6 @@ async function eventSheet(id, preset) {
 <div class="s2 tbnote">${allDay ? '하루 일정이면 끝 날짜를 그대로 두세요.' : '시작 시간을 고르면 끝 시간은 1시간 뒤로 맞춰져요.'}</div>
 </div>
 <label class="fld">장소<input class="in" id="e2_place" value="${esc(e.place || '')}"></label>
-<label class="fld">메모<textarea id="e2_memo" style="min-height:70px">${esc(e.memo || '')}</textarea></label>
 <div class="fld">사진 (최대 10장)</div>${pkHtml('event')}
 <div class="sub" id="e2_msg"></div>
 <div class="btns"><button class="pri" data-act="eventSave">저장</button><button class="sec" data-act="sheetClose">취소</button></div>
@@ -2370,6 +2372,7 @@ function parseICS(txt) {
     if (!cur) { if (N === 'X-WR-CALNAME') calName = icsUnesc(v); continue; }
     if (N === 'SUMMARY') cur.title = icsUnesc(v);
     else if (N === 'LOCATION') cur.place = icsUnesc(v);
+    else if (N === 'DESCRIPTION') cur.memo = icsUnesc(v).replace(/<[^>]+>/g, ' ').slice(0, 1000);
     else if (N === 'DTSTART') cur.s = icsTime(v, P);
     else if (N === 'DTEND') cur.e = icsTime(v, P);
     else if (N === 'DURATION') cur.dur = v;
@@ -2427,7 +2430,7 @@ function icsToItems(parsed, from, to) {
     if (e.s.allDay) { const ed = e.e ? addDays(e.e.date, -1) : e.dur ? addDays(e.s.date, Math.max(0, Math.round(durMin(e.dur) / 1440) - 1)) : e.s.date; spanD = Math.max(0, dayDiff(e.s.date, ed)); }
     else { const en = e.e ? e.e : e.dur ? addMin(e.s.date, e.s.time, durMin(e.dur)) : addMin(e.s.date, e.s.time, 60); spanD = Math.max(0, dayDiff(e.s.date, en.date)); endT = en.time; }
     const dates = e.rrule && !e.rid ? expandRule(e.s.date, e.rrule, from, to).filter(d => !e.ex.includes(d) && !overrides.has(e.uid + '|' + d)) : (e.s.date >= from && e.s.date <= to ? [e.s.date] : []);
-    dates.forEach(d => items.push({ title: e.title || '(제목 없음)', date: d, endDate: spanD ? addDays(d, spanD) : '', allDay: !!e.s.allDay, time: e.s.allDay ? '' : e.s.time, endTime: e.s.allDay ? '' : endT, place: e.place || '', gid: (e.uid || e.title + e.s.date) + '|' + d }));
+    dates.forEach(d => items.push({ title: e.title || '(제목 없음)', date: d, endDate: spanD ? addDays(d, spanD) : '', allDay: !!e.s.allDay, time: e.s.allDay ? '' : e.s.time, endTime: e.s.allDay ? '' : endT, place: e.place || '', memo: e.memo || '', gid: (e.uid || e.title + e.s.date) + '|' + d }));
   }
   return items.sort((a, b) => ko(a.date + a.time, b.date + b.time));
 }
@@ -2437,7 +2440,7 @@ function gToItem(g) {
   let date, endDate = '', time = '', endTime = '', allDay = false;
   if (g.start.date) { allDay = true; date = g.start.date; const ed = g.end && g.end.date ? addDays(g.end.date, -1) : date; endDate = ed > date ? ed : ''; }
   else { const s = kstParts(Date.parse(g.start.dateTime)), e = g.end && g.end.dateTime ? kstParts(Date.parse(g.end.dateTime)) : addMin(s.date, s.time, 60); date = s.date; time = s.time; endTime = e.time; endDate = e.date > date ? e.date : ''; }
-  return { title: g.summary || '(제목 없음)', date, endDate, allDay, time, endTime, place: g.location || '', gid: (g.iCalUID || g.id) + '|' + date };
+  return { title: g.summary || '(제목 없음)', date, endDate, allDay, time, endTime, place: g.location || '', memo: String(g.description || '').replace(/<[^>]+>/g, ' ').slice(0, 1000), gid: (g.iCalUID || g.id) + '|' + date };
 }
 async function impSheet() {
   if (!isAdminMe()) return;
@@ -2499,7 +2502,7 @@ async function impRun() {
   const name = val('im_name') || IMP.name || '가져온 일정', kind = IMP.kind;
   const msg = $('#im_msg'); msg.textContent = `${pick.length}개 넣는 중…`;
   const bref = doc(collection(db, 'imports')), bid = bref.id;
-  const rows = pick.map(x => ({ ref: doc(collection(db, 'events')), data: { ...x, kind, memo: '', staffId: '', imgCount: 0, by: S.me.email, byName: myName(), importBatch: bid, source: IMP.src } }));
+  const rows = pick.map(x => ({ ref: doc(collection(db, 'events')), data: { ...x, kind, memo: x.memo || '', staffId: '', imgCount: 0, by: S.me.email, byName: myName(), importBatch: bid, source: IMP.src } }));
   try {
     for (let i = 0; i < rows.length; i += 400) { const b = writeBatch(db); rows.slice(i, i + 400).forEach(r => b.set(r.ref, r.data)); await b.commit(); msg.textContent = `${Math.min(rows.length, i + 400)} / ${rows.length}`; }
     const meta = { name, count: rows.length, src: IMP.src, from: IMP.from, to: IMP.to, at: new Date().toISOString(), by: S.me.email, byName: myName() };
@@ -2862,3 +2865,313 @@ Object.assign(ACT, {
   histOpen: async () => { toast('지난 찬양을 불러오는 중…'); await loadHist(); paint(); },
   histGo: d => { W.date = d.id; W.tab = 'songs'; loadSongs(d.id).then(() => { paint(); const sc = $('.scroll'); if (sc) sc.scrollTop = 0; }); }
 });
+
+/* ================= v12 · 자료 내려받기 (PDF · 엑셀) · 연간 일정 엑셀 일괄 입력 ================= */
+let xlP = null;
+function loadXLSX() {
+  return xlP || (xlP = (async () => {
+    for (const u of ['https://cdn.sheetjs.com/xlsx-0.20.3/package/xlsx.mjs', 'https://cdn.jsdelivr.net/npm/xlsx@0.18.5/xlsx.mjs']) { try { return await import(u); } catch { /* 다음 것 */ } }
+    xlP = null; throw new Error('엑셀 도구를 불러오지 못했어요. 인터넷 연결을 확인해 주세요');
+  })());
+}
+const EX = { year: new Date().getFullYear(), cls: 'all', busy: '' };
+const todayDot = () => ymd(new Date()).replace(/-/g, '.');
+const exClasses = () => EX.cls === 'all' ? S.myClasses : [EX.cls];
+const clsName = c => (S.classes[c] || {}).name || c;
+const SONGS_ALL = { rows: null };
+async function loadSongsAll() {
+  if (SONGS_ALL.rows) return SONGS_ALL.rows;
+  try { const s = await getDocs(collection(db, 'songs')); SONGS_ALL.rows = s.docs.map(d => d.data()); } catch { SONGS_ALL.rows = []; }
+  return SONGS_ALL.rows;
+}
+async function loadFamsAll() {
+  if (isAdminMe()) { try { const s = await getDocs(collection(db, 'families')); s.docs.forEach(d => { S.fam[d.id] = { id: d.id, ...d.data() }; }); return; } catch { /* 하나씩 */ } }
+  await Promise.all(exClasses().flatMap(c => (S.kids[c] || []).map(k => k.familyId ? loadFam(k.familyId) : null)));
+}
+const famOf = k => S.fam[k.familyId] || {};
+const phonesOf = f => Object.values(f.phones || {}).concat([f.fatherTel, f.motherTel]).filter(Boolean).join(' / ');
+const sibOf = f => (f.siblings || []).map(x => x.name + (x.org ? `(${x.org})` : '')).join(', ');
+const yesNo = v => v ? 'O' : '';
+
+/* 종류마다: 무엇을 받아 와서(need) 어떤 표(tables)를 만들지 */
+const EXP = [
+  { k: 'kids', t: '아이 명단', d: '반별 이름 · 생일 · 부모님 · 셀 · 형제', ic: 'kids', who: 'all', orient: 'portrait',
+    need: () => loadFamsAll(),
+    tables: () => exClasses().map(c => ({ title: clsName(c), cols: [['번호', 5], ['이름', 10], ['생일', 12], ['아빠', 9], ['엄마', 9], ['셀', 10], ['형제', 18], ['연락처', 20], ['함께한 날', 11], ['메모', 22]],
+      rows: activeKids(c).map((k, i) => { const f = famOf(k); return [i + 1, k.name, k.birth || (k.birthYear ? k.birthYear + '년' : ''), f.father || '', f.mother || '', [f.fatherCell, f.motherCell].filter(Boolean).join(' · '), sibOf(f), phonesOf(f), k.since || '', [(k.flags || []).join(' '), k.remark || '', k.note || ''].filter(Boolean).join(' · ')]; }) })) },
+  { k: 'att', t: '출석부', d: '반별 · 주일마다 O, 출석률', ic: 'att', who: 'all', orient: 'landscape', year: true,
+    need: () => Promise.all(exClasses().map(ensureAtt)),
+    tables: () => exClasses().map(c => {
+      const ds = recorded(c).filter(d => d.startsWith(String(EX.year)));
+      const kids = activeKids(c);
+      const rows = kids.map((k, i) => { const own = ds.filter(d => !k.since || d >= k.since); const n = own.filter(d => (S.att[c][d] || {})[k.id] === 'p').length; return [i + 1, k.name, ...ds.map(d => (k.since && d < k.since) ? '·' : ((S.att[c][d] || {})[k.id] === 'p' ? 'O' : '')), n, own.length ? Math.round(n / own.length * 100) + '%' : '']; });
+      rows.push(['', '출석', ...ds.map(d => presentCount(c, d)), '', '']);
+      return { title: `${clsName(c)} · ${EX.year}년 ${ds.length}주`, cols: [['번호', 5], ['이름', 9], ...ds.map(d => [fmtShort(d), 5]), ['출석', 6], ['출석률', 7]], rows, dense: ds.length > 14, foot: true };
+    }) },
+  { k: 'bday', t: '생일 달력', d: '달마다 아이 · 선생님 생일 (한 장)', ic: 'kids', who: 'all', orient: 'portrait',
+    need: () => Promise.resolve(),
+    tables: () => [{ title: '달마다 생일', cols: [['달', 6], ['아이 (반)', 60], ['선생님', 24]],
+      rows: MONTHS.map((mn, i) => { const m = pad(i + 1); const kid = exClasses().flatMap(c => activeKids(c)).filter(k => (k.birth || '').slice(5, 7) === m).sort((a, b) => ko(a.birth.slice(8), b.birth.slice(8))); const st = S.staff.filter(x => (x.birth || '').slice(5, 7) === m); return [mn, kid.map(k => `${Number(k.birth.slice(8))}일 ${k.name}(${clsName(k.classId).replace('반', '')})`).join(', '), st.map(x => `${Number(x.birth.slice(8))}일 ${x.name}`).join(', ')]; }) }] },
+  { k: 'staff', t: '교사 명단', d: '반 · 담임/보조 · 맡은 일 · 연락처', ic: 'kids', who: 'all', orient: 'landscape',
+    need: () => Promise.resolve(),
+    tables: () => [{ title: `교사 ${S.staff.length}명`, cols: [['번호', 5], ['이름', 9], ['구분', 10], ['반', 14], ['맡은 일', 40], ['생일', 11], ['연락처', 14], ['구글 연결', 9]],
+      rows: S.staff.map((st, i) => [i + 1, st.name, roleLabel(st), (st.classes || []).map(c => `${clsName(c)} ${(st.classRole || {})[c] || '보조'}`).join(', '), (st.duties || []).join(', '), st.birth || '', st.phone || '', st.email ? 'O' : '']) }] },
+  { k: 'duty', t: '업무 분담', d: '역할 · 담당 · 부재 시 대신할 분', ic: 'room', who: 'all', orient: 'landscape',
+    need: () => loadDuties(),
+    tables: () => [{ title: '업무 분담', cols: [['구역', 10], ['영역', 10], ['역할', 16], ['담당', 26], ['부재 시', 16], ['설명', 44]],
+      rows: (W.duties || []).map(d => [d.section || '', d.area || '', d.role || '', (d.people || []).join(', '), (d.backup || []).join ? (d.backup || []).join(', ') : (d.backup || ''), [d.desc, d.note].filter(Boolean).join(' / ')]) }] },
+  { k: 'sched', t: '순서표', d: '주일마다 이야기 · 설교 · 기도 · 챈트 · 율동 · 헌금기도', ic: 'room', who: 'all', orient: 'landscape', year: true,
+    need: () => Promise.resolve(),
+    tables: () => [{ title: `${EX.year}년 순서표`, cols: SCH_COLS.map(c => [c[1], c[2]]),
+      rows: S.schedule.filter(s => s.date.startsWith(String(EX.year))).map(s => SCH_COLS.map(([k]) => k === 'date' ? s.date.slice(5).replace('-', '/') : k === 'dow' ? DOW[parseD(s.date).getDay()] : k === 'noService' ? yesNo(s.noService) : (s[k] || ''))), dense: true }] },
+  { k: 'events', t: '일정', d: '교사실 캘린더 일정 · 공휴일 · 내용', ic: 'room', who: 'all', orient: 'landscape', year: true,
+    need: () => Promise.all([loadEvents(), loadHol(EX.year)]),
+    tables: () => {
+      const Y = String(EX.year), hol = (HOL.y[Y] && HOL.y[Y].days) || {};
+      const rows = (R.events || []).filter(e => (e.date || '').startsWith(Y) || (e.endDate || '').startsWith(Y)).map(e => ({ d: e.date, r: [fmtShort(e.date) + ' ' + DOW[parseD(e.date).getDay()] + (e.endDate && e.endDate > e.date ? ' – ' + fmtShort(e.endDate) : ''), timeText(e), e.kind || '행사', e.title || '', e.memo || '', e.place || '', e.byName || ''] }))
+        .concat(Object.entries(hol).map(([d, n]) => ({ d, r: [fmtShort(d) + ' ' + DOW[parseD(d).getDay()], '종일', '공휴일', n, '', '', ''] })))
+        .sort((a, b) => ko(a.d, b.d)).map(x => x.r);
+      return [{ title: `${Y}년 일정 ${rows.length}개`, cols: [['날짜', 15], ['시간', 12], ['종류', 8], ['제목', 28], ['내용', 44], ['장소', 18], ['올린 사람', 9]], rows }];
+    } },
+  { k: 'counts', t: '주일 인원', d: '부모님·아이들 · 교사 · 총 (해마다)', ic: 'stats', who: 'all', orient: 'portrait', year: true,
+    need: () => { CNT.rows = null; return loadCounts(); },
+    tables: () => { const rs = (CNT.rows || []).filter(r => r.date.startsWith(String(EX.year))); const t = r => r.total || ((r.family || 0) + (r.teachers || 0)); const avg = k => rs.length ? Math.round(rs.reduce((s, r) => s + (k === 'total' ? t(r) : (r[k] || 0)), 0) / rs.length) : ''; return [{ title: `${EX.year}년 주일 인원 ${rs.length}주`, cols: [['주일', 10], ['부모님·아이들', 13], ['아이들', 8], ['교사', 7], ['총', 7], ['메모', 30]], rows: rs.map(r => [r.date.slice(5).replace('-', '/'), r.family ?? '', r.kids ?? '', r.teachers ?? '', t(r), r.place || r.memo || '']).concat(rs.length ? [['평균', avg('family'), '', avg('teachers'), avg('total'), '']] : []), foot: !!rs.length }]; } },
+  { k: 'songs', t: '주일 찬양', d: '주일마다 곡 순서 · 악기 · 키 · 빠르기', ic: 'music', who: 'all', orient: 'portrait', year: true,
+    need: () => { SONGS_ALL.rows = null; return loadSongsAll(); },
+    tables: () => { const by = {}; (SONGS_ALL.rows || []).filter(s => (s.date || '').startsWith(String(EX.year))).forEach(s => (by[s.date] ||= []).push(s)); const ds = Object.keys(by).sort(); return [{ title: `${EX.year}년 주일 찬양 ${ds.length}주`, cols: [['주일', 8], ['순서', 5], ['곡', 30], ['악기', 7], ['키', 6], ['빠르기', 7], ['메모', 24]], rows: ds.flatMap(d => by[d].sort((a, b) => (a.order || 0) - (b.order || 0)).map((s, i) => [i ? '' : d.slice(5).replace('-', '/'), i + 1, s.title || '', s.inst || '', s.key || '', s.bpm ? '♩' + s.bpm : '', s.memo || ''])), compact: true }]; } }
+];
+const SCH_COLS = [['date', '날짜', 8], ['dow', '요일', 5], ['story', '성경이야기', 24], ['preacher', '설교', 12], ['pray', '중보기도 인도', 12], ['nation', '나라 기도', 12], ['chant', '챈트', 14], ['verse', '챈트 말씀', 12], ['dance', '율동', 14], ['guitar', '기타·메트로놈', 12], ['offering', '헌금기도 가정', 12], ['noService', '예배 없음', 8], ['noServiceNote', '예배 없음 사유', 16]];
+
+/* ---------- PDF (인쇄 → PDF로 저장) ---------- */
+function pdfHtml(title, sub, tables, orient) {
+  const css = `@font-face{font-family:'Dongdong';src:url('fonts/Cafe24DongdongRegular.woff2') format('woff2')}
+@page{size:A4 ${orient};margin:10mm}
+*{box-sizing:border-box}body{margin:0;font-family:'Apple SD Gothic Neo','Malgun Gothic','Noto Sans KR',sans-serif;color:#2B2018;-webkit-print-color-adjust:exact;print-color-adjust:exact;word-break:keep-all}
+.bar{position:sticky;top:0;display:flex;gap:10px;align-items:center;justify-content:space-between;padding:12px 16px;background:#FFF6E5;border-bottom:1px solid #EBD9B8;font-size:14px}
+.bar button{font:inherit;font-size:15px;border:0;border-radius:22px;background:#C62828;color:#fff;padding:10px 18px;cursor:pointer}
+.page{padding:16px}
+header{display:flex;align-items:center;gap:10px;border-bottom:2px solid #C62828;padding-bottom:6px;margin-bottom:8px}
+header img{width:30px;height:30px;border-radius:8px}header h1{font-family:'Dongdong',sans-serif;font-weight:400;font-size:20px;margin:0;flex:1}header span{font-size:10px;color:#7A6656}
+h2{font-size:12px;margin:10px 0 4px;color:#8E1B1B}
+table{border-collapse:collapse;width:100%;table-layout:auto;margin-bottom:6px;page-break-inside:auto}
+th,td{border:0.5px solid #D9C7A8;padding:2.5px 4px;font-size:9.5px;line-height:1.35;vertical-align:top;text-align:left}
+th{background:#FBEFD8;font-weight:600;white-space:nowrap}tr{page-break-inside:avoid}
+tbody tr:nth-child(even) td{background:#FFFBF4}
+table.dense th,table.dense td{font-size:7.5px;padding:1.5px 2px}
+table.dense td{text-align:center}table.dense td:nth-child(2){text-align:left;white-space:nowrap}
+table.foot tbody tr:last-child td{background:#FDE3E1;font-weight:600}
+td.o{color:#C62828;font-weight:700}
+.empty{font-size:11px;color:#7A6656;padding:8px 0}
+footer{font-size:8px;color:#9A8676;margin-top:6px}
+@media print{.bar{display:none}.page{padding:0}}`;
+  const tbl = t => !t.rows.length ? `<h2>${esc(t.title)}</h2><div class="empty">기록이 없어요.</div>` : `<h2>${esc(t.title)}</h2><table class="${t.dense ? 'dense' : ''} ${t.foot ? 'foot' : ''}"><thead><tr>${t.cols.map(c => `<th>${esc(c[0])}</th>`).join('')}</tr></thead><tbody>${t.rows.map(r => `<tr>${r.map(v => `<td class="${v === 'O' ? 'o' : ''}">${esc(v)}</td>`).join('')}</tr>`).join('')}</tbody></table>`;
+  return `<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><base href="${esc(location.href.split('#')[0])}"><title>${esc(title)}</title><style>${css}</style></head><body>
+<div class="bar"><span>인쇄 창에서 <b>대상: PDF로 저장</b>을 고르면 PDF 파일이 돼요. (A4 ${orient === 'landscape' ? '가로' : '세로'} · 여백 10mm)</span><button onclick="print()">PDF로 저장 · 인쇄</button></div>
+<div class="page"><header><img src="icon-192.png" alt=""><h1>${esc(title)}</h1><span>${esc(sub)}</span></header>${tables.map(tbl).join('')}<footer>조이코너 노트 ${APP_VERSION} · ${todayDot()} 내려받음 · ${esc(myName())} · 아이들 정보가 들어 있어요. 보관에 주의해 주세요.</footer></div>
+<script>window.addEventListener('load',()=>setTimeout(()=>{try{print()}catch(e){}},500))<\/script></body></html>`;
+}
+async function exRun(k, fmt) {
+  const T = EXP.find(x => x.k === k); if (!T) return;
+  let w = null;
+  if (fmt === 'pdf') { w = window.open('', '_blank'); if (!w) return toast('새 창이 막혔어요. 팝업을 허용해 주세요'); w.document.write('<p style="font-family:sans-serif;padding:24px">자료를 모으는 중…</p>'); }
+  EX.busy = k + fmt; paint();
+  try {
+    await T.need();
+    const tables = T.tables();
+    const sub = `${T.year ? EX.year + '년 · ' : ''}${EX.cls === 'all' ? (S.myClasses.length > 1 ? '모든 반' : clsName(S.myClasses[0] || '')) : clsName(EX.cls)} · ${todayDot()}`;
+    const name = `조이코너_${T.t.replace(/\s/g, '')}${T.year ? '_' + EX.year : ''}_${ymd(new Date())}`;
+    if (fmt === 'pdf') { const url = URL.createObjectURL(new Blob([pdfHtml(`조이코너 ${T.t}`, sub, tables, T.orient)], { type: 'text/html;charset=utf-8' })); w.location.href = url; setTimeout(() => URL.revokeObjectURL(url), 60000); }
+    else {
+      const multi = tables.length > 1;
+      const cols = (multi ? [['반', 8]] : []).concat(tables[0] ? tables[0].cols : []);
+      const aoa = [cols.map(c => c[0])].concat(tables.flatMap(t => t.rows.map(r => (multi ? [t.title] : []).concat(r))));
+      if (k === 'att') await xlsxDownload(name + '.xlsx', tables.map(t => ({ name: t.title.split(' · ')[0], aoa: [t.cols.map(c => c[0])].concat(t.rows), cols: t.cols.map(c => c[1]) })));
+      else await xlsxDownload(name + '.xlsx', [{ name: T.t, aoa, cols: cols.map(c => c[1]) }]);
+      toast('엑셀 파일을 내려받았어요');
+    }
+  } catch (e) { if (w) w.close(); toast('만들지 못했어요: ' + (e.message || e)); }
+  EX.busy = ''; paint();
+}
+async function xlsxDownload(fname, sheets) {
+  const X = await loadXLSX(), wb = X.utils.book_new();
+  const used = new Set();
+  sheets.forEach(s => {
+    const ws = X.utils.aoa_to_sheet(s.aoa);
+    if (s.cols) ws['!cols'] = s.cols.map(w => ({ wch: w }));
+    let n = String(s.name || 'Sheet').replace(/[\\/?*[\]:]/g, ' ').slice(0, 31); while (used.has(n)) n = n.slice(0, 28) + '_' + used.size; used.add(n);
+    X.utils.book_append_sheet(wb, ws, n);
+  });
+  X.writeFile(wb, fname);
+}
+async function exAll() {
+  EX.busy = 'all'; paint();
+  try {
+    const sheets = [];
+    for (const T of EXP) {
+      await T.need();
+      const tables = T.tables(), multi = tables.length > 1;
+      if (T.k === 'att') { tables.forEach(t => sheets.push({ name: '출석 ' + t.title.split(' · ')[0], aoa: [t.cols.map(c => c[0])].concat(t.rows), cols: t.cols.map(c => c[1]) })); continue; }
+      const cols = (multi ? [['반', 8]] : []).concat(tables[0] ? tables[0].cols : []);
+      sheets.push({ name: T.t, aoa: [cols.map(c => c[0])].concat(tables.flatMap(t => t.rows.map(r => (multi ? [t.title] : []).concat(r)))), cols: cols.map(c => c[1]) });
+    }
+    await xlsxDownload(`조이코너_전체자료_${EX.year}_${ymd(new Date())}.xlsx`, sheets);
+    toast(`엑셀 한 파일에 ${sheets.length}개 시트를 담았어요`);
+  } catch (e) { toast('만들지 못했어요: ' + (e.message || e)); }
+  EX.busy = ''; paint();
+}
+
+/* ---------- 화면: 자료 내려받기 ---------- */
+function vExport() {
+  const y0 = new Date().getFullYear(), years = [y0 - 2, y0 - 1, y0, y0 + 1];
+  const btn = (k, f, l) => `<button class="${f === 'pdf' ? 'sec' : 'ghost'} sm" data-act="exRun" data-id="${k}" data-f="${f}" ${EX.busy ? 'disabled' : ''}>${EX.busy === k + f ? '만드는 중…' : l}</button>`;
+  return `<div class="scroll"><div class="hd"><button class="back" data-act="back">← 홈</button></div><div class="ttl">자료 내려받기</div>
+<div class="sub">종류마다 <b>PDF</b>(한 장으로 바로 인쇄 · 공유)나 <b>엑셀</b>(고치고 정리하기)로 받아요. 아이들 정보가 들어 있으니 보관에 주의해 주세요.</div>
+<section class="card exbar"><div class="exrow"><span class="lbl">연도</span><div class="yrseg">${years.map(y => `<button class="${y === EX.year ? 'on' : ''}" data-act="exYear" data-id="${y}">${y}</button>`).join('')}</div></div>
+${S.myClasses.length > 1 ? `<div class="exrow"><span class="lbl">반</span><div class="yrseg"><button class="${EX.cls === 'all' ? 'on' : ''}" data-act="exCls" data-id="all">모든 반</button>${S.myClasses.map(c => `<button class="${EX.cls === c ? 'on' : ''}" data-act="exCls" data-id="${c}">${esc(clsName(c))}</button>`).join('')}</div></div>` : ''}</section>
+<div class="exgrid">${EXP.map(T => `<section class="extile"><div class="exhead">${svg(ICON[T.ic] || ICON.room, 22, 1.8)}<b>${esc(T.t)}</b>${T.year ? `<span class="tag g">${EX.year}</span>` : ''}</div><div class="s2">${esc(T.d)}</div><div class="exbtns">${btn(T.k, 'pdf', 'PDF')}${btn(T.k, 'xlsx', '엑셀')}</div></section>`).join('')}</div>
+${isAdminMe() ? `<button class="cta" data-act="exAll" ${EX.busy ? 'disabled' : ''}>${svg('<path d="M12 4v12m-5-5 5 5 5-5"/><path d="M4 20h16"/>', 24, 2)}${EX.busy === 'all' ? '만드는 중…' : `전체 자료를 엑셀 한 파일로 (${EX.year}년)`}</button>` : ''}
+${isAdminMe() ? bulkCard() : ''}</div>${nav('home')}`;
+}
+
+/* ---------- 연간 일정 한 번에 넣기 (엑셀 양식 → 올리기) ---------- */
+const BULK = { year: new Date().getFullYear() + (new Date().getMonth() >= 9 ? 1 : 0), plan: null };
+const EV_COLS = [['id', '앱 번호 (고치지 마세요)', 14], ['date', '시작 날짜', 12], ['endDate', '끝 날짜', 12], ['time', '시작 시간', 9], ['endTime', '끝 시간', 9], ['title', '제목', 28], ['memo', '내용', 40], ['place', '장소', 18], ['kind', '종류', 9]];
+function bulkCard() {
+  const y0 = new Date().getFullYear();
+  return `<section class="card bulk"><div class="lbl"><span>연간 일정 한 번에 넣기 (엑셀)</span><span class="s2">디렉터 · 관리자</span></div>
+<div class="sub">새해 순서표와 캘린더 일정을 엑셀로 한꺼번에 넣어요. 디렉터 혼자 해도 되고, 관리자를 정해 나눠 맡겨도 돼요.</div>
+<div class="exrow"><span class="lbl">연도</span><div class="yrseg">${[y0, y0 + 1].map(y => `<button class="${y === BULK.year ? 'on' : ''}" data-act="bulkYear" data-id="${y}">${y}</button>`).join('')}</div></div>
+<ol class="steps"><li><b>양식 내려받기</b> — ${BULK.year}년 주일이 모두 들어 있고, 이미 있는 내용은 채워져 있어요.<br><button class="sec sm" data-act="bulkTpl">${BULK.year}년 양식 내려받기</button></li>
+<li><b>엑셀에서 채우기</b> — '순서표' 시트는 주일마다, '일정' 시트는 한 줄에 일정 하나. 빈칸은 그대로 두고, 지우려면 <b>-</b> 를 적어요.</li>
+<li><b>올리기</b> — 바뀌는 것을 먼저 보여 드리고, [적용하기]를 눌러야 들어가요.<br><label class="filebtn sm">${svg('<path d="M12 16V4m-5 5 5-5 5 5"/><path d="M4 16v3a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3"/>', 18, 1.8)}<span>작성한 엑셀 올리기</span><input type="file" id="bulkFile" accept=".xlsx,.xls,.csv" hidden></label></li></ol></section>`;
+}
+async function bulkTpl() {
+  try {
+    const Y = String(BULK.year);
+    const sch = sundaysOfYear(Y).map(d => { const s = schedFor(d) || {}; return SCH_COLS.map(([k]) => k === 'date' ? d : k === 'dow' ? DOW[parseD(d).getDay()] : k === 'noService' ? yesNo(s.noService) : (s[k] || '')); });
+    if (!Array.isArray(R.events)) await loadEvents();
+    const ev = (R.events || []).filter(e => (e.date || '').startsWith(Y)).sort((a, b) => ko(a.date, b.date)).map(e => [e.id, e.date, e.endDate || '', e.allDay ? '' : (e.time || ''), e.allDay ? '' : (e.endTime || ''), e.title || '', e.memo || '', e.place || '', e.kind || '행사']);
+    const guide = [['조이코너 연간 일정 양식 — ' + Y + '년'], [''], ['1. 순서표 시트: 주일마다 한 줄이에요. 날짜 칸은 바꾸지 마세요. 특별 예배가 있으면 맨 아래에 날짜를 더해도 돼요.'], ['2. 이름이 여럿이면 쉼표로: 김혜원, 황지솔'], ['3. 예배 없음 칸에 O 를 적으면 그 주일은 "조이코너 예배 없음"이 돼요. 사유 칸에 이유를 적어요.'], ['4. 일정 시트: 한 줄에 일정 하나. 시작 날짜 · 제목은 꼭 적어요. 시간을 비우면 종일 일정이에요.'], ['   날짜는 2027-03-01 또는 2027.3.1, 시간은 13:30 또는 오후 1:30 처럼 적어요.'], ['   종류: 행사 · 회의 · 교육 · 부재 · 기타'], ['5. 빈칸은 앱에 있는 내용을 그대로 둬요. 앱의 내용을 지우려면 칸에 - 를 적어요.'], ['6. 앱 번호 칸은 이미 있는 일정이에요. 지우지 말고 그대로 두면 그 일정이 고쳐져요. 새 일정은 앱 번호를 비워 두세요.'], ['7. 올리면 바뀌는 것을 먼저 보여 드려요. 확인 뒤 [적용하기]를 눌러야 들어가요.'], ['8. 새로 들어간 일정은 묶음으로 남아서, 잘못 넣었으면 캘린더 → 바깥 캘린더 가져오기 → 가져온 기록에서 한 번에 지울 수 있어요.']];
+    await xlsxDownload(`조이코너_연간일정양식_${Y}.xlsx`, [
+      { name: '안내', aoa: guide, cols: [110] },
+      { name: '순서표', aoa: [SCH_COLS.map(c => c[1])].concat(sch), cols: SCH_COLS.map(c => c[2]) },
+      { name: '일정', aoa: [EV_COLS.map(c => c[1])].concat(ev).concat(ev.length ? [] : [['', `${Y}-01-01`, '', '', '', '(예) 신년 교사 모임', '올해 순서표 나눔', '교육관', '회의']]), cols: EV_COLS.map(c => c[2]) }
+    ]);
+    toast('양식을 내려받았어요');
+  } catch (e) { toast('양식을 만들지 못했어요: ' + e.message); }
+}
+function xDate(v, Y) {
+  if (v === null || v === undefined || v === '') return '';
+  if (typeof v === 'number' && v > 20000 && v < 80000) { const d = new Date(Math.round((v - 25569) * 864e5)); return `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())}`; }
+  if (v instanceof Date) return ymd(v);
+  const s = String(v).trim();
+  let m = /^(\d{4})\s*[.\-/년]\s*(\d{1,2})\s*[.\-/월]\s*(\d{1,2})/.exec(s); if (m) return `${m[1]}-${pad(m[2])}-${pad(m[3])}`;
+  m = /^(\d{1,2})\s*[.\-/월]\s*(\d{1,2})/.exec(s); if (m) return `${Y}-${pad(m[1])}-${pad(m[2])}`;
+  return null;
+}
+function xTime(v) {
+  if (v === null || v === undefined || v === '') return '';
+  if (typeof v === 'number') { const f = v % 1, mins = Math.round(f * 1440); return `${pad(Math.floor(mins / 60) % 24)}:${pad(mins % 60)}`; }
+  const s = String(v).trim(); const pm = /오후|pm/i.test(s), am = /오전|am/i.test(s);
+  const m = /(\d{1,2})\s*[:시]\s*(\d{1,2})?/.exec(s); if (!m) return null;
+  let h = +m[1]; if (pm && h < 12) h += 12; if (am && h === 12) h = 0;
+  return `${pad(h)}:${pad(+(m[2] || 0))}`;
+}
+const xStr = v => String(v ?? '').trim();
+const xYes = v => /^(o|ㅇ|○|●|y|yes|예|네|1|v|✓|✔|없음|true)$/i.test(xStr(v));
+async function bulkRead(file) {
+  try {
+    const X = await loadXLSX();
+    const wb = X.read(await file.arrayBuffer(), { type: 'array' });
+    const Y = String(BULK.year);
+    const sheetBy = name => { const n = wb.SheetNames.find(s => s.replace(/\s/g, '').includes(name)); return n ? X.utils.sheet_to_json(wb.Sheets[n], { header: 1, raw: true, defval: '' }) : null; };
+    const plan = { sch: [], schNew: 0, schChg: 0, cells: 0, evNew: [], evChg: [], bad: [], year: Y };
+    const sch = sheetBy('순서표');
+    if (sch && sch.length > 1) {
+      const head = sch[0].map(xStr), idx = {};
+      SCH_COLS.forEach(([k, h]) => { const i = head.findIndex(x => x.replace(/\s/g, '') === h.replace(/\s/g, '')); if (i >= 0) idx[k] = i; });
+      if (idx.date === undefined) plan.bad.push('순서표: "날짜" 칸을 찾지 못했어요');
+      else sch.slice(1).forEach((row, ri) => {
+        const raw = row[idx.date]; if (raw === '' || raw === undefined) return;
+        const date = xDate(raw, Y); if (!date) return plan.bad.push(`순서표 ${ri + 2}줄: 날짜 "${xStr(raw)}"를 읽지 못했어요`);
+        const cur = schedFor(date) || null, patch = {}, diff = [];
+        SCH_COLS.forEach(([k, h]) => {
+          if (k === 'date' || k === 'dow' || idx[k] === undefined) return;
+          const v = row[idx[k]]; if (xStr(v) === '') return;
+          let nv = xStr(v) === '-' ? '' : xStr(v);
+          if (k === 'noService') nv = xStr(v) === '-' ? false : xYes(v);
+          const ov = cur ? (k === 'noService' ? !!cur.noService : (cur[k] || '')) : (k === 'noService' ? false : '');
+          if (nv !== ov) { patch[k] = nv; diff.push([h, ov === true ? 'O' : ov === false ? '' : ov, nv === true ? 'O' : nv === false ? '' : nv]); }
+        });
+        if (diff.length) { plan.sch.push({ date, isNew: !cur, patch, diff }); cur ? plan.schChg++ : plan.schNew++; plan.cells += diff.length; }
+      });
+    }
+    const ev = sheetBy('일정');
+    if (ev && ev.length > 1) {
+      if (!Array.isArray(R.events)) await loadEvents();
+      const head = ev[0].map(xStr), idx = {};
+      EV_COLS.forEach(([k, h]) => { const i = head.findIndex(x => x.replace(/\s/g, '').startsWith(h.replace(/\s|\(.*\)/g, ''))); if (i >= 0) idx[k] = i; });
+      ev.slice(1).forEach((row, ri) => {
+        const g = k => idx[k] === undefined ? '' : row[idx[k]];
+        const title = xStr(g('title')); if (!title || title.startsWith('(예)')) return;
+        const date = xDate(g('date'), Y); if (!date) return plan.bad.push(`일정 ${ri + 2}줄 "${title}": 시작 날짜를 읽지 못했어요`);
+        const endDate = xDate(g('endDate'), Y), time = xTime(g('time')), endTime = xTime(g('endTime'));
+        if (endDate === null || time === null || endTime === null) return plan.bad.push(`일정 ${ri + 2}줄 "${title}": 끝 날짜나 시간을 읽지 못했어요`);
+        const kindRaw = xStr(g('kind')), kind = ['행사', '회의', '교육', '부재', '기타'].includes(kindRaw) ? kindRaw : (kindRaw ? '기타' : '');
+        const id = xStr(g('id'));
+        const cur = (id && R.events.find(e => e.id === id)) || R.events.find(e => e.date === date && (e.title || '') === title);
+        const val2 = (v, keep) => xStr(v) === '' ? keep : (xStr(v) === '-' ? '' : xStr(v));
+        if (cur) {
+          const nxt = { title, date, endDate: xStr(g('endDate')) === '' ? (cur.endDate || '') : (xStr(g('endDate')) === '-' ? '' : (endDate > date ? endDate : '')), time: time === '' ? (cur.time || '') : time, endTime: endTime === '' ? (cur.endTime || '') : endTime, memo: val2(g('memo'), cur.memo || ''), place: val2(g('place'), cur.place || ''), kind: kind || cur.kind || '행사' };
+          if (xStr(g('time')) === '-') { nxt.time = ''; nxt.endTime = ''; }
+          nxt.allDay = !nxt.time;
+          const ch = Object.keys(nxt).filter(k => (nxt[k] ?? '') !== (cur[k] ?? (k === 'allDay' ? !cur.time : '')));
+          if (ch.length) plan.evChg.push({ id: cur.id, patch: nxt, ch, title });
+        } else plan.evNew.push({ title, date, endDate: endDate && endDate > date ? endDate : '', time, endTime, allDay: !time, memo: val2(g('memo'), ''), place: val2(g('place'), ''), kind: kind || '행사' });
+      });
+    }
+    if (!sch && !ev) plan.bad.push('"순서표"나 "일정" 시트를 찾지 못했어요. 앱에서 내려받은 양식을 써 주세요');
+    BULK.plan = plan; bulkPreview();
+  } catch (e) { toast('엑셀을 읽지 못했어요: ' + e.message); }
+}
+function bulkPreview() {
+  const p = BULK.plan; if (!p) return;
+  const nothing = !p.sch.length && !p.evNew.length && !p.evChg.length;
+  sheet(`<div class="ttl" style="font-size:24px">엑셀에서 읽은 것 · ${p.year}년</div>
+<div class="kres"><div><b>${p.schNew}주</b><small>순서표 새로</small></div><div><b>${p.schChg}주</b><small>순서표 바뀜 (${p.cells}칸)</small></div><div><b>${p.evNew.length}개</b><small>새 일정</small></div><div><b>${p.evChg.length}개</b><small>고칠 일정</small></div></div>
+${p.bad.length ? `<section class="card warnbox"><div class="lbl"><span>읽지 못한 줄 ${p.bad.length}개 (넣지 않아요)</span></div>${p.bad.slice(0, 12).map(b => `<div class="s2">· ${esc(b)}</div>`).join('')}</section>` : ''}
+${p.sch.length ? `<section class="card"><div class="lbl"><span>순서표에서 바뀌는 칸</span></div><div class="imlist">${p.sch.slice(0, 60).map(x => `<div class="bkrow"><span class="d">${fmtShort(x.date)}${x.isNew ? ' <span class="tag">새로</span>' : ''}</span><span class="grow">${x.diff.map(([h, a, b]) => `<span class="bkc"><small>${esc(h)}</small>${a ? `<s>${esc(a)}</s> → ` : ''}<b>${esc(b || '(지움)')}</b></span>`).join('')}</span></div>`).join('')}${p.sch.length > 60 ? `<div class="s2" style="padding:8px 12px">… ${p.sch.length - 60}주 더</div>` : ''}</div></section>` : ''}
+${p.evNew.length || p.evChg.length ? `<section class="card"><div class="lbl"><span>일정</span></div><div class="imlist">${p.evNew.map(e => `<div class="bkrow"><span class="d">${fmtShort(e.date)} <span class="tag">새로</span></span><span class="grow"><b>${esc(e.title)}</b><small>${esc([timeText(e), e.place, e.memo].filter(Boolean).join(' · '))}</small></span></div>`).join('')}${p.evChg.map(e => `<div class="bkrow"><span class="d">${fmtShort(e.patch.date)} <span class="tag g">고침</span></span><span class="grow"><b>${esc(e.title)}</b><small>바뀌는 칸: ${esc(e.ch.map(k => ({ title: '제목', date: '날짜', endDate: '끝 날짜', time: '시간', endTime: '끝 시간', memo: '내용', place: '장소', kind: '종류', allDay: '종일' })[k] || k).join(', '))}</small></span></div>`).join('')}</div></section>` : ''}
+${nothing ? '<div class="sub">앱과 같아서 바꿀 것이 없어요.</div>' : ''}
+<div class="btns">${nothing ? '' : '<button class="pri" data-act="bulkApply">적용하기</button>'}<button class="sec" data-act="sheetClose">${nothing ? '닫기' : '취소'}</button></div>`);
+}
+async function bulkApply() {
+  const p = BULK.plan; if (!p) return;
+  const ops = [], who = { by: S.me.email, byName: myName() };
+  p.sch.forEach(x => ops.push([doc(db, 'schedule', x.date), x.isNew ? { date: x.date, ...x.patch } : x.patch, true]));
+  const bref = doc(collection(db, 'imports')), bid = bref.id, newEv = [];
+  p.evNew.forEach(e => { const r = doc(collection(db, 'events')); const d = { ...e, staffId: '', imgCount: 0, ...who, importBatch: bid, source: 'excel', gid: `excel|${e.date}|${e.title}` }; ops.push([r, d]); newEv.push({ id: r.id, ...d }); });
+  p.evChg.forEach(e => ops.push([doc(db, 'events', e.id), e.patch, true]));
+  try {
+    for (let i = 0; i < ops.length; i += 400) { const b = writeBatch(db); ops.slice(i, i + 400).forEach(([r, d, m]) => (m ? b.set(r, d, { merge: true }) : b.set(r, d))); await b.commit(); }
+    if (p.evNew.length) { const meta = { name: `엑셀 일괄 입력 ${p.year}`, count: p.evNew.length, src: 'excel', at: new Date().toISOString(), ...who }; await setDoc(bref, meta); if (IMP.batches) IMP.batches.unshift({ id: bid, ...meta }); }
+    p.sch.forEach(x => { const s = schedFor(x.date); if (s) Object.assign(s, x.patch); else S.schedule.push({ id: x.date, date: x.date, ...x.patch }); });
+    S.schedule.sort((a, b) => ko(a.date, b.date));
+    if (Array.isArray(R.events)) { newEv.forEach(e => R.events.push(e)); p.evChg.forEach(e => { const c = R.events.find(x => x.id === e.id); if (c) Object.assign(c, e.patch); }); }
+    BULK.plan = null; closeSheet();
+    toast(`넣었어요 · 순서표 ${p.sch.length}주 · 새 일정 ${p.evNew.length}개 · 고친 일정 ${p.evChg.length}개`); gcalSoon(); paint();
+  } catch (e) { toast('넣지 못했어요: ' + errMsg(e)); }
+}
+
+Object.assign(ACT, {
+  exYear: d => { EX.year = Number(d.id); paint(); },
+  exCls: d => { EX.cls = d.id; paint(); },
+  exRun: d => exRun(d.id, d.f),
+  exAll: () => exAll(),
+  bulkYear: d => { BULK.year = Number(d.id); paint(); },
+  bulkTpl: () => bulkTpl(),
+  bulkApply: () => bulkApply()
+});
+appEl.addEventListener('change', e => { if (e.target.id === 'bulkFile' && e.target.files[0]) { bulkRead(e.target.files[0]); e.target.value = ''; } });
+
+VIEWS.export = vExport;
