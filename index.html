@@ -644,6 +644,41 @@ input[type=date].in::-webkit-date-and-time-value,input[type=time].in::-webkit-da
 .imb .grow{flex:1;display:flex;flex-direction:column;min-width:0}
 .gcopts{display:flex;flex-wrap:wrap;gap:4px 18px}
 .gcopts .switch b{font-size:15px}
+
+/* ===== v11 ===== */
+.three{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr) minmax(0,1fr);gap:8px}
+.three>*{min-width:0}
+.cntcard{gap:12px}
+.yrseg{display:flex;gap:6px;flex-wrap:wrap}.yrseg button{min-height:38px;padding:0 14px;border-radius:19px;border:1px solid #F0E2C8;background:#fff;color:#8A5A2B;font-family:inherit;font-size:15px;cursor:pointer}.yrseg button.on{background:#C62828;border-color:#C62828;color:#fff}
+.cntstat{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}
+.cntstat>div{background:#FFFBF3;border:1px solid #F0E2C8;border-radius:16px;padding:10px 12px;display:flex;flex-direction:column;gap:2px;min-width:0}
+.cntstat b{font-size:26px;color:#C62828;line-height:1.1}
+.cntstat small{font-size:12px;color:#6B5646}
+@media (max-width:520px){.cntstat{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.cntchart{display:flex;align-items:flex-end;gap:3px;height:170px;overflow-x:auto;padding:4px 2px 0;scrollbar-width:thin}
+.cntchart .cb{flex:1 0 14px;max-width:34px;height:100%;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;gap:3px;border:0;background:none;padding:0;cursor:pointer;font-family:inherit;color:inherit}
+.cntchart .cb i{width:100%;background:#E8A39C;border-radius:6px 6px 2px 2px;display:flex;flex-direction:column;justify-content:flex-end;overflow:hidden;min-height:3px}
+.cntchart .cb i em{display:block;background:#C62828;width:100%}
+.cntchart .cb .bw{flex:1;width:100%;display:flex;align-items:flex-end;min-height:0}
+.cntchart .cb .lb{font-size:9px;color:#8A5A2B;white-space:nowrap;writing-mode:vertical-rl;transform:rotate(180deg);height:30px}
+.cntchart .cb:hover i{filter:brightness(.92)}
+.cntchart .cb b{font-size:9px;font-weight:400;color:#8A5A2B;line-height:1}
+@media (max-width:719px){.cntchart .cb b{display:none}}
+.cntin{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.histcard{gap:10px}
+.kres{display:grid;grid-template-columns:repeat(auto-fit,minmax(96px,1fr));gap:8px}
+.kres>div{background:#fff;border:1px solid #F0E2C8;border-radius:16px;padding:10px 12px;display:flex;flex-direction:column}
+.kres b{font-size:22px;color:#C62828}
+.kres small{font-size:12px;color:#6B5646}
+.histlist{display:flex;flex-direction:column;border:1px solid #F0E2C8;border-radius:16px;background:#fff;max-height:420px;overflow-y:auto}
+.hist{border-bottom:1px solid #F5EBD8}.hist:last-child{border-bottom:0}
+.hist summary{list-style:none;display:flex;align-items:center;gap:8px;padding:10px 12px;cursor:pointer}
+.hist summary::-webkit-details-marker{display:none}
+.hist summary .grow{display:flex;flex-direction:column;min-width:0;flex:1}
+.hist summary b{font-size:16px;font-weight:400}
+.hist summary small{font-size:12px;color:#6B5646}
+.histdates{display:flex;flex-wrap:wrap;gap:6px;padding:0 12px 12px}
+.histdates .chip{cursor:pointer;border:1px solid #F0E2C8;background:#FFFBF3}
 </style>
 </head>
 <body>

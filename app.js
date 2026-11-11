@@ -288,7 +288,7 @@ function vStats() {
   const avgP = total && useDs.length ? Math.round(avgN / total * 100) : null;
   const care = careList(c).filter(x => x.n >= 2);
   const low = kids.map(k => ({ k, r: kidRate(c, k) })).filter(x => x.r !== null).sort((a, b) => a.r - b.r).slice(0, 5);
-  return `<div class="scroll cols"><div class="ttl">교사실</div>${roomTabs('stats')}${classChips()}
+  return `<div class="scroll cols"><div class="ttl">교사실</div>${roomTabs('stats')}${countsCard()}${classChips()}
 <section class="card"><div class="lbl"><span>${esc(S.classes[c].name)} 최근 ${ds.length}주 출석</span></div>${ds.length ? `<div class="chart">${counts.map((n, i) => `<div class="col"><b>${n}</b><i class="${i === counts.length - 1 ? 'cur' : ''}" style="height:${Math.max(4, Math.round(n / Math.max(total, 1) * 100))}px"></i></div>`).join('')}</div><div class="axis">${ds.map(d => { const x = parseD(d); return `<span>${x.getMonth() + 1}/${x.getDate()}</span>`; }).join('')}</div>` : `<div class="sub">출석을 기록하면 여기에 그래프가 나와요.</div>`}</section>
 <div class="twoc"><section class="card"><div class="lbl"><span>${mds.length ? '이번 달 평균' : '최근 4주 평균'}</span></div><div class="bigp">${avgP ?? '-'}<small>%</small></div><div class="s2">${total}명 중 평균 ${Math.round(avgN)}명</div></section>
 <section class="card"><div class="lbl"><span>돌봄 신호</span></div><div class="bigp">${care.length}<small>명</small></div><div class="s2">2주 이상 연속 결석</div></section></div>
@@ -530,6 +530,7 @@ async function delStaff() {
 async function runImport() {
   const f = $('#impFile')?.files[0]; if (!f) return toast('가져올 파일을 먼저 골라 주세요');
   let data; try { data = JSON.parse(await f.text()); } catch { return toast('파일을 읽을 수 없어요'); }
+  if (data.kind === 'kakao') return runKakaoImport(data);
   if (!data.children && !data.duties && !data.staff && !data.schedulePatch) return toast('조이코너 가져오기 파일이 아니에요');
   if (data.children && !S.importOk && allKids().length) {
     return sheet(`<div class="ttl" style="font-size:22px">이미 아이들 정보가 있어요</div><div class="sub">다시 가져오면 아이·가정·출석·일정이 시트 내용으로 덮어써져요. 그동안 앱에서 고친 내용이 사라질 수 있어요. (교사 명단의 구글 연결은 그대로 남아요)</div><div class="btns"><button class="pri" data-act="importYes">그래도 가져오기</button><button class="sec" data-act="sheetClose">취소</button></div>`);
@@ -725,9 +726,10 @@ async function dutyDel() {
 }
 
 /* ---------- 교사실 (공지 · 캘린더 · 업무 분담 · 조직도 · 통계) ---------- */
-const APP_VERSION = 'v10';
+const APP_VERSION = 'v11';
 const APP_DATE = '2026-11-11';
 const CHANGELOG = [
+  { v: 'v11', date: '11월 11일', items: ['카톡 교사방 기록 가져오기: 주일 찬양 5년치 · 주일 인원 · 올해 행사 (있는 값은 그대로, 빈칸만)', '교사실 → 통계: 주일 인원 막대 그래프 · 해마다 비교 · 이번 주 넣기', '예배 → 악보: 지난 찬양 찾기 (언제 · 몇 번 · 키 · 빠르기)', '곡마다 악기 · 빠르기(♩) 칸'] },
   { v: 'v10', date: '11월 11일', items: ['처음 여는 속도: 휴대폰에 남은 것으로 먼저 보여 주고 새 것은 뒤에서 받아요', '화면마다 필요한 것만 받아요 (출석 기록은 그 반만, 순서표는 연 달만)', '일정 넣기 창을 세로 화면에 맞게 정리 (시작 · 끝 한 줄씩)', '공휴일: 해마다 불러오기 · 대체·임시공휴일이 바뀌면 관리자에게 알림', '바깥 캘린더 가져오기 (관리자): .ics 파일 또는 구글 캘린더에서 바로 · 묶음째 지우기', '내 구글 캘린더 연결: 교사실 일정과 내 주일 순서가 "조이코너" 캘린더로'] },
   { v: 'v9', date: '11월 11일', items: ['일정: 종일 또는 몇 시부터 몇 시까지', '순서표: 날짜 더하기 · 한 해 빈 주일 한 번에 만들기', '캘린더의 "예배 없음" 일정이 순서표·예배 탭에 함께 반영돼요', '주일 카드에 그날 일정이 함께 보여요', '눈 깜빡임: 두 번 → 다음, 세 번 → 이전'] },
   { v: 'v8', date: '11월 11일', items: ['순서표를 월별 서랍과 주일 카드로 정리 (아이콘 · 맡은 횟수 타일)', '헌금기도도 아이 얼굴 카드와 나이로', '선생님 색이 겹치지 않게, 사진을 넣으면 사진으로', '업무 분담 사람별 카드 · 반 올리기 화면을 가나다순 격자로', '위쪽 메뉴 칸 길이를 모든 화면에서 같게', '캘린더 기간 일정: 끌어서 고르기(컴퓨터) · 길게 눌러 고르기(폰)', '사진은 화면에 보일 때 불러와서 더 빨라졌어요'] },
@@ -1055,9 +1057,9 @@ function wSongs(d) {
   const list = W.songs[d] || [], sl = W.setlist[d] || {}, total = list.reduce((s, g) => s + (g.pages || 0), 0);
   return `${total ? `<button class="cta" data-act="songPlay" data-id="">${svg('<path d="M7 5l12 7-12 7z"/>', 24, 2)}악보 넘겨 보기 · ${total}장</button>` : ''}
 <section class="card"><div class="lbl"><span>이번 주 악보 ${list.length}곡</span></div>
-${list.length ? `<div class="list">${list.map((g, i) => `<div class="songrow"><button class="row" data-act="songPlay" data-id="${g.id}"><span class="num2">${i + 1}</span><span class="grow"><span class="nm" style="font-size:18px">${esc(g.title)}</span><span class="sub">${[g.key ? '키 ' + g.key : '', g.pages ? `${g.pages}장` : '사진 없음'].filter(Boolean).map(esc).join(' · ')}</span></span></button><div class="mv"><button data-act="songMove" data-id="${g.id}" data-n="-1" aria-label="위로" ${i === 0 ? 'disabled' : ''}>▲</button><button data-act="songMove" data-id="${g.id}" data-n="1" aria-label="아래로" ${i === list.length - 1 ? 'disabled' : ''}>▼</button></div><button class="editbtn" data-act="songEdit" data-id="${g.id}" aria-label="${esc(g.title)} 고치기">${svg('<path d="M4 20h4L19 9l-4-4L4 16z"/>', 18, 1.8)}</button></div>`).join('')}</div>` : '<div class="sub">아직 올라온 악보가 없어요. 보통 6~10곡을 올려요.</div>'}
+${list.length ? `<div class="list">${list.map((g, i) => `<div class="songrow"><button class="row" data-act="songPlay" data-id="${g.id}"><span class="num2">${i + 1}</span><span class="grow"><span class="nm" style="font-size:18px">${esc(g.title)}</span><span class="sub">${[g.inst || '', g.key ? '키 ' + g.key : '', g.bpm ? '♩' + g.bpm : '', g.pages ? `${g.pages}장` : '사진 없음', g.memo || ''].filter(Boolean).map(esc).join(' · ')}</span></span></button><div class="mv"><button data-act="songMove" data-id="${g.id}" data-n="-1" aria-label="위로" ${i === 0 ? 'disabled' : ''}>▲</button><button data-act="songMove" data-id="${g.id}" data-n="1" aria-label="아래로" ${i === list.length - 1 ? 'disabled' : ''}>▼</button></div><button class="editbtn" data-act="songEdit" data-id="${g.id}" aria-label="${esc(g.title)} 고치기">${svg('<path d="M4 20h4L19 9l-4-4L4 16z"/>', 18, 1.8)}</button></div>`).join('')}</div>` : '<div class="sub">아직 올라온 악보가 없어요. 보통 6~10곡을 올려요.</div>'}
 <button class="sec" data-act="songNew">+ 곡 추가</button></section>
-<section class="card"><div class="lbl"><span>예배 순서 · 기록</span></div><textarea id="sl_memo" style="min-height:120px" placeholder="예: 여는 찬양 → 기도 → 챈트 → 율동 찬양 → 성경이야기 → 헌금 → 광고">${esc(sl.memo || '')}</textarea><button class="sec" data-act="slSave">기록 저장</button>${sl.byName ? `<div class="s2">마지막 저장 · ${esc(sl.byName)}</div>` : ''}</section>`;
+<section class="card"><div class="lbl"><span>예배 순서 · 기록</span></div><textarea id="sl_memo" style="min-height:120px" placeholder="예: 여는 찬양 → 기도 → 챈트 → 율동 찬양 → 성경이야기 → 헌금 → 광고">${esc(sl.memo || '')}</textarea><button class="sec" data-act="slSave">기록 저장</button>${sl.byName ? `<div class="s2">마지막 저장 · ${esc(sl.byName)}</div>` : ''}</section>${histCard()}`;
 }
 async function songSheet(id) {
   const list = W.songs[W.date] || [], sg = id ? list.find(x => x.id === id) : { title: '', key: '', memo: '', link: '', pages: 0 };
@@ -1066,7 +1068,8 @@ async function songSheet(id) {
   pkInit('song', id ? await loadImgs('scorePages', id, sg.pages) : [], 'score');
   sheet(`<div class="ttl" style="font-size:24px">${id ? '곡 고치기' : '곡 추가'} · ${fmtMD(W.date)}</div>
 <label class="fld">곡 제목<input class="in" id="g_title" value="${esc(sg.title)}"></label>
-<div class="two"><label class="fld">키<input class="in" id="g_key" value="${esc(sg.key || '')}" placeholder="예: G"></label><label class="fld">링크 (영상·PDF)<input class="in" id="g_link" value="${esc(sg.link || '')}" placeholder="https://"></label></div>
+<div class="three"><label class="fld">악기<select class="in" id="g_inst">${['', '신디', '기타', '드럼'].map(x => `<option value="${x}" ${(sg.inst || '') === x ? 'selected' : ''}>${x || '-'}</option>`).join('')}</select></label><label class="fld">키<input class="in" id="g_key" value="${esc(sg.key || '')}" placeholder="예: G"></label><label class="fld">빠르기 ♩<input class="in" id="g_bpm" inputmode="numeric" value="${esc(sg.bpm || '')}" placeholder="120"></label></div>
+<label class="fld">링크 (영상·PDF)<input class="in" id="g_link" value="${esc(sg.link || '')}" placeholder="https://"></label>
 <label class="fld">메모 (반복, 율동, 엔딩 등)<textarea id="g_memo" style="min-height:60px">${esc(sg.memo || '')}</textarea></label>
 <div class="fld">악보 사진 (최대 10장)</div>${pkHtml('song')}
 <div class="sub" id="g_msg"></div>
@@ -1079,7 +1082,7 @@ async function songSave() {
   const title = val('g_title'); if (!title) return toast('곡 제목을 적어 주세요');
   const ref = id ? doc(db, 'songs', id) : doc(collection(db, 'songs'));
   const old = id ? list.find(x => x.id === id) : null;
-  const data = { date: d, title, key: val('g_key'), link: val('g_link'), memo: $('#g_memo').value.trim(), order: old ? old.order : (list.length ? Math.max(...list.map(x => x.order || 0)) + 1 : 1), pages: 0, by: (old && old.by) || S.me.email, byName: (old && old.byName) || myName() };
+  const data = { date: d, title, key: val('g_key'), inst: val('g_inst'), bpm: val('g_bpm'), link: val('g_link'), memo: $('#g_memo').value.trim(), order: old ? old.order : (list.length ? Math.max(...list.map(x => x.order || 0)) + 1 : 1), pages: 0, by: (old && old.by) || S.me.email, byName: (old && old.byName) || myName() };
   const msg = $('#g_msg'); msg.textContent = '저장 중…';
   try {
     data.pages = await pkSave('song', 'scorePages', ref.id, { songId: ref.id, date: d }, old ? old.pages : 0);
@@ -2458,7 +2461,7 @@ async function impSheet() {
 </div>
 ${IMP.cals ? `<section class="card"><div class="lbl"><span>어느 캘린더를 가져올까요?</span></div><div class="list">${IMP.cals.map(c => `<button class="row" data-act="impCal" data-id="${esc(c.id)}"><i class="cdot" style="background:${esc(c.backgroundColor || '#C62828')}"></i><span class="grow"><span class="nm">${esc(c.summaryOverride || c.summary || c.id)}</span><span class="sub">${c.primary ? '내 기본 캘린더' : esc(c.accessRole === 'owner' ? '내가 만든 캘린더' : '구독 · 공유')}</span></span><span class="chev">›</span></button>`).join('')}</div></section>` : ''}
 <div class="sub" id="im_msg"></div>`;
-  const hist = IMP.batches.length ? `<section class="card"><div class="lbl"><span>가져온 기록</span><span class="s2">잘못 가져왔으면 묶음째 지워요</span></div>${IMP.batches.map(b => { const left = (R.events || []).filter(e => e.importBatch === b.id).length; return `<div class="hrow imb"><span class="grow"><b>${esc(b.name || '가져온 일정')}</b><span class="s2">${esc((b.at || '').slice(0, 10))} · ${esc(b.byName || '')} · ${left}개 남음</span></span><button class="ghost sm danger" data-act="impDelAsk" data-id="${b.id}">묶음 지우기</button></div>`; }).join('')}</section>` : '';
+  const hist = IMP.batches.length ? `<section class="card"><div class="lbl"><span>가져온 기록</span><span class="s2">잘못 가져왔으면 묶음째 지워요</span></div>${IMP.batches.map(b => { const left = (R.events || []).filter(e => e.importBatch === b.id).length; return `<div class="hrow imb"><span class="grow"><b>${esc(b.name || '가져온 일정')}</b><span class="s2">${esc((b.at || '').slice(0, 10))} · ${esc(b.byName || '')} · 일정 ${left}개${b.songs ? ` · 찬양 ${b.songs}곡` : ''}${b.counts ? ` · 인원 ${b.counts}주` : ''}</span></span><button class="ghost sm danger" data-act="impDelAsk" data-id="${b.id}">묶음 지우기</button></div>`; }).join('')}</section>` : '';
   sheet(`<div class="ttl" style="font-size:24px">바깥 캘린더 가져오기</div><div class="sub">교회 · 부서 구글 캘린더의 일정을 한 번에 교사실 캘린더로 옮겨요. 가져온 일정은 묶음으로 기억해서, 잘못 가져왔으면 한 번에 지울 수 있어요.</div>${body}${hist}<div class="btns"><button class="sec" data-act="sheetClose">닫기</button></div>`);
   const box = $('#sheet');
   const cnt = () => { const c = $('#im_cnt'); if (c) c.textContent = `${box.querySelectorAll('[data-im]:checked').length}개 고름`; };
@@ -2512,6 +2515,11 @@ async function impDel(bid) {
     let ids = (R.events || []).filter(e => e.importBatch === bid).map(e => e.id);
     try { const s = await getDocs(query(collection(db, 'events'), where('importBatch', '==', bid))); ids = [...new Set([...ids, ...s.docs.map(d => d.id)])]; } catch { /* 가진 것만 */ }
     for (let i = 0; i < ids.length; i += 400) { const b = writeBatch(db); ids.slice(i, i + 400).forEach(id => b.delete(doc(db, 'events', id))); await b.commit(); }
+    let more = 0;
+    for (const col of ['songs', 'setlists', 'counts']) {
+      try { const s = await getDocs(query(collection(db, col), where('importBatch', '==', bid))); for (let i = 0; i < s.docs.length; i += 400) { const b = writeBatch(db); s.docs.slice(i, i + 400).forEach(d => b.delete(d.ref)); await b.commit(); } more += s.docs.length; } catch { /* 없음 */ }
+    }
+    if (more) { W.songs = {}; W.setlist = {}; CNT.rows = null; HIST.rows = null; }
     await deleteDoc(doc(db, 'imports', bid));
     R.events = (R.events || []).filter(e => e.importBatch !== bid);
     IMP.batches = (IMP.batches || []).filter(b => b.id !== bid);
@@ -2686,7 +2694,7 @@ Object.assign(ACT, {
   },
   impCal: d => { const c = (IMP.cals || []).find(x => x.id === d.id) || {}; impFetchGoogle(d.id, c.summaryOverride || c.summary || '구글 캘린더'); },
   impRun: () => impRun(),
-  impDelAsk: d => { const b = (IMP.batches || []).find(x => x.id === d.id) || {}; const n = (R.events || []).filter(e => e.importBatch === d.id).length; sheet(`<div class="ttl" style="font-size:22px">묶음 지우기</div><div class="sub">"${esc(b.name || '가져온 일정')}"으로 가져온 일정 ${n}개를 모두 지울까요? 가져온 뒤 사진을 붙인 일정도 함께 지워져요.</div><div class="btns"><button class="pri danger" data-act="impDel" data-id="${d.id}">${n}개 지우기</button><button class="sec" data-act="impSheet">돌아가기</button></div>`); },
+  impDelAsk: d => { const b = (IMP.batches || []).find(x => x.id === d.id) || {}; const n = (R.events || []).filter(e => e.importBatch === d.id).length; sheet(`<div class="ttl" style="font-size:22px">묶음 지우기</div><div class="sub">"${esc(b.name || '가져온 일정')}"으로 가져온 일정 ${n}개${b.songs ? `, 찬양 ${b.songs}곡, 주일 인원 ${b.counts || 0}주` : ''}를 모두 지울까요? 가져온 뒤 사진을 붙인 일정도 함께 지워져요.</div><div class="btns"><button class="pri danger" data-act="impDel" data-id="${d.id}">${n}개 지우기</button><button class="sec" data-act="impSheet">돌아가기</button></div>`); },
   impDel: d => impDel(d.id),
   gcalConnect: () => gcalConnect(),
   gcalFix: () => gcalFix(),
@@ -2699,4 +2707,158 @@ appEl.addEventListener('change', e => {
   GC.doc.opts = { ...gcalOpts(), [k]: e.target.checked };
   setDoc(doc(db, 'gcal', S.me.email), { opts: GC.doc.opts }, { merge: true }).catch(() => { });
   if (gTokGet(GCAL_SCOPE)) gcalSync(); else paint();
+});
+
+/* ================= v11 · 카톡 기록 가져오기 · 주일 인원 · 지난 찬양 ================= */
+
+/* ---------- 카톡 교사방 기록 가져오기 (있는 값은 건드리지 않고 빈칸만) ---------- */
+async function runKakaoImport(data) {
+  const bar = $('#impBar'), fillEl = bar.firstElementChild, msg = $('#impMsg'); bar.classList.remove('hide');
+  const say = (t, p) => { msg.textContent = t; if (p !== undefined) fillEl.style.width = Math.round(p * 100) + '%'; };
+  try {
+    say('지금 앱에 있는 것을 확인하는 중…', 0.05);
+    const [songsNow, countsNow, slNow] = await Promise.all([getDocs(collection(db, 'songs')), getDocs(collection(db, 'counts')).catch(() => ({ docs: [] })), getDocs(collection(db, 'setlists'))]);
+    const songDates = new Set(songsNow.docs.map(d => d.data().date));
+    const countDates = new Set(countsNow.docs.map(d => d.id));
+    const slDates = new Set(slNow.docs.map(d => d.id));
+    if (!Array.isArray(R.events)) await loadEvents();
+    const haveGid = new Set((R.events || []).map(e => e.gid).filter(Boolean));
+    const bref = doc(collection(db, 'imports')), bid = bref.id, who = { by: S.me.email, byName: myName() };
+    const ops = [], n = { songs: 0, weeks: 0, counts: 0, events: 0, fill: 0, staff: 0, skipSongs: 0, skipCounts: 0, skipEvents: 0, skipFill: 0 };
+    for (const s of data.setlists || []) {
+      if (songDates.has(s.date)) { n.skipSongs++; continue; }
+      n.weeks++;
+      s.songs.forEach((g, i) => { ops.push([doc(collection(db, 'songs')), { date: s.date, title: g.title, key: g.key || '', inst: g.inst || '', bpm: g.bpm || '', memo: g.memo || '', link: '', order: i + 1, pages: 0, ...who, importBatch: bid, src: 'kakao' }]); n.songs++; });
+      if (!slDates.has(s.date) && (s.leaders || []).length) ops.push([doc(db, 'setlists', s.date), { date: s.date, memo: `찬양 인도: ${s.leaders.join(' · ')}`, ...who, at: new Date().toISOString(), importBatch: bid, src: 'kakao' }]);
+    }
+    for (const c of data.counts || []) {
+      if (countDates.has(c.date)) { n.skipCounts++; continue; }
+      ops.push([doc(db, 'counts', c.date), { ...c, ...who, importBatch: bid, src: 'kakao' }]); n.counts++;
+    }
+    const newEv = [];
+    for (const e of data.events || []) {
+      if (haveGid.has(e.gid)) { n.skipEvents++; continue; }
+      const ref = doc(collection(db, 'events')), d2 = { ...e, staffId: '', imgCount: 0, ...who, importBatch: bid, source: 'kakao' };
+      ops.push([ref, d2]); newEv.push({ id: ref.id, ...d2 }); n.events++;
+    }
+    const fills = [];
+    for (const f of data.scheduleFill || []) {
+      const s = schedFor(f.date);
+      if (!s || String(s[f.field] || '').trim()) { n.skipFill++; continue; }
+      ops.push([doc(db, 'schedule', f.date), { [f.field]: f.value }, true]); fills.push(f); n.fill++;
+    }
+    for (const st of data.newStaff || []) {
+      if (S.staff.some(x => x.name === st.name)) continue;
+      ops.push([doc(collection(db, 'staff')), { name: st.name, classes: [], classRole: {}, role: 'teacher', kind: '', duties: [], order: 900 + n.staff, since: st.since || '', note: st.note || '', email: '' }]); n.staff++;
+    }
+    for (let i = 0; i < ops.length; i += 400) {
+      const b = writeBatch(db); ops.slice(i, i + 400).forEach(([r, d, m]) => (m ? b.set(r, d, { merge: true }) : b.set(r, d))); await b.commit();
+      say(`올리는 중… ${Math.min(ops.length, i + 400)} / ${ops.length}`, 0.1 + 0.85 * Math.min(1, (i + 400) / ops.length));
+    }
+    const meta = { name: data.batchName || '카톡 교사방', count: n.events, songs: n.songs, counts: n.counts, src: 'kakao', at: new Date().toISOString(), ...who };
+    if (n.events + n.songs + n.counts + n.fill + n.staff) await setDoc(bref, meta);
+    if (Array.isArray(R.events)) newEv.forEach(e => R.events.push(e));
+    fills.forEach(f => { const s = schedFor(f.date); if (s) s[f.field] = f.value; });
+    if (IMP.batches && n.events + n.songs + n.counts) IMP.batches.unshift({ id: bid, ...meta });
+    W.songs = {}; W.setlist = {}; CNT.rows = null; HIST.rows = null;
+    say('끝났어요', 1);
+    if (n.staff) await loadAll();
+    const skip = n.skipSongs + n.skipCounts + n.skipEvents + n.skipFill;
+    sheet(`<div class="ttl" style="font-size:24px">${n.events + n.songs + n.counts + n.fill + n.staff ? '카톡 기록을 가져왔어요' : '새로 넣을 것이 없어요'}</div>
+<div class="kres"><div><b>${n.weeks}주</b><small>주일 찬양 · ${n.songs}곡</small></div><div><b>${n.counts}주</b><small>주일 인원</small></div><div><b>${n.events}개</b><small>일정</small></div><div><b>${n.fill}칸</b><small>순서표 빈칸</small></div><div><b>${n.staff}명</b><small>새 선생님</small></div></div>
+${skip ? `<div class="sub">이미 앱에 있어서 건너뛴 것: 찬양 ${n.skipSongs}주 · 인원 ${n.skipCounts}주 · 일정 ${n.skipEvents}개 · 순서표 ${n.skipFill}칸 — 있는 값은 바꾸지 않았어요.</div>` : ''}
+${n.events + n.songs + n.counts ? '<div class="s2">잘못 들어갔으면 교사실 → 캘린더 → 바깥 캘린더 가져오기 → 가져온 기록에서 묶음째 지울 수 있어요.</div>' : ''}
+<div class="btns"><button class="pri" data-act="sheetClose">확인</button></div>`);
+    gcalSoon(); softPaint();
+  } catch (e) { say('중간에 멈췄어요: ' + (e.code === 'permission-denied' ? '권한 문제예요. 보안 규칙을 새로 게시했는지 확인해 주세요' : e.message)); }
+}
+
+/* ---------- 주일 인원 (교사실 → 통계) ---------- */
+const CNT = { rows: null, year: null };
+async function loadCounts() {
+  if (CNT.rows) return CNT.rows;
+  CNT.rows = [];
+  await twoStep(collection(db, 'counts'), a => { CNT.rows = a.sort((x, y) => ko(x.date, y.date)); });
+  return CNT.rows;
+}
+function countsCard() {
+  if (CNT.rows === null) { loadCounts().then(() => softPaint()); return '<section class="card full"><div class="lbl"><span>주일 인원</span></div><div class="s2">불러오는 중…</div></section>'; }
+  const years = [...new Set(CNT.rows.map(r => r.date.slice(0, 4)))].sort();
+  const thisY = String(new Date().getFullYear());
+  if (!CNT.year) CNT.year = years.includes(thisY) ? thisY : years[years.length - 1] || thisY;
+  const rows = CNT.rows.filter(r => r.date.startsWith(CNT.year));
+  const tot = r => r.total || ((r.family || 0) + (r.teachers || 0));
+  const max = Math.max(1, ...rows.map(tot)), lo = rows.length ? Math.max(0, Math.floor(Math.min(...rows.map(tot)) * 0.8 / 10) * 10) : 0, sc = t => Math.max(6, Math.round((t - lo) / Math.max(1, max - lo) * 100)), avg = rows.length ? Math.round(rows.reduce((s, r) => s + tot(r), 0) / rows.length) : 0;
+  const last = CNT.rows[CNT.rows.length - 1];
+  const prevY = String(Number(CNT.year) - 1), prev = CNT.rows.filter(r => r.date.startsWith(prevY));
+  const prevAvg = prev.length ? Math.round(prev.reduce((s, r) => s + tot(r), 0) / prev.length) : 0;
+  const best = rows.slice().sort((a, b) => tot(b) - tot(a))[0];
+  return `<section class="card full cntcard"><div class="lbl"><span>주일 인원 · 부모님 + 아이들 + 교사</span><button class="linkbtn" data-act="cntNew">+ 이번 주 넣기</button></div>
+${years.length > 1 ? `<div class="yrseg">${years.map(y => `<button class="${y === CNT.year ? 'on' : ''}" data-act="cntYear" data-id="${y}">${y}</button>`).join('')}</div>` : ''}
+${rows.length ? `<div class="cntstat"><div><b>${avg}</b><small>${CNT.year}년 평균${prevAvg ? ` · 작년 ${prevAvg}` : ''}</small></div><div><b>${best ? tot(best) : '-'}</b><small>가장 많은 날${best ? ' · ' + fmtShort(best.date) : ''}</small></div><div><b>${last ? tot(last) : '-'}</b><small>최근 · ${last ? fmtShort(last.date) : ''}</small></div><div><b>${rows.length}</b><small>기록한 주일</small></div></div>
+<div class="cntchart" role="img" aria-label="${CNT.year}년 주일 인원 막대">${rows.map(r => { const t = tot(r), f = r.family || 0; return `<button class="cb" data-act="cntEdit" data-id="${r.date}" title="${fmtShort(r.date)} · 총 ${t} (부모님·아이들 ${f}${r.kids ? ' / 아이들 ' + r.kids : ''} · 교사 ${r.teachers || 0})${r.place ? ' · ' + r.place : ''}"><b>${t}</b><span class="bw"><i style="height:${sc(t)}%"><em style="height:${t ? Math.min(100, Math.round((r.teachers || 0) / Math.max(1, t - lo) * 100)) : 0}%"></em></i></span><span class="lb">${parseD(r.date).getMonth() + 1}/${parseD(r.date).getDate()}</span></button>`; }).join('')}</div>
+<div class="legend"><span><i class="cdot" style="background:#E8A39C"></i>부모님 · 아이들</span><span><i class="cdot sun"></i>교사</span><span class="s2">${lo ? `막대는 ${lo}명부터 그렸어요 · ` : ''}누르면 고칠 수 있어요</span></div>` : `<div class="s2">${CNT.year}년 기록이 없어요.</div>`}</section>`;
+}
+function cntSheet(date) {
+  const r = (CNT.rows || []).find(x => x.date === date) || { date: date || nextSunday() };
+  if (!date && parseD(r.date) > new Date()) r.date = ymd(sundayOnOrBefore(new Date()));
+  sheet(`<div class="ttl" style="font-size:24px">주일 인원</div>
+<label class="fld">주일<input class="in" type="date" id="cn_date" value="${esc(r.date)}"></label>
+<div class="cntin"><label class="fld">부모님 · 아이들<input class="in" type="number" inputmode="numeric" id="cn_f" value="${r.family ?? ''}"></label><label class="fld">그중 아이들<input class="in" type="number" inputmode="numeric" id="cn_k" value="${r.kids ?? ''}"></label><label class="fld">교사<input class="in" type="number" inputmode="numeric" id="cn_t" value="${r.teachers ?? ''}"></label></div>
+<label class="fld">메모 <span class="s2">(야외예배, 분단별 등)</span><input class="in" id="cn_m" value="${esc(r.place || r.memo || '')}"></label>
+<div class="sub" id="cn_sum"></div>
+<div class="btns"><button class="pri" data-act="cntSave">저장</button><button class="sec" data-act="sheetClose">닫기</button></div>`);
+  const upd = () => { const f = +val('cn_f') || 0, t = +val('cn_t') || 0; $('#cn_sum').textContent = f || t ? `총 ${f + t}명` : ''; };
+  $('#sheet').addEventListener('input', upd); upd();
+}
+async function cntSave() {
+  const date = val('cn_date'); if (!date) return toast('주일을 골라 주세요');
+  const family = val('cn_f') === '' ? null : +val('cn_f'), kids = val('cn_k') === '' ? null : +val('cn_k'), teachers = val('cn_t') === '' ? null : +val('cn_t');
+  if (family === null && teachers === null) return toast('숫자를 넣어 주세요');
+  const old = (CNT.rows || []).find(x => x.date === date) || {};
+  const d = { date, family, kids, teachers, total: (family || 0) + (teachers || 0), place: val('cn_m'), by: S.me.email, byName: myName(), at: new Date().toISOString() };
+  if (old.importBatch) d.importBatch = old.importBatch;
+  try {
+    await setDoc(doc(db, 'counts', date), d);
+    CNT.rows = (CNT.rows || []).filter(x => x.date !== date).concat({ id: date, ...d }).sort((a, b) => ko(a.date, b.date)); CNT.year = date.slice(0, 4);
+    closeSheet(); toast('저장했어요'); paint();
+  } catch (e) { toast('저장하지 못했어요: ' + errMsg(e)); }
+}
+
+/* ---------- 지난 찬양 찾기 (예배 → 악보) ---------- */
+const HIST = { rows: null, q: '' };
+const songKey = t => String(t || '').toLowerCase().replace(/\(.*?\)|<.*?>|\[.*?\]|new|예비|\s|[~·,.!?'"]/g, '');
+async function loadHist() {
+  if (HIST.rows) return;
+  let rows = [];
+  try { const s = await getDocs(collection(db, 'songs')); rows = s.docs.map(d => d.data()).map(x => ({ date: x.date, title: x.title, key: x.key || '', inst: x.inst || '', bpm: x.bpm || '' })); } catch { rows = []; }
+  HIST.rows = rows;
+}
+function histCard() {
+  if (HIST.rows === null) return `<section class="card"><div class="lbl"><span>지난 찬양 찾기</span></div><div class="sub">곡 이름으로 언제 불렀는지, 키 · 빠르기는 어땠는지 찾아요.</div><button class="sec" data-act="histOpen">지난 찬양 열기</button></section>`;
+  const g = {};
+  HIST.rows.forEach(r => { const k = songKey(r.title); if (!k) return; (g[k] ||= { title: r.title, list: [] }).list.push(r); });
+  let groups = Object.values(g).map(x => ({ ...x, list: x.list.sort((a, b) => ko(b.date, a.date)) }));
+  const q = songKey(HIST.q);
+  groups = q ? groups.filter(x => songKey(x.title).includes(q)) : groups;
+  groups.sort((a, b) => b.list.length - a.list.length || ko(b.list[0].date, a.list[0].date));
+  const show = groups.slice(0, q ? 30 : 12);
+  return `<section class="card histcard"><div class="lbl"><span>지난 찬양 찾기</span><span class="s2">${Object.keys(g).length}곡 · ${new Set(HIST.rows.map(r => r.date)).size}주</span></div>
+<input class="in" id="histq" value="${esc(HIST.q)}" placeholder="곡 이름 (예: 예예예)" autocomplete="off">
+<div class="s2">${q ? `${groups.length}곡 찾음` : '많이 부른 곡'}</div>
+<div class="histlist">${show.map(x => { const l = x.list[0]; return `<details class="hist"><summary><span class="grow"><b>${esc(x.title)}</b><small>${x.list.length}번 · 마지막 ${esc(l.date.replace(/-/g, '.'))}${l.key ? ' · ' + esc(l.key) : ''}${l.bpm ? ' · ♩' + esc(l.bpm) : ''}</small></span></summary><div class="histdates">${x.list.slice(0, 40).map(r => `<button class="chip sm" data-act="histGo" data-id="${r.date}">${esc(r.date.slice(2).replace(/-/g, '.'))}${r.key ? ' ' + esc(r.key) : ''}</button>`).join('')}</div></details>`; }).join('') || '<div class="sub">찾는 곡이 없어요.</div>'}</div></section>`;
+}
+appEl.addEventListener('input', e => {
+  if (e.target.id !== 'histq') return;
+  HIST.q = e.target.value; clearTimeout(HIST.t);
+  HIST.t = setTimeout(() => { const pos = e.target.selectionStart; const box = document.querySelector('.histcard'); if (!box) return; const tmp = document.createElement('div'); tmp.innerHTML = histCard(); box.replaceWith(tmp.firstElementChild); const inp = $('#histq'); if (inp) { inp.focus(); try { inp.setSelectionRange(pos, pos); } catch { /* 괜찮아요 */ } } }, 160);
+});
+
+Object.assign(ACT, {
+  cntYear: d => { CNT.year = d.id; paint(); },
+  cntNew: () => cntSheet(''),
+  cntEdit: d => cntSheet(d.id),
+  cntSave: () => cntSave(),
+  histOpen: async () => { toast('지난 찬양을 불러오는 중…'); await loadHist(); paint(); },
+  histGo: d => { W.date = d.id; W.tab = 'songs'; loadSongs(d.id).then(() => { paint(); const sc = $('.scroll'); if (sc) sc.scrollTop = 0; }); }
 });
