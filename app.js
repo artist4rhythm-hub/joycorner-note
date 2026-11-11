@@ -3,7 +3,7 @@ import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.14.1/fireba
 import { getAuth, onAuthStateChanged, GoogleAuthProvider, signInWithPopup, signOut } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js';
 import {
   initializeFirestore, getFirestore, persistentLocalCache, persistentMultipleTabManager,
-  doc, collection, getDoc, getDocs, setDoc, updateDoc, deleteDoc, deleteField,
+  doc, collection, getDoc, getDocs, getDocFromCache, getDocsFromCache, setDoc, updateDoc, deleteDoc, deleteField,
   query, where, onSnapshot, writeBatch, serverTimestamp, increment
 } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js';
 import { firebaseConfig, OWNER_EMAIL } from './firebase-config.js';
@@ -59,30 +59,6 @@ const S = {
 const appEl = $('#app');
 
 /* ---------- 데이터 읽기 ---------- */
-async function loadAll() {
-  const cs = await getDocs(collection(db, 'classes'));
-  S.classes = {}; cs.forEach(d => { S.classes[d.id] = { id: d.id, ...d.data() }; });
-  const isAdmin = S.me.role === 'admin';
-  S.myClasses = (isAdmin ? Object.keys(S.classes) : (S.me.classes || []).filter(c => S.classes[c])).sort();
-  const saved = lsGet('jc_cur');
-  S.cur = S.myClasses.includes(saved) ? saved : S.myClasses[0] || null;
-  await Promise.all(S.myClasses.map(async c => {
-    const k = await getDocs(query(collection(db, 'children'), where('classId', '==', c)));
-    S.kids[c] = k.docs.map(d => ({ id: d.id, ...d.data() }));
-    const a = await getDocs(query(collection(db, 'attendance'), where('classId', '==', c)));
-    S.att[c] = {}; a.forEach(d => { S.att[c][d.data().date] = d.data().marks || {}; });
-  }));
-  const sc = await getDocs(collection(db, 'schedule'));
-  S.schedule = sc.docs.map(d => ({ id: d.id, ...d.data() })).sort((a, b) => ko(a.date, b.date));
-  try {
-    const st = await getDocs(collection(db, 'staff'));
-    S.staff = st.docs.map(d => ({ id: d.id, ...d.data() })).sort((a, b) => (a.order ?? 999) - (b.order ?? 999) || ko(a.name, b.name));
-  } catch { S.staff = []; }
-  const mine = S.staff.find(x => x.email && x.email === S.me.email); if (mine) S.me.name = mine.name;
-  R.notices = null; R.events = null; await loadRoom();
-  // 가정 정보는 미리 받아 두면 인터넷이 끊겨도 볼 수 있어요
-  S.myClasses.forEach(c => (S.kids[c] || []).forEach(k => { if (k.familyId && !S.fam[k.familyId]) loadFam(k.familyId); }));
-}
 async function loadFam(id) {
   if (S.fam[id]) return S.fam[id];
   try { const s = await getDoc(doc(db, 'families', id)); if (s.exists()) S.fam[id] = { id, ...s.data() }; } catch { /* 권한/오프라인 */ }
@@ -186,7 +162,7 @@ function vHome() {
   const nextS = S.schedule.find(x => x.date >= todayStr && !x.noService) || S.schedule[S.schedule.length - 1];
   const diff = nextS ? Math.round((parseD(nextS.date) - parseD(todayStr)) / 86400000) : 99;
   const care = careList(c).slice(0, 6), bdays = upcomingBirthdays(c).slice(0, 4);
-  return `<div class="scroll cols">${header}${classChips()}
+  return `<div class="scroll cols">${header}${holBanner()}${gcalBanner()}${classChips()}
 <section class="card"><div class="rowtop"><div style="display:flex;padding-left:10px">${faces.map(k => `<span style="margin-left:-10px;border:3px solid #fff;border-radius:50%;display:block;line-height:0">${avatar(k, 46)}</span>`).join('')}</div><div><div class="big">${esc(cl.name)}</div><div class="sub">친구 ${kids.length}명</div></div></div>
 <div class="chips">${(() => { const cs = classStaff(c); const h = cs.homeroom.map(n => `<span class="chip">담임 ${esc(n)}</span>`).join('') + cs.assistants.map(n => `<span class="chip">${esc(n)}</span>`).join(''); return h || (S.me.role === 'admin' ? `<button class="chip dashed" data-act="go" data-to="settings">+ 교사 명단에서 정해 주세요</button>` : '<span class="chip">담임 미정</span>'); })()}</div>
 <button class="cta" data-act="go" data-to="attend">${svg(ICON.checkc, 28, 2.4)}출석 시작하기</button></section>
@@ -326,7 +302,9 @@ function vSettings() {
   const admin = S.me.role === 'admin';
   return `<div class="scroll cols"><div class="hd"><button class="back" data-act="back">← 홈</button></div><div class="ttl">설정</div>
 <section class="card"><div class="lbl"><span>내 정보</span></div><div class="big" style="font-size:22px">${esc(S.me.name || S.user.displayName || '')}</div><div class="sub">${esc(S.user.email)} · ${S.me.owner ? '수퍼관리자' : S.me.director ? '디렉터' : admin ? '시스템 관리자' : '교사'}</div><button class="sec" data-act="logout">로그아웃</button></section>
+${gcalCard()}
 ${admin ? `
+${gcalSettingsCard()}
 ${vStaffList()}
 <section class="card"><div class="lbl"><span>시트 데이터 가져오기</span></div><div class="sub">처음에는 joycorner-import.json(전체). 그 뒤에 더할 때는 extra 파일(아이 정보는 건드리지 않아요).</div><label class="filebtn">${svg('<path d="M12 16V4m-5 5 5-5 5 5"/><path d="M4 16v3a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3"/>', 20, 1.8)}<span id="impName">파일 고르기</span><input type="file" id="impFile" accept="application/json,.json" hidden></label><div class="pbar hide" id="impBar"><i></i></div><div class="sub" id="impMsg"></div><button class="sec" data-act="runImport">가져오기 시작</button></section>
 <section class="card"><div class="lbl"><span>연도별 백업</span></div><div class="sub">한 해의 기록을 파일 하나로 내려받아 보관해요.</div><div class="two"><label class="fld">연도<select class="in" id="bk_year">${[new Date().getFullYear() + 1, new Date().getFullYear(), new Date().getFullYear() - 1].map(y => `<option ${y === new Date().getFullYear() ? 'selected' : ''}>${y}</option>`).join('')}</select></label><span></span></div><div class="btns" style="flex-wrap:wrap"><button class="ghost" data-act="backup" data-id="0">사진 빼고</button><button class="ghost" data-act="backup" data-id="1">사진까지</button></div><div class="s2" id="bk_msg"></div></section>
@@ -358,7 +336,7 @@ ${total ? '' : '<div class="sub">아직 명단이 없어요. 시트 데이터를
 const VIEWS = { home: vHome, attend: vAttend, friends: vFriends, kid: vKid, stats: vStats, settings: vSettings, worship: vWorship, room: vRoom, notice: vNotice, event: vEvent, staff: vStaff, help: vHelp, usage: vUsage, promote: vPromote };
 function paint() {
   if (S.phase === 'setup') { appEl.innerHTML = vSetup(); return; }
-  if (S.phase === 'boot') { appEl.innerHTML = '<div class="center"><div class="sub">불러오는 중…</div></div>'; return; }
+  if (S.phase === 'boot') { appEl.innerHTML = '<div class="center boot"><img src="logo-dark.png" alt="" width="96" height="96"><div class="sub">조이코너 노트를 여는 중…</div></div>'; return; }
   if (S.phase === 'login') { appEl.innerHTML = vLogin(); return; }
   if (S.phase === 'pending') { appEl.innerHTML = vPending(); return; }
   const sc = $('.scroll'), top = sc ? sc.scrollTop : 0, key = S.route + (S.arg || '') + S.cur;
@@ -380,7 +358,11 @@ function route() {
   usageScreen(S.route);
   if (S.route === 'promote') { PROMO.inc = null; }
   if (S.route === 'worship') loadWorship().then(() => { if (S.route === 'worship') paint(); });
-  if (['room', 'notice', 'stats', 'home', 'event', 'staff'].includes(S.route)) loadRoom().then(() => { if (['room', 'notice', 'home', 'event', 'staff'].includes(S.route)) paint(); });
+  if (['home', 'attend', 'friends', 'stats'].includes(S.route) && S.cur) ensureAtt(S.cur);
+  if (S.route === 'kid') { const k = findKid(S.arg); if (k) ensureAtt(k.classId); }
+  if (['room', 'notice', 'home', 'event', 'staff'].includes(S.route)) { const was = Array.isArray(R.events) && Array.isArray(R.notices); loadRoom().then(() => { if (!was && ['room', 'notice', 'home', 'event', 'staff'].includes(S.route)) softPaint(); }); }
+  if (S.route === 'settings' || S.route === 'room') loadCfg().then(c => { if (c.gcalClientId) loadGIS().catch(() => { }); });
+  if (S.route === 'room' || S.route === 'settings') gcalLoad().then(() => softPaint());
   if (S.route === 'staff' && S.arg && !(S.staffEx[S.arg] && S.staffEx[S.arg].notes)) { S.staffEx[S.arg] = { notes: null }; loadStaffExtra(S.arg); }
   if (S.route === 'kid' && S.kidFor !== S.arg) { S.kidData = null; S.kidFor = S.arg; loadKid(S.arg).catch(() => { }); }
   paint();
@@ -743,9 +725,10 @@ async function dutyDel() {
 }
 
 /* ---------- 교사실 (공지 · 캘린더 · 업무 분담 · 조직도 · 통계) ---------- */
-const APP_VERSION = 'v9';
-const APP_DATE = '2026-11-10';
+const APP_VERSION = 'v10';
+const APP_DATE = '2026-11-11';
 const CHANGELOG = [
+  { v: 'v10', date: '11월 11일', items: ['처음 여는 속도: 휴대폰에 남은 것으로 먼저 보여 주고 새 것은 뒤에서 받아요', '화면마다 필요한 것만 받아요 (출석 기록은 그 반만, 순서표는 연 달만)', '일정 넣기 창을 세로 화면에 맞게 정리 (시작 · 끝 한 줄씩)', '공휴일: 해마다 불러오기 · 대체·임시공휴일이 바뀌면 관리자에게 알림', '바깥 캘린더 가져오기 (관리자): .ics 파일 또는 구글 캘린더에서 바로 · 묶음째 지우기', '내 구글 캘린더 연결: 교사실 일정과 내 주일 순서가 "조이코너" 캘린더로'] },
   { v: 'v9', date: '11월 11일', items: ['일정: 종일 또는 몇 시부터 몇 시까지', '순서표: 날짜 더하기 · 한 해 빈 주일 한 번에 만들기', '캘린더의 "예배 없음" 일정이 순서표·예배 탭에 함께 반영돼요', '주일 카드에 그날 일정이 함께 보여요', '눈 깜빡임: 두 번 → 다음, 세 번 → 이전'] },
   { v: 'v8', date: '11월 11일', items: ['순서표를 월별 서랍과 주일 카드로 정리 (아이콘 · 맡은 횟수 타일)', '헌금기도도 아이 얼굴 카드와 나이로', '선생님 색이 겹치지 않게, 사진을 넣으면 사진으로', '업무 분담 사람별 카드 · 반 올리기 화면을 가나다순 격자로', '위쪽 메뉴 칸 길이를 모든 화면에서 같게', '캘린더 기간 일정: 끌어서 고르기(컴퓨터) · 길게 눌러 고르기(폰)', '사진은 화면에 보일 때 불러와서 더 빨라졌어요'] },
   { v: 'v7', date: '11월 10일', items: ['권한 정리: 수퍼관리자 · 디렉터 · 시스템 관리자(데이터 담당) · 교사 · 헬퍼 선생님', '교사 돌봄 기록은 디렉터와 쓴 사람만 봐요', '이름 칸을 선생님 카드 고르기로 (업무 분담 · 주일 담당), 헬퍼 선생님 카드 바로 만들기', '교사실 순서표: 설교·기도 인도·챈트·율동·기타·헌금기도를 종류별로 한눈에, 사전 점검 표시', '캘린더에 주일 담당이 자동으로 보여요 · 내 순서 표시', '선생님 카드 사진을 눌러 바로 바꾸기', '사용 현황(수퍼관리자), 연도별 백업, 새해 반 올리기(디렉터)', '줄 바꿈 때 낱말이 끊기지 않게 정리'] },
@@ -761,12 +744,6 @@ const ROOM_TABS = [['notice', '공지'], ['cal', '캘린더'], ['turns', '순서
 const roomTabs = active => `<div class="seg">${ROOM_TABS.map(([k, l]) => `<button class="${active === k ? 'on' : ''}" data-act="rtab" data-id="${k}">${l}</button>`).join('')}</div>`;
 const NOTE_KINDS = ['통화', '문자', '심방', '기도제목', '특이사항'];
 
-async function loadNotices() {
-  try { const s = await getDocs(collection(db, 'notices')); R.notices = s.docs.map(d => ({ id: d.id, ...d.data() })); } catch { R.notices = []; }
-}
-async function loadEvents() {
-  try { const s = await getDocs(collection(db, 'events')); R.events = s.docs.map(d => ({ id: d.id, ...d.data() })); } catch { R.events = []; }
-}
 async function loadDuties() {
   if (Array.isArray(W.duties)) return;
   try { const s = await getDocs(collection(db, 'duties')); W.duties = s.docs.map(d => ({ id: d.id, ...d.data() })).sort((a, b) => (a.order ?? 999) - (b.order ?? 999)); } catch { W.duties = []; }
@@ -776,6 +753,7 @@ async function loadRoom() {
   if (R.notices === null) { R.notices = undefined; jobs.push(loadNotices()); }
   if (R.events === null) { R.events = undefined; jobs.push(loadEvents()); }
   if (W.duties === null) { W.duties = undefined; jobs.push((async () => { W.duties = null; await loadDuties(); })()); }
+  const y = new Date().getFullYear(); [y, y + 1].forEach(x => { if (!(String(x) in HOL.y)) jobs.push(loadHol(x)); });
   await Promise.all(jobs);
 }
 const sortedNotices = () => (R.notices || []).slice().sort((a, b) => (b.pinned ? 1 : 0) - (a.pinned ? 1 : 0) || ko(b.at || '', a.at || ''));
@@ -828,7 +806,7 @@ function homeNoticeCard() {
 }
 function homeEventsCard() {
   const today = ymd(new Date()), out = [];
-  for (let i = 0; i < 14; i++) { const d = addDays(today, i); itemsOn(d).filter(x => x.kind === 'evt' || x.kind === 'meet').forEach(x => out.push({ d, ...x })); }
+  for (let i = 0; i < 14; i++) { const d = addDays(today, i); itemsOn(d).filter(x => x.kind === 'evt' || x.kind === 'meet' || x.kind === 'hol').forEach(x => out.push({ d, ...x })); }
   if (!out.length) return '';
   return `<section class="card"><div class="lbl"><span>다가오는 일정 (2주)</span><button class="linkbtn" data-act="rtab" data-id="cal">캘린더</button></div>${out.slice(0, 5).map(x => `<div class="bday"><span class="d">${parseD(x.d).getMonth() + 1}/${parseD(x.d).getDate()}</span><span>${esc(x.label)}${x.sub ? ` <span class="s2">${esc(x.sub)}</span>` : ''}</span></div>`).join('')}</section>`;
 }
@@ -1177,7 +1155,7 @@ async function noticeDel() {
 
 /* ---------- 캘린더 ---------- */
 const KIND_CLASS = { 회의: 'meet', 교육: 'meet', 부재: 'away' };
-const itemAct = x => x.notice ? `data-act="noticeOpen" data-id="${x.notice}"` : x.kid ? `data-act="kid" data-id="${x.kid}"` : x.staff ? `data-act="staffOpen" data-id="${x.staff}"` : x.event ? `data-act="eventOpen" data-id="${x.event}"` : `data-act="wgoWeek" data-id="${x.d}"`;
+const itemAct = x => x.hol ? `data-act="calDay" data-id="${x.d}"` : x.notice ? `data-act="noticeOpen" data-id="${x.notice}"` : x.kid ? `data-act="kid" data-id="${x.kid}"` : x.staff ? `data-act="staffOpen" data-id="${x.staff}"` : x.event ? `data-act="eventOpen" data-id="${x.event}"` : `data-act="wgoWeek" data-id="${x.d}"`;
 const itemRow = (x, showDate) => `<button class="row calrow" ${itemAct(x)}><i class="cdot ${x.kind}"></i><span class="grow"><span class="it">${esc(x.label)}</span>${x.sub ? `<span class="sub">${esc(x.sub)}</span>` : ''}</span>${showDate ? `<span class="s2">${parseD(x.d).getMonth() + 1}/${parseD(x.d).getDate()}</span>` : '<span class="chev">›</span>'}</button>`;
 function vEvent() {
   const e = (R.events || []).find(x => x.id === S.arg);
@@ -1716,7 +1694,7 @@ function namesHtml(v) {
 function sundayCard(s, opts = {}) {
   const d = parseD(s.date), now = s.date === nextSunday();
   const keys = ['preacher', 'pray', 'nation', 'chant', 'dance', 'guitar', 'offering'];
-  return `<article class="sunday ${now ? 'now' : ''} ${s.noService ? 'off' : ''}"><header><span class="sd"><b>${d.getMonth() + 1}/${d.getDate()}</b><small>주일</small></span><span class="st">${esc(s.story || (s.noService ? '조이코너 예배 없음' : '이야기 미정'))}</span>${now ? '<span class="tag">이번 주</span>' : ''}${checkBadge(s)}${isAdminMe() && !opts.noEdit ? `<button class="editbtn" data-act="schedEditDate" data-id="${s.date}" aria-label="${d.getMonth() + 1}월 ${d.getDate()}일 담당 고치기">${svg('<path d="M4 20h4L19 9l-4-4L4 16z"/>', 16, 1.8)}</button>` : ''}</header>
+  return `<article class="sunday ${now ? 'now' : ''} ${s.noService ? 'off' : ''}"><header><span class="sd"><b>${d.getMonth() + 1}/${d.getDate()}</b><small>주일</small></span><span class="st">${esc(s.story || (s.noService ? '조이코너 예배 없음' : '이야기 미정'))}</span>${holName(s.date) ? `<span class="tag hol">${esc(holName(s.date))}</span>` : ''}${now ? '<span class="tag">이번 주</span>' : ''}${checkBadge(s)}${isAdminMe() && !opts.noEdit ? `<button class="editbtn" data-act="schedEditDate" data-id="${s.date}" aria-label="${d.getMonth() + 1}월 ${d.getDate()}일 담당 고치기">${svg('<path d="M4 20h4L19 9l-4-4L4 16z"/>', 16, 1.8)}</button>` : ''}</header>
 ${sundayEventsHtml(s.date)}${s.noService ? `<div class="offnote">${esc(s.noServiceNote || '이 주일은 조이코너 예배가 없어요')}</div>` : `<div class="rrows">${sundayRows(s, keys)}</div>`}</article>`;
 }
 function wWeek(d) {
@@ -1770,7 +1748,7 @@ ${other.length ? `<div class="splbl">초청 · 그 밖에</div><div class="tileg
   };
   const months = Object.keys(byMonth).map(Number).sort((a, b) => a - b);
   const mini = list => { const names = [...new Set(list.flatMap(r => k === 'all' || k === 'mine' ? splitNames(r.preacher) : splitNames(r[k])))].filter(n => S.staff.some(s => s.name === n)).slice(0, 5); return names.map(n => staffAv(S.staff.find(s => s.name === n), 22)).join(''); };
-  const drawerM = m => { const miss = isAdminMe() ? sundaysOfYear(Y, m).filter(d => !schedFor(d)).length : 0; return `<details class="drawer full" data-dr="${Y}-${m}" ${isOpen(m) ? 'open' : ''}><summary><span class="mname">${MONTHS[m - 1]}</span><span class="s2">주일 ${byMonth[m].length}번${m === curM ? ' · 이번 달' : ''}</span><span class="minis">${mini(byMonth[m])}</span></summary>${miss ? `<button class="addrow" data-act="turnFillM" data-id="${Y}-${m}">${svg('<path d="M12 5v14M5 12h14"/>', 16, 2.2)} 이 달 빈 주일 ${miss}번 더하기</button>` : ''}${monthBody(m, byMonth[m])}</details>`; };
+  const drawerM = m => { const miss = isAdminMe() ? sundaysOfYear(Y, m).filter(d => !schedFor(d)).length : 0; return `<details class="drawer full" data-dr="${Y}-${m}" ${isOpen(m) ? 'open' : ''}><summary><span class="mname">${MONTHS[m - 1]}</span><span class="s2">주일 ${byMonth[m].length}번${m === curM ? ' · 이번 달' : ''}</span><span class="minis">${mini(byMonth[m])}</span></summary>${isOpen(m) ? `${miss ? `<button class="addrow" data-act="turnFillM" data-id="${Y}-${m}">${svg('<path d="M12 5v14M5 12h14"/>', 16, 2.2)} 이 달 빈 주일 ${miss}번 더하기</button>` : ''}${monthBody(m, byMonth[m])}` : ''}</details>`; };
   const ahead = curM ? months.filter(m => m >= curM) : months, past = curM ? months.filter(m => m < curM) : [];
   return `${head}${summary}${ahead.map(drawerM).join('')}${past.length ? `<details class="drawer full soft" data-dr="${Y}-past" ${R.openM[Y + '-past'] ? 'open' : ''}><summary><span class="mname">지난 달</span><span class="s2">${MONTHS[past[0] - 1]} – ${MONTHS[past[past.length - 1] - 1]}</span></summary><div class="pastwrap">${past.slice().reverse().map(drawerM).join('')}</div></details>` : ''}${months.length ? '' : '<div class="sub full">이 해의 일정표가 없어요.</div>'}`;
 }
@@ -1827,14 +1805,15 @@ function rCal() {
   const day = itemsOn(R.day), dd = parseD(R.day);
   const upcoming = []; for (let i = 0; i < 21; i++) itemsOn(addDays(today, i)).filter(x => x.kind !== 'sun' && (!x.span || x.first || i === 0)).forEach(x => upcoming.push(x));
   const rng = R.range && R.range.end ? [R.range.start, R.range.end].sort() : R.range ? [R.range.start, R.range.start] : null;
-  return `<div class="calwrap full"><section class="card cal"><div class="calhead"><button data-act="calMonth" data-n="-1" aria-label="지난 달">‹</button><b>${y}년 ${m}월</b><button data-act="calMonth" data-n="1" aria-label="다음 달">›</button></div>
+  const tools = isAdminMe() ? `<div class="caltools full"><button class="tool" data-act="holSheet">${svg('<path d="M4 21V4m0 0h12l-2 4 2 4H4"/>', 18, 1.9)}<span>공휴일</span></button><button class="tool" data-act="impSheet">${svg('<path d="M12 4v12m-5-5 5 5 5-5"/><path d="M4 20h16"/>', 18, 1.9)}<span>바깥 캘린더 가져오기</span></button></div>` : '';
+  return `${holBanner()}${gcalBanner()}${tools}<div class="calwrap full"><section class="card cal"><div class="calhead"><button data-act="calMonth" data-n="-1" aria-label="지난 달">‹</button><b>${y}년 ${m}월</b><button data-act="calMonth" data-n="1" aria-label="다음 달">›</button></div>
 ${R.range ? `<div class="rangebar">${svg('<path d="M4 7h16M4 12h16M4 17h10"/>', 16, 2)}<span>${R.range.end ? `${fmtShort(rng[0])} – ${fmtShort(rng[1])}` : `${fmtShort(R.range.start)}부터 — 끝 날짜를 눌러 주세요`}</span><button class="linkbtn" data-act="rangeCancel">취소</button></div>` : ''}
 <div class="cgrid" id="cgrid">${'일월화수목금토'.split('').map((w, i) => `<span class="cw ${i === 0 ? 'sun' : ''}">${w}</span>`).join('')}
-${cells.slice(0, weeks * 7).map(d => { const it = itemsOn(d); const out = d.slice(0, 7) !== R.month; const inR = rng && d >= rng[0] && d <= rng[1]; const s = schedFor(d); const mine = s && TURN_KEYS.some(([k]) => hasName(s[k], myName())); return `<button class="cday ${out ? 'out' : ''} ${d === today ? 'today' : ''} ${d === R.day ? 'sel' : ''} ${parseD(d).getDay() === 0 ? 'sun' : ''} ${inR ? 'inrange' : ''}" data-act="calDay" data-id="${d}"><span class="dn">${parseD(d).getDate()}${mine ? '<i class="mydot" title="내 순서"></i>' : ''}</span><span class="dots">${it.slice(0, 4).map(x => `<i class="cdot ${x.kind}"></i>`).join('')}</span><span class="clab">${it.slice(0, 3).map(x => `<em class="${x.kind} ${x.span ? 'span' : ''}">${x.span && !x.first && parseD(d).getDay() !== 0 ? '&nbsp;' : esc(x.label)}</em>`).join('')}</span></button>`; }).join('')}</div>
-<div class="legend"><span><i class="cdot sun"></i>주일</span><span><i class="cdot evt"></i>행사</span><span><i class="cdot meet"></i>회의·교육</span><span><i class="cdot away"></i>부재</span><span><i class="cdot bday"></i>생일</span><span><i class="mydot"></i>내 순서</span></div>
+${cells.slice(0, weeks * 7).map(d => { const it = itemsOn(d); const out = d.slice(0, 7) !== R.month; const inR = rng && d >= rng[0] && d <= rng[1]; const s = schedFor(d); const mine = s && TURN_KEYS.some(([k]) => hasName(s[k], myName())); return `<button class="cday ${holName(d) ? 'hol' : ''} ${out ? 'out' : ''} ${d === today ? 'today' : ''} ${d === R.day ? 'sel' : ''} ${parseD(d).getDay() === 0 ? 'sun' : ''} ${inR ? 'inrange' : ''}" data-act="calDay" data-id="${d}"><span class="dn">${parseD(d).getDate()}${mine ? '<i class="mydot" title="내 순서"></i>' : ''}</span><span class="dots">${it.slice(0, 4).map(x => `<i class="cdot ${x.kind}"></i>`).join('')}</span><span class="clab">${it.slice(0, 3).map(x => `<em class="${x.kind} ${x.span ? 'span' : ''}">${x.span && !x.first && parseD(d).getDay() !== 0 ? '&nbsp;' : esc(x.label)}</em>`).join('')}</span></button>`; }).join('')}</div>
+<div class="legend"><span><i class="cdot hol"></i>공휴일</span><span><i class="cdot sun"></i>주일</span><span><i class="cdot evt"></i>행사</span><span><i class="cdot meet"></i>회의·교육</span><span><i class="cdot away"></i>부재</span><span><i class="cdot bday"></i>생일</span><span><i class="mydot"></i>내 순서</span></div>
 <div class="s2">${matchMedia('(pointer:fine)').matches ? '날짜를 끌어서 고르면 기간 일정을 바로 넣어요.' : '날짜를 길게 누른 뒤 끝 날짜를 누르면 기간 일정을 넣어요.'}</div></section>
 <div class="calside"><section class="card"><div class="lbl"><span>${dd.getMonth() + 1}월 ${dd.getDate()}일 ${DOW[dd.getDay()]}요일</span><button class="linkbtn" data-act="eventNew">+ 일정</button></div>${day.filter(x => x.kind !== 'sun').length ? day.filter(x => x.kind !== 'sun').map(x => itemRow(x)).join('') : (schedFor(R.day) ? '' : '<div class="sub">일정이 없어요.</div>')}${schedFor(R.day) ? `<div class="mtop">${sundayCard(schedFor(R.day))}</div>` : ''}</section>
-<section class="card"><div class="lbl"><span>다가오는 3주</span></div>${upcoming.length ? upcoming.slice(0, 12).map(x => itemRow(x, true)).join('') : '<div class="sub">다가오는 행사·생일이 없어요.</div>'}</section></div></div>`;
+<section class="card"><div class="lbl"><span>다가오는 3주</span></div>${upcoming.length ? upcoming.slice(0, 12).map(x => itemRow(x, true)).join('') : '<div class="sub">다가오는 행사·생일이 없어요.</div>'}</section>${gcalCard()}</div></div>`;
 }
 /* 끌어서 기간 고르기 (마우스) · 길게 눌러 고르기 (터치) */
 const CD = { on: false };
@@ -1883,6 +1862,7 @@ function gcalUrl(e) {
 }
 function itemsOn(d) {
   const out = [];
+  const hn = holName(d); if (hn) out.push({ d, kind: 'hol', label: hn, sub: '공휴일', hol: true });
   const s = schedFor(d);
   if (s && !(s.noService && s.noServiceBy && (R.events || []).some(e => e.id === s.noServiceBy))) out.push({ d, kind: s.noService ? 'off' : 'sun', label: s.noService ? (s.noServiceNote || '조이코너 예배 없음') : (s.story || '주일 예배'), sub: s.noService ? '' : (s.preacher ? '설교 ' + s.preacher : '') });
   (R.notices || []).filter(n => n.eventDate === d).forEach(n => out.push({ d, kind: 'evt', label: n.title, sub: n.eventTime || '', notice: n.id }));
@@ -1906,11 +1886,12 @@ async function eventSheet(id, preset) {
 <label class="fld">제목<input class="in" id="e2_title" value="${esc(e.title)}" placeholder="예: 교사 리트릿"></label>
 <div class="fld">종류</div><div class="kindgrid">${kinds.map(k => `<label class="kindopt ${e.kind === k ? 'on' : ''}"><input type="radio" name="e2_kind" value="${k}" ${e.kind === k ? 'checked' : ''}><i class="cdot ${k === '예배 없음' ? 'off' : (KIND_CLASS[k] || 'evt')}"></i>${k}</label>`).join('')}</div>
 <div class="s2" id="e2_offnote" ${e.kind === '예배 없음' ? '' : 'hidden'}>이 기간의 주일은 순서표와 예배 탭에 "조이코너 예배 없음"으로 함께 바뀌어요.</div>
-<div class="timebox">
-<div class="two"><label class="fld">시작 날짜<input class="in" type="date" id="e2_date" value="${esc(e.date)}"></label><label class="fld">끝 날짜 <span class="s2">(하루면 비워 두세요)</span><input class="in" type="date" id="e2_end" value="${esc(e.endDate || '')}"></label></div>
-<label class="switch"><input type="checkbox" id="e2_allday" ${allDay ? 'checked' : ''}><span class="sw"></span><b>종일</b><span class="s2">시간 없이 하루 종일</span></label>
-<div class="two" id="e2_times" ${allDay ? 'hidden' : ''}><label class="fld">시작 시간<input class="in" type="time" id="e2_time" value="${esc(e.time || '')}" step="300"></label><label class="fld">끝 시간<input class="in" type="time" id="e2_etime" value="${esc(e.endTime || '')}" step="300"></label></div>
-<div class="quickt" id="e2_quick" ${allDay ? 'hidden' : ''}>${['09:00', '11:00', '12:00', '13:30', '15:00', '19:30'].map(t => `<button type="button" class="chip sm" data-act="quickTime" data-id="${t}">${t}</button>`).join('')}<span class="s2">시작 시간을 누르면 끝 시간은 1시간 뒤로 맞춰져요</span></div>
+<div class="timebox ${allDay ? 'allday' : ''}" id="e2_box">
+<label class="switch tbhead"><b>언제</b><span class="grow"></span><span class="s2">종일</span><input type="checkbox" id="e2_allday" ${allDay ? 'checked' : ''}><span class="sw"></span></label>
+<div class="evrow"><span class="tl">시작</span><input class="in" type="date" id="e2_date" value="${esc(e.date)}" aria-label="시작 날짜"><input class="in tm" type="time" id="e2_time" value="${esc(e.time || '')}" step="300" aria-label="시작 시간"></div>
+<div class="evrow"><span class="tl">끝</span><input class="in" type="date" id="e2_end" value="${esc(e.endDate || e.date)}" aria-label="끝 날짜"><input class="in tm" type="time" id="e2_etime" value="${esc(e.endTime || '')}" step="300" aria-label="끝 시간"></div>
+<div class="quickt tm" id="e2_quick">${['09:00', '11:00', '12:00', '13:30', '15:00', '19:30'].map(t => `<button type="button" class="chip sm" data-act="quickTime" data-id="${t}">${t}</button>`).join('')}</div>
+<div class="s2 tbnote">${allDay ? '하루 일정이면 끝 날짜를 그대로 두세요.' : '시작 시간을 고르면 끝 시간은 1시간 뒤로 맞춰져요.'}</div>
 </div>
 <label class="fld">장소<input class="in" id="e2_place" value="${esc(e.place || '')}"></label>
 <label class="fld">메모<textarea id="e2_memo" style="min-height:70px">${esc(e.memo || '')}</textarea></label>
@@ -1919,8 +1900,10 @@ async function eventSheet(id, preset) {
 <div class="btns"><button class="pri" data-act="eventSave">저장</button><button class="sec" data-act="sheetClose">취소</button></div>
 ${id ? '<button class="ghost danger" data-act="eventDel">일정 지우기</button>' : ''}`);
   const box = $('#sheet');
+  $('#e2_date').dataset.old = e.date;
   box.addEventListener('change', ev => {
-    if (ev.target.id === 'e2_allday') { const on = ev.target.checked; $('#e2_times').hidden = on; $('#e2_quick').hidden = on; }
+    if (ev.target.id === 'e2_allday') { const on = ev.target.checked; $('#e2_box').classList.toggle('allday', on); box.querySelector('.tbnote').textContent = on ? '하루 일정이면 끝 날짜를 그대로 두세요.' : '시작 시간을 고르면 끝 시간은 1시간 뒤로 맞춰져요.'; }
+    if (ev.target.id === 'e2_date' && ev.target.value) { const en = $('#e2_end'), old = ev.target.dataset.old || ''; if (!en.value || en.value < ev.target.value || en.value === old) en.value = ev.target.value; ev.target.dataset.old = ev.target.value; }
     if (ev.target.name === 'e2_kind') { box.querySelectorAll('.kindopt').forEach(l => l.classList.toggle('on', l.querySelector('input').checked)); $('#e2_offnote').hidden = ev.target.value !== '예배 없음'; }
     if (ev.target.id === 'e2_time' && ev.target.value && !$('#e2_etime').value) $('#e2_etime').value = plusHour(ev.target.value);
   });
@@ -1956,7 +1939,7 @@ async function eventSave() {
     let linked = 0;
     if (isAdminMe() && (kind === '예배 없음' || (old && old.kind === '예배 없음'))) linked = await linkNoService(ref.id, old, data);
     R.day = data.date; R.month = data.date.slice(0, 7);
-    closeSheet(); toast(linked ? `저장했어요 · 주일 ${linked}번을 "예배 없음"으로 바꿨어요` : '저장했어요');
+    closeSheet(); toast(linked ? `저장했어요 · 주일 ${linked}번을 "예배 없음"으로 바꿨어요` : '저장했어요'); gcalSoon();
     if (S.route === 'event' && S.arg === ref.id) paint(); else if (S.route === 'staff' || (S.route === 'room' && R.tab === 'cal')) paint(); else go('event/' + ref.id);
   } catch (err) { msg.textContent = ''; toast('저장하지 못했어요: ' + errMsg(err)); }
 }
@@ -1965,7 +1948,7 @@ async function eventDel() {
   try {
     for (let i = 0; i < (e.imgCount || 0); i++) await deleteDoc(doc(db, 'eventImages', `${id}_${i}`)).catch(() => { });
     if (e.kind === '예배 없음' && isAdminMe()) await linkNoService(id, e, null);
-    await deleteDoc(doc(db, 'events', id)); R.events = R.events.filter(x => x.id !== id); closeSheet(); toast('지웠어요');
+    await deleteDoc(doc(db, 'events', id)); R.events = R.events.filter(x => x.id !== id); closeSheet(); toast('지웠어요'); gcalSoon();
     if (S.route === 'event') { R.tab = 'cal'; go('room'); } else paint();
   } catch (err) { toast('지우지 못했어요: ' + errMsg(err)); }
 }
@@ -2074,7 +2057,9 @@ appEl.addEventListener('click', e => {
 });
 appEl.addEventListener('toggle', e => {
   const d = e.target; if (!d.dataset || !d.dataset.dr) return;
+  const was = d.dataset.dr === 'count' ? R.openCount : (R.openM || {})[d.dataset.dr];
   if (d.dataset.dr === 'count') R.openCount = d.open; else { R.openM = R.openM || {}; R.openM[d.dataset.dr] = d.open; }
+  if (d.open && !was && /^\d{4}-\d{1,2}$/.test(d.dataset.dr) && !d.querySelector('.sunday,.addrow')) paint();
 }, true);
 appEl.addEventListener('change', e => {
   const t = e.target;
@@ -2095,20 +2080,623 @@ async function start(user) {
   S.phase = 'boot'; paint();
   const email = user.email.toLowerCase();
   try {
-    let snap = await getDoc(doc(db, 'teachers', email));
+    let snap = null;
+    try { snap = await getDocFromCache(doc(db, 'teachers', email)); if (!snap.exists()) snap = null; } catch { snap = null; }
+    const fromCache = !!snap;
+    if (!snap) snap = await getDoc(doc(db, 'teachers', email));
     if (!snap.exists() && email === OWNER_EMAIL.toLowerCase()) {
       await setDoc(doc(db, 'teachers', email), { name: user.displayName || '', role: 'admin', classes: [] });
       snap = await getDoc(doc(db, 'teachers', email));
     }
     if (!snap.exists()) { S.phase = 'pending'; return route(); }
-    S.me = { email, ...snap.data() };
-    if (S.me.role === 'director') { S.me.director = true; S.me.role = 'admin'; }
-    if (email === OWNER_EMAIL.toLowerCase()) { S.me.role = 'admin'; S.me.owner = true; }
+    const setMe = d => {
+      S.me = { email, ...d, name: S.me && S.me.email === email ? S.me.name : d.name };
+      if (S.me.role === 'director') { S.me.director = true; S.me.role = 'admin'; }
+      if (email === OWNER_EMAIL.toLowerCase()) { S.me.role = 'admin'; S.me.owner = true; }
+    };
+    setMe(snap.data());
     await loadAll();
-    S.phase = 'ready'; route(); checkVersion();
+    S.phase = 'ready'; route(); setTimeout(checkVersion, 1500);
+    // 권한이 바뀌었는지 서버에서 한 번 더 확인해요
+    if (fromCache) getDoc(doc(db, 'teachers', email)).then(n => {
+      if (!n.exists()) { if (email !== OWNER_EMAIL.toLowerCase()) { S.phase = 'pending'; route(); } return; }
+      const d = n.data(), old = snap.data();
+      if (d.role !== old.role || JSON.stringify(d.classes || []) !== JSON.stringify(old.classes || [])) { setMe(d); Object.keys(ATT).forEach(k => delete ATT[k]); loadAll().then(() => softPaint()); }
+    }).catch(() => { });
+    // 잠깐 쉬는 틈에 나머지를 미리 받아 둬요
+    const idle = window.requestIdleCallback || (f => setTimeout(f, 2500));
+    idle(() => { loadRoom().then(() => { holAutoCheck(); }); gcalLoad().then(() => { if (gcalOn()) { gPrep(); softPaint(); } }); });
   } catch (e) {
     S.phase = 'pending'; route(); toast('불러오지 못했어요: ' + (e.code || e.message));
   }
 }
 if (!configured) { S.phase = 'setup'; paint(); }
 else onAuthStateChanged(auth, start);
+
+/* ================= v10 · 빠르게 열기 · 공휴일 · 구글 캘린더 가져오기 · 내 구글 캘린더 ================= */
+
+/* ---------- 빠르게 열기: 휴대폰에 남아 있는 것(캐시)으로 먼저 그리고, 서버 것은 뒤에서 받아 바꿔요 ---------- */
+const qDocs = async (ref, cache) => { try { const s = await (cache ? getDocsFromCache(ref) : getDocs(ref)); return s.docs.map(d => ({ id: d.id, ...d.data() })); } catch { return null; } };
+const ATT = {};
+function kidRefs() {
+  return S.me.role === 'admin' ? [collection(db, 'children')] : (S.me.classes || []).map(c => query(collection(db, 'children'), where('classId', '==', c)));
+}
+async function fetchCore(cache) {
+  const [cs, ks, sc, st] = await Promise.all([
+    qDocs(collection(db, 'classes'), cache),
+    Promise.all(kidRefs().map(r => qDocs(r, cache))).then(a => a.some(x => x === null) ? null : a.flat()),
+    qDocs(collection(db, 'schedule'), cache),
+    qDocs(collection(db, 'staff'), cache)
+  ]);
+  return { cs, ks, sc, st };
+}
+function applyCore({ cs, ks, sc, st }) {
+  if (cs) { S.classes = {}; cs.forEach(x => { S.classes[x.id] = x; }); }
+  S.myClasses = (S.me.role === 'admin' ? Object.keys(S.classes) : (S.me.classes || []).filter(c => S.classes[c])).sort();
+  if (!S.myClasses.includes(S.cur)) { const saved = lsGet('jc_cur'); S.cur = S.myClasses.includes(saved) ? saved : S.myClasses[0] || null; }
+  if (ks) { const by = {}; S.myClasses.forEach(c => { by[c] = []; }); ks.forEach(k => { if (by[k.classId]) by[k.classId].push(k); }); S.kids = by; }
+  if (sc) S.schedule = sc.sort((a, b) => ko(a.date, b.date));
+  if (st) S.staff = st.sort((a, b) => (a.order ?? 999) - (b.order ?? 999) || ko(a.name, b.name));
+  const mine = S.staff.find(x => x.email && x.email === S.me.email); if (mine) S.me.name = mine.name;
+}
+async function loadAtt(c, cache) {
+  const a = await qDocs(query(collection(db, 'attendance'), where('classId', '==', c)), cache);
+  if (a === null || (cache && !a.length)) return false;
+  const m = {}; a.forEach(x => { m[x.date] = x.marks || {}; });
+  const old = S.att[c] || {};
+  if (S.watchKey === `${c}_${S.attDate}` && old[S.attDate]) m[S.attDate] = old[S.attDate];
+  S.att[c] = m; return true;
+}
+// 반 하나의 출석 기록은 그 반을 볼 때 받아요
+function ensureAtt(c) {
+  if (!c) return Promise.resolve();
+  if (!ATT[c]) ATT[c] = (async () => { if (await loadAtt(c, true)) softPaint(); await loadAtt(c, false); softPaint(); })();
+  return ATT[c];
+}
+function softPaint() {
+  if (S.phase !== 'ready') return;
+  clearTimeout(S.spT);
+  S.spT = setTimeout(() => {
+    const a = document.activeElement;
+    if (a && a.closest && a.closest('main') && /^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName)) return;
+    if (CD.on || CD.t || document.querySelector('.viewer')) return;
+    paint();
+  }, 40);
+}
+async function loadAll() {
+  const guess = lsGet('jc_cur');
+  const c0 = await fetchCore(true);
+  if (c0.cs && c0.cs.length && c0.ks && c0.ks.length) {
+    applyCore(c0);
+    ensureAtt(S.cur);
+    fetchCore(false).then(n => { applyCore(n); softPaint(); if (S.cur) ensureAtt(S.cur); });
+    return;
+  }
+  if (guess) ensureAtt(guess);
+  applyCore(await fetchCore(false));
+  await ensureAtt(S.cur);
+}
+// 캐시가 있으면 먼저 쓰고, 서버 것이 오면 다시 그려요
+function twoStep(ref, put) {
+  return new Promise(res => {
+    let done = false, net = false;
+    const fin = () => { if (!done) { done = true; res(); } };
+    qDocs(ref, true).then(c => { if (!net && c && c.length) { put(c); fin(); } });
+    qDocs(ref, false).then(n => { net = true; if (n) put(n); else if (!done) put([]); if (done) softPaint(); fin(); });
+  });
+}
+async function loadNotices() { await twoStep(collection(db, 'notices'), a => { R.notices = a; }); }
+async function loadEvents() { await twoStep(collection(db, 'events'), a => { R.events = a; }); }
+
+/* ---------- 공휴일 ---------- */
+// 자료: @hyunbinseo/holidays-kr (MIT) — 우주항공청 월력요항 · 대체·임시공휴일 포함
+const HOL = { y: {}, chk: null };
+const HOL_PKG = '@hyunbinseo/holidays-kr';
+const HOL_BUILTIN = {
+  2026: { '2026-01-01': '1월 1일', '2026-02-16': '설날 전날', '2026-02-17': '설날', '2026-02-18': '설날 다음 날', '2026-03-01': '3ㆍ1절', '2026-03-02': '대체공휴일(3ㆍ1절)', '2026-05-01': '노동절', '2026-05-05': '어린이날', '2026-05-24': '부처님 오신 날', '2026-05-25': '대체공휴일(부처님 오신 날)', '2026-06-03': '전국동시지방선거', '2026-06-06': '현충일', '2026-07-17': '제헌절', '2026-08-15': '광복절', '2026-08-17': '대체공휴일(광복절)', '2026-09-24': '추석 전날', '2026-09-25': '추석', '2026-09-26': '추석 다음 날', '2026-10-03': '개천절', '2026-10-05': '대체공휴일(개천절)', '2026-10-09': '한글날', '2026-12-25': '기독탄신일' },
+  2027: { '2027-01-01': '1월 1일', '2027-02-06': '설날 전날', '2027-02-07': '설날', '2027-02-08': '설날 다음 날', '2027-02-09': '대체공휴일(설날)', '2027-03-01': '3ㆍ1절', '2027-05-01': '노동절', '2027-05-03': '대체공휴일(노동절)', '2027-05-05': '어린이날', '2027-05-13': '부처님 오신 날', '2027-06-06': '현충일', '2027-07-17': '제헌절', '2027-07-19': '대체공휴일(제헌절)', '2027-08-15': '광복절', '2027-08-16': '대체공휴일(광복절)', '2027-09-14': '추석 전날', '2027-09-15': '추석', '2027-09-16': '추석 다음 날', '2027-10-03': '개천절', '2027-10-04': '대체공휴일(개천절)', '2027-10-09': '한글날', '2027-10-11': '대체공휴일(한글날)', '2027-12-25': '기독탄신일', '2027-12-27': '대체공휴일(기독탄신일)' }
+};
+function loadHol(y) {
+  y = String(y);
+  if (y in HOL.y) return Promise.resolve(HOL.y[y]);
+  HOL.y[y] = undefined;
+  return getDoc(doc(db, 'holidays', y)).then(s => { HOL.y[y] = s.exists() ? s.data() : null; }).catch(() => { HOL.y[y] = null; }).then(() => HOL.y[y]);
+}
+const holName = d => { const h = HOL.y[d.slice(0, 4)]; if (h === undefined) loadHol(d.slice(0, 4)).then(() => softPaint()); return (h && h.days && h.days[d]) || ''; };
+// 최신판을 받아 와요 (없으면 앱에 들어 있는 표)
+async function fetchHolidays(y) {
+  const tries = [];
+  try { const r = await fetch(`https://data.jsdelivr.com/v1/packages/npm/${HOL_PKG}/resolved?specifier=latest`); if (r.ok) { const v = (await r.json()).version; if (v) tries.push(v); } } catch { /* 넘어가요 */ }
+  tries.push('latest', '5');
+  for (const v of tries) {
+    try {
+      const m = await import(`https://cdn.jsdelivr.net/npm/${HOL_PKG}@${v}/dist/all.js`);
+      const p = m['y' + y];
+      if (p) return { days: Object.fromEntries(Object.entries(p).map(([d, n]) => [d, [].concat(n).join(' · ')])), src: `${HOL_PKG}@${v}` };
+    } catch { /* 다음 것 */ }
+  }
+  return HOL_BUILTIN[y] ? { days: { ...HOL_BUILTIN[y] }, src: 'builtin' } : null;
+}
+function holDiff(oldDays, newDays) {
+  const o = oldDays || {}, n = newDays || {}, add = [], chg = [], del = [];
+  Object.keys(n).sort().forEach(d => { if (!(d in o)) add.push(d); else if (o[d] !== n[d]) chg.push(d); });
+  Object.keys(o).sort().forEach(d => { if (!(d in n)) del.push(d); });
+  return { add, chg, del, n: add.length + chg.length + del.length };
+}
+async function holSave(y, got) {
+  const data = { year: Number(y), days: got.days, src: got.src, at: new Date().toISOString(), by: S.me.email, byName: myName() };
+  await setDoc(doc(db, 'holidays', String(y)), data);
+  HOL.y[String(y)] = data;
+}
+// 관리자: 일주일에 한 번 나라 공휴일이 바뀌었는지 살펴봐요 (바뀌면 알림, 한 번 눌러 반영)
+async function holAutoCheck() {
+  if (!isAdminMe() || HOL.chk) return;
+  const last = Number(lsGet('jc_holchk') || 0);
+  const now = new Date(), y = now.getFullYear(), years = [y, y + 1];
+  await Promise.all(years.map(loadHol));
+  const missing = years.filter(x => !HOL.y[x] && (x === y || now.getMonth() >= 9));
+  if (Date.now() - last < 7 * 864e5 && !missing.length) { HOL.chk = { list: [] }; return; }
+  HOL.chk = { list: [] };
+  for (const x of years) {
+    const got = await fetchHolidays(x); if (!got) continue;
+    const cur = HOL.y[x];
+    if (!cur) { if (x === y || now.getMonth() >= 9) HOL.chk.list.push({ y: x, got, diff: holDiff({}, got.days), isNew: true }); continue; }
+    const diff = holDiff(cur.days, got.days);
+    if (diff.n && got.src !== 'builtin') HOL.chk.list.push({ y: x, got, diff });
+  }
+  lsSet('jc_holchk', String(Date.now()));
+  if (HOL.chk.list.length) softPaint();
+}
+function holBanner() {
+  if (!isAdminMe() || !HOL.chk || !HOL.chk.list.length) return '';
+  const L = HOL.chk.list, allNew = L.every(x => x.isNew);
+  const line = L.map(x => x.isNew ? `${x.y}년 ${Object.keys(x.got.days).length}일` : `${x.y}년 ` + [x.diff.add.length ? `새로 ${x.diff.add.length}` : '', x.diff.chg.length ? `바뀜 ${x.diff.chg.length}` : '', x.diff.del.length ? `빠짐 ${x.diff.del.length}` : ''].filter(Boolean).join(' · ') + ([...x.diff.add, ...x.diff.chg][0] ? ` (${fmtShort([...x.diff.add, ...x.diff.chg][0])} ${x.got.days[[...x.diff.add, ...x.diff.chg][0]]})` : '')).join(' · ');
+  return `<section class="card banner full"><div class="bnrow">${svg('<path d="M4 21V4m0 0h12l-2 4 2 4H4"/>', 22, 1.9)}<span class="grow"><b>${allNew ? '공휴일을 캘린더에 넣을 때예요' : '나라 공휴일이 바뀌었어요'}</b><span class="s2">${esc(line)} · 대체·임시공휴일 포함</span></span><button class="pri sm" data-act="holApply" data-id="${L.map(x => x.y).join(',')}">${allNew ? '넣기' : '반영'}</button></div></section>`;
+}
+async function holSheet() {
+  const y = new Date().getFullYear(), years = [y - 1, y, y + 1, y + 2];
+  await Promise.all(years.map(loadHol));
+  sheet(`<div class="ttl" style="font-size:24px">공휴일</div>
+<div class="sub">나라에서 정한 공휴일(대체공휴일·선거일 같은 임시공휴일 포함)을 해마다 불러와 캘린더에 빨간 날로 보여 줘요. 관리자에게는 일주일에 한 번 바뀐 게 있는지 살펴서 알려 드려요.</div>
+<div class="holyears">${years.map(x => { const h = HOL.y[x]; return `<div class="holy"><b>${x}년</b><span class="s2">${h ? `${Object.keys(h.days || {}).length}일 · ${esc((h.at || '').slice(5, 10).replace('-', '/'))} 넣음` : '아직 없어요'}</span><span class="holbtns">${h ? `<button class="ghost sm danger" data-act="holDel" data-id="${x}">지우기</button>` : ''}<button class="ghost sm" data-act="holLoad" data-id="${x}">${h ? '다시 확인' : '불러오기'}</button></span></div>`; }).join('')}</div>
+<div id="holPrev"></div>
+<div class="btns"><button class="sec" data-act="sheetClose">닫기</button></div>`);
+}
+async function holLoad(y) {
+  const box = $('#holPrev'); if (box) box.innerHTML = '<div class="sub">최신 공휴일을 받아 오는 중…</div>';
+  const got = await fetchHolidays(y);
+  if (!got) { if (box) box.innerHTML = `<div class="sub">${y}년 공휴일 자료가 아직 나오지 않았어요. 보통 전년도 여름에 발표돼요.</div>`; return; }
+  const cur = HOL.y[y], diff = holDiff(cur ? cur.days : {}, got.days);
+  HOL.pending = { y, got };
+  const mark = d => diff.add.includes(d) ? '<span class="tag">새로</span>' : diff.chg.includes(d) ? '<span class="tag g">바뀜</span>' : '';
+  if (box) box.innerHTML = `<section class="card"><div class="lbl"><span>${y}년 · ${Object.keys(got.days).length}일</span><span class="s2">${got.src === 'builtin' ? '앱에 들어 있는 표' : '최신 자료'}</span></div>
+${cur && !diff.n ? '<div class="sub">지금 넣어 둔 것과 같아요.</div>' : ''}
+<div class="hollist">${Object.keys(got.days).sort().map(d => `<div class="holrow"><span class="d">${fmtShort(d)} ${DOW[parseD(d).getDay()]}</span><span class="grow">${esc(got.days[d])}</span>${mark(d)}</div>`).join('')}${diff.del.map(d => `<div class="holrow del"><span class="d">${fmtShort(d)}</span><span class="grow">${esc(cur.days[d])}</span><span class="tag g">빠짐</span></div>`).join('')}</div>
+${!cur || diff.n ? `<button class="pri" data-act="holApply" data-id="${y}">${cur ? '바뀐 것 반영하기' : '캘린더에 넣기'}</button>` : ''}</section>`;
+}
+
+/* ---------- 구글 연결 공통 (클라이언트 ID · 토큰) ---------- */
+const GCAL_SCOPE = 'https://www.googleapis.com/auth/calendar.app.created';
+const GREAD_SCOPE = 'https://www.googleapis.com/auth/calendar.readonly';
+const GAPI = 'https://www.googleapis.com/calendar/v3';
+const CFG = { loaded: false, gcalClientId: '' };
+async function loadCfg() {
+  if (CFG.loaded) return CFG;
+  try { const s = await getDoc(doc(db, 'config', 'app')); if (s.exists()) Object.assign(CFG, s.data()); } catch { /* 없음 */ }
+  CFG.loaded = true; return CFG;
+}
+let gisP = null;
+function loadGIS() {
+  if (window.google && google.accounts && google.accounts.oauth2) return Promise.resolve();
+  return gisP || (gisP = new Promise((res, rej) => {
+    const s = document.createElement('script'); s.src = 'https://accounts.google.com/gsi/client'; s.async = true;
+    s.onload = () => res(); s.onerror = () => { gisP = null; rej(new Error('구글 연결 도구를 불러오지 못했어요')); };
+    document.head.appendChild(s);
+  }));
+}
+const GTOK = {};
+function gTokGet(scope) {
+  const t = GTOK[scope]; if (t && Date.now() < t.exp - 60000) return t.t;
+  try { const o = JSON.parse(sessionStorage.getItem('jc_gtok_' + scope.split('/').pop()) || 'null'); if (o && o.e === S.me.email && Date.now() < o.exp - 60000) { GTOK[scope] = o; return o.t; } } catch { /* 없음 */ }
+  return '';
+}
+function gTokSet(scope, t, sec) {
+  const o = { t, exp: Date.now() + Math.min(3500, Number(sec) || 3500) * 1000, e: S.me.email }; GTOK[scope] = o;
+  try { sessionStorage.setItem('jc_gtok_' + scope.split('/').pop(), JSON.stringify(o)); } catch { /* 괜찮아요 */ }
+}
+function gTokDrop(scope) { delete GTOK[scope]; try { sessionStorage.removeItem('jc_gtok_' + scope.split('/').pop()); } catch { /* 괜찮아요 */ } }
+// 반드시 버튼을 누른 그 순간에 불러야 구글 창이 막히지 않아요
+function gAsk(scope) {
+  return new Promise((res, rej) => {
+    if (!CFG.gcalClientId) return rej(new Error('관리자가 설정에서 "구글 연결 설정(클라이언트 ID)"을 먼저 넣어야 해요'));
+    if (!(window.google && google.accounts && google.accounts.oauth2)) { loadGIS().catch(() => { }); return rej(new Error('구글 연결을 준비하는 중이에요. 한 번 더 눌러 주세요')); }
+    const tc = google.accounts.oauth2.initTokenClient({
+      client_id: CFG.gcalClientId, scope, login_hint: S.me.email, prompt: '',
+      callback: r => {
+        if (r.error) return rej(new Error(r.error_description || r.error));
+        if (google.accounts.oauth2.hasGrantedAllScopes && !google.accounts.oauth2.hasGrantedAllScopes(r, scope)) return rej(new Error('구글 창에서 캘린더 칸에 체크해 주세요'));
+        gTokSet(scope, r.access_token, r.expires_in); res(r.access_token);
+      },
+      error_callback: e => rej(new Error(e && e.type === 'popup_closed' ? '구글 창이 닫혔어요' : e && e.type === 'popup_failed_to_open' ? '구글 창이 막혔어요. 팝업을 허용해 주세요' : (e && (e.message || e.type)) || '구글 연결 오류'))
+    });
+    tc.requestAccessToken();
+  });
+}
+async function gReq(tok, path, opt = {}) {
+  const r = await fetch(GAPI + path, { method: opt.method || 'GET', headers: { Authorization: 'Bearer ' + tok, ...(opt.body ? { 'Content-Type': 'application/json' } : {}) }, body: opt.body ? JSON.stringify(opt.body) : undefined });
+  if (r.status === 204) return null;
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) { const e = new Error((j.error && j.error.message) || ('구글 오류 ' + r.status)); e.status = r.status; throw e; }
+  return j;
+}
+const gPrep = () => { loadCfg().then(c => { if (c.gcalClientId) loadGIS().catch(() => { }); }); };
+
+/* ---------- 바깥 캘린더 가져오기 (관리자 이상) ---------- */
+const IMP = { step: 'pick', list: null, items: null, name: '', src: '', from: '', to: '', kind: '행사', cals: null, batches: null };
+const kstParts = ms => { const d = new Date(ms + 9 * 3600e3); return { date: `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())}`, time: `${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())}` }; };
+function tzOffsetMs(tz, ms) {
+  try {
+    const p = Object.fromEntries(new Intl.DateTimeFormat('en-US', { timeZone: tz, hourCycle: 'h23', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit' }).formatToParts(new Date(ms)).map(x => [x.type, x.value]));
+    return Date.UTC(+p.year, +p.month - 1, +p.day, +p.hour % 24, +p.minute, +p.second) - ms;
+  } catch { return 9 * 3600e3; }
+}
+// 20261121 / 20261121T133000 / 20261121T043000Z → 한국 시간
+function icsTime(v, P = {}) {
+  const m = /^(\d{4})(\d{2})(\d{2})(?:T(\d{2})(\d{2})(\d{2})?(Z)?)?$/.exec(String(v).trim());
+  if (!m) return null;
+  const date = `${m[1]}-${m[2]}-${m[3]}`;
+  if (!m[4] || P.VALUE === 'DATE') return { allDay: true, date, time: '' };
+  const local = Date.UTC(+m[1], +m[2] - 1, +m[3], +m[4], +m[5], +(m[6] || 0));
+  let utc;
+  if (m[7]) utc = local;
+  else if (P.TZID && !/seoul/i.test(P.TZID)) utc = local - tzOffsetMs(P.TZID.replace(/^"|"$/g, ''), local);
+  else return { allDay: false, date, time: `${m[4]}:${m[5]}` };
+  return { allDay: false, ...kstParts(utc) };
+}
+const icsUnesc = s => String(s || '').replace(/\\n/gi, '\n').replace(/\\([,;\\])/g, '$1').trim();
+function parseICS(txt) {
+  const lines = String(txt).replace(/\r\n/g, '\n').replace(/\n[ \t]/g, '').split('\n');
+  const evs = []; let cur = null, calName = '';
+  for (const ln of lines) {
+    if (ln === 'BEGIN:VEVENT') { cur = { ex: [] }; continue; }
+    if (ln === 'END:VEVENT') { if (cur) evs.push(cur); cur = null; continue; }
+    const i = ln.indexOf(':'); if (i < 0) continue;
+    const head = ln.slice(0, i), v = ln.slice(i + 1), [nm, ...ps] = head.split(';'), P = {};
+    ps.forEach(p => { const j = p.indexOf('='); if (j > 0) P[p.slice(0, j).toUpperCase()] = p.slice(j + 1); });
+    const N = nm.toUpperCase();
+    if (!cur) { if (N === 'X-WR-CALNAME') calName = icsUnesc(v); continue; }
+    if (N === 'SUMMARY') cur.title = icsUnesc(v);
+    else if (N === 'LOCATION') cur.place = icsUnesc(v);
+    else if (N === 'DTSTART') cur.s = icsTime(v, P);
+    else if (N === 'DTEND') cur.e = icsTime(v, P);
+    else if (N === 'DURATION') cur.dur = v;
+    else if (N === 'UID') cur.uid = v.trim();
+    else if (N === 'RRULE') cur.rrule = v.trim();
+    else if (N === 'EXDATE') v.split(',').forEach(x => { const t = icsTime(x, P); if (t) cur.ex.push(t.date); });
+    else if (N === 'RECURRENCE-ID') cur.rid = icsTime(v, P);
+    else if (N === 'STATUS') cur.status = v.trim().toUpperCase();
+  }
+  return { calName, evs };
+}
+const dayDiff = (a, b) => Math.round((parseD(b) - parseD(a)) / 864e5);
+function durMin(s) { const m = /P(?:(\d+)W)?(?:(\d+)D)?(?:T(?:(\d+)H)?(?:(\d+)M)?)?/.exec(s || ''); return m ? ((+m[1] || 0) * 7 * 1440 + (+m[2] || 0) * 1440 + (+m[3] || 0) * 60 + (+m[4] || 0)) : 0; }
+function addMin(date, time, min) { const [h, mi] = time.split(':').map(Number); const t = Date.UTC(...date.split('-').map((x, i) => i === 1 ? x - 1 : +x), h, mi) + min * 6e4; const d = new Date(t); return { date: `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())}`, time: `${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())}` }; }
+const WD = { SU: 0, MO: 1, TU: 2, WE: 3, TH: 4, FR: 5, SA: 6 };
+// 반복 일정 펼치기 (매일 · 매주 · 매달 · 매년, 간격 · 횟수 · 끝 날짜 · 요일)
+function expandRule(start, rule, from, to) {
+  const R0 = Object.fromEntries(rule.split(';').map(x => x.split('=')).map(([k, v]) => [k.toUpperCase(), v]));
+  const F = R0.FREQ, iv = Math.max(1, +R0.INTERVAL || 1), cnt = +R0.COUNT || 0;
+  const until = R0.UNTIL ? (icsTime(R0.UNTIL) || {}).date : '';
+  const by = (R0.BYDAY || '').split(',').filter(Boolean).map(x => { const m = /^([+-]?\d+)?([A-Z]{2})$/.exec(x); return m ? { n: m[1] ? +m[1] : 0, d: WD[m[2]] } : null; }).filter(Boolean);
+  const bmd = (R0.BYMONTHDAY || '').split(',').filter(Boolean).map(Number);
+  const out = []; let n = 0, guard = 0;
+  const push = d => { if (d < start) return true; if (until && d > until) return false; if (cnt && n >= cnt) return false; n++; if (d >= from && d <= to) out.push(d); return d <= to || cnt; };
+  const sd = parseD(start);
+  const nth = (y, m, w, k) => { if (k > 0) { const f = new Date(y, m, 1); const off = (w - f.getDay() + 7) % 7; const d = new Date(y, m, 1 + off + (k - 1) * 7); return d.getMonth() === m ? ymd(d) : ''; } const l = new Date(y, m + 1, 0); const off = (l.getDay() - w + 7) % 7; const d = new Date(y, m + 1, 0 - off + (k + 1) * 7); return d.getMonth() === m ? ymd(d) : ''; };
+  if (F === 'DAILY') { for (let d = start; guard++ < 3000; d = addDays(d, iv)) { if (d > to && !cnt) break; if (!push(d)) break; } }
+  else if (F === 'WEEKLY') {
+    const days = by.length ? by.map(x => x.d).sort() : [sd.getDay()];
+    for (let w = ymd(sundayOnOrBefore(sd)); guard++ < 800; w = addDays(w, 7 * iv)) { let go = true; for (const dw of days) { if (!push(addDays(w, dw))) { go = false; break; } } if (!go || (w > to && !cnt)) break; }
+  } else if (F === 'MONTHLY') {
+    for (let k = 0; guard++ < 400; k += iv) {
+      const y = sd.getFullYear() + Math.floor((sd.getMonth() + k) / 12), m = (sd.getMonth() + k) % 12;
+      let ds = by.length ? by.map(b => b.n ? nth(y, m, b.d, b.n) : '').filter(Boolean) : bmd.length ? bmd.map(x => { const L = new Date(y, m + 1, 0).getDate(); const dd = x < 0 ? L + 1 + x : x; return dd >= 1 && dd <= L ? ymd(new Date(y, m, dd)) : ''; }).filter(Boolean) : [new Date(y, m, sd.getDate()).getMonth() === m ? ymd(new Date(y, m, sd.getDate())) : ''].filter(Boolean);
+      ds = ds.sort(); let go = true; for (const d of ds) if (!push(d)) { go = false; break; }
+      if (!go || (`${y}-${pad(m + 1)}-01` > to && !cnt)) break;
+    }
+  } else if (F === 'YEARLY') {
+    const bm = R0.BYMONTH ? +R0.BYMONTH - 1 : sd.getMonth();
+    for (let k = 0; guard++ < 120; k += iv) {
+      const y = sd.getFullYear() + k;
+      const d = by.length && by[0].n ? nth(y, bm, by[0].d, by[0].n) : (new Date(y, bm, sd.getDate()).getMonth() === bm ? ymd(new Date(y, bm, sd.getDate())) : '');
+      if (d && !push(d)) break; if (`${y}-01-01` > to && !cnt) break;
+    }
+  } else out.push(start);
+  return out;
+}
+// .ics → 앱 일정 목록 (기간 안의 것만)
+function icsToItems(parsed, from, to) {
+  const items = [], overrides = new Set();
+  parsed.evs.filter(e => e.rid && e.uid).forEach(e => overrides.add(e.uid + '|' + e.rid.date));
+  for (const e of parsed.evs) {
+    if (!e.s || e.status === 'CANCELLED') continue;
+    let spanD = 0, endT = '';
+    if (e.s.allDay) { const ed = e.e ? addDays(e.e.date, -1) : e.dur ? addDays(e.s.date, Math.max(0, Math.round(durMin(e.dur) / 1440) - 1)) : e.s.date; spanD = Math.max(0, dayDiff(e.s.date, ed)); }
+    else { const en = e.e ? e.e : e.dur ? addMin(e.s.date, e.s.time, durMin(e.dur)) : addMin(e.s.date, e.s.time, 60); spanD = Math.max(0, dayDiff(e.s.date, en.date)); endT = en.time; }
+    const dates = e.rrule && !e.rid ? expandRule(e.s.date, e.rrule, from, to).filter(d => !e.ex.includes(d) && !overrides.has(e.uid + '|' + d)) : (e.s.date >= from && e.s.date <= to ? [e.s.date] : []);
+    dates.forEach(d => items.push({ title: e.title || '(제목 없음)', date: d, endDate: spanD ? addDays(d, spanD) : '', allDay: !!e.s.allDay, time: e.s.allDay ? '' : e.s.time, endTime: e.s.allDay ? '' : endT, place: e.place || '', gid: (e.uid || e.title + e.s.date) + '|' + d }));
+  }
+  return items.sort((a, b) => ko(a.date + a.time, b.date + b.time));
+}
+// 구글 캘린더 API 일정 → 앱 일정
+function gToItem(g) {
+  if (!g.start || g.status === 'cancelled') return null;
+  let date, endDate = '', time = '', endTime = '', allDay = false;
+  if (g.start.date) { allDay = true; date = g.start.date; const ed = g.end && g.end.date ? addDays(g.end.date, -1) : date; endDate = ed > date ? ed : ''; }
+  else { const s = kstParts(Date.parse(g.start.dateTime)), e = g.end && g.end.dateTime ? kstParts(Date.parse(g.end.dateTime)) : addMin(s.date, s.time, 60); date = s.date; time = s.time; endTime = e.time; endDate = e.date > date ? e.date : ''; }
+  return { title: g.summary || '(제목 없음)', date, endDate, allDay, time, endTime, place: g.location || '', gid: (g.iCalUID || g.id) + '|' + date };
+}
+async function impSheet() {
+  if (!isAdminMe()) return;
+  if (IMP.batches === null) { IMP.batches = []; try { const s = await getDocs(collection(db, 'imports')); IMP.batches = s.docs.map(d => ({ id: d.id, ...d.data() })).sort((a, b) => ko(b.at || '', a.at || '')); } catch { IMP.batches = []; } }
+  const y = new Date().getFullYear();
+  if (!IMP.from) { IMP.from = `${y}-01-01`; IMP.to = `${y + 1}-12-31`; }
+  loadCfg().then(() => { if (CFG.gcalClientId) loadGIS().catch(() => { }); });
+  const items = IMP.items;
+  const have = new Set((R.events || []).map(e => e.gid).filter(Boolean));
+  const body = IMP.step === 'preview' && items ? `
+<section class="card"><div class="lbl"><span>${esc(IMP.name)}</span><span class="s2">${items.length}개 찾음</span></div>
+<div class="two"><label class="fld">이 날부터<input class="in" type="date" id="im_from" value="${IMP.from}"></label><label class="fld">이 날까지<input class="in" type="date" id="im_to" value="${IMP.to}"></label></div>
+<label class="fld">묶음 이름 <span class="s2">(나중에 한 번에 지울 때 보여요)</span><input class="in" id="im_name" value="${esc(IMP.name)}"></label>
+<div class="fld">종류</div><div class="kindgrid k4">${['행사', '회의', '교육', '기타'].map(k => `<label class="kindopt ${IMP.kind === k ? 'on' : ''}"><input type="radio" name="im_kind" value="${k}" ${IMP.kind === k ? 'checked' : ''}><i class="cdot ${KIND_CLASS[k] || 'evt'}"></i>${k}</label>`).join('')}</div>
+<div class="imtools"><button class="ghost sm" data-act="impAll" data-id="1">모두 고르기</button><button class="ghost sm" data-act="impAll" data-id="0">모두 빼기</button><span class="s2" id="im_cnt"></span></div>
+<div class="imlist">${items.map((x, i) => { const dup = have.has(x.gid); return `<label class="imrow ${dup ? 'dup' : ''}"><input type="checkbox" data-im="${i}" ${dup ? '' : 'checked'}><span class="d">${fmtShort(x.date)}${x.endDate ? '–' + fmtShort(x.endDate) : ''}</span><span class="grow"><b>${esc(x.title)}</b><small>${esc([timeText(x), x.place].filter(Boolean).join(' · '))}${dup ? ' · 이미 있어요' : ''}</small></span></label>`; }).join('') || '<div class="sub">이 기간에는 일정이 없어요.</div>'}</div>
+<div class="btns"><button class="pri" data-act="impRun">고른 일정 가져오기</button><button class="sec" data-act="impBack">다시 고르기</button></div><div class="sub" id="im_msg"></div></section>` : `
+<div class="impick">
+<label class="imopt">${svg('<path d="M12 16V4m-5 5 5-5 5 5"/><path d="M4 16v3a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3"/>', 26, 1.8)}<b>.ics 파일로</b><small>구글 캘린더 → 설정 → 가져오기/내보내기 → 내보내기 (컴퓨터)</small><input type="file" id="im_file" accept=".ics,text/calendar" hidden></label>
+<button class="imopt" data-act="impGoogle">${svg('<rect x="3" y="4" width="18" height="17" rx="3"/><path d="M3 9h18M8 2v4M16 2v4"/>', 26, 1.8)}<b>구글 캘린더에서 바로</b><small>${CFG.gcalClientId ? '내 구글 계정의 캘린더 목록에서 골라요 (보기 권한만)' : '설정 → 구글 연결 설정을 먼저 해 주세요'}</small></button>
+</div>
+${IMP.cals ? `<section class="card"><div class="lbl"><span>어느 캘린더를 가져올까요?</span></div><div class="list">${IMP.cals.map(c => `<button class="row" data-act="impCal" data-id="${esc(c.id)}"><i class="cdot" style="background:${esc(c.backgroundColor || '#C62828')}"></i><span class="grow"><span class="nm">${esc(c.summaryOverride || c.summary || c.id)}</span><span class="sub">${c.primary ? '내 기본 캘린더' : esc(c.accessRole === 'owner' ? '내가 만든 캘린더' : '구독 · 공유')}</span></span><span class="chev">›</span></button>`).join('')}</div></section>` : ''}
+<div class="sub" id="im_msg"></div>`;
+  const hist = IMP.batches.length ? `<section class="card"><div class="lbl"><span>가져온 기록</span><span class="s2">잘못 가져왔으면 묶음째 지워요</span></div>${IMP.batches.map(b => { const left = (R.events || []).filter(e => e.importBatch === b.id).length; return `<div class="hrow imb"><span class="grow"><b>${esc(b.name || '가져온 일정')}</b><span class="s2">${esc((b.at || '').slice(0, 10))} · ${esc(b.byName || '')} · ${left}개 남음</span></span><button class="ghost sm danger" data-act="impDelAsk" data-id="${b.id}">묶음 지우기</button></div>`; }).join('')}</section>` : '';
+  sheet(`<div class="ttl" style="font-size:24px">바깥 캘린더 가져오기</div><div class="sub">교회 · 부서 구글 캘린더의 일정을 한 번에 교사실 캘린더로 옮겨요. 가져온 일정은 묶음으로 기억해서, 잘못 가져왔으면 한 번에 지울 수 있어요.</div>${body}${hist}<div class="btns"><button class="sec" data-act="sheetClose">닫기</button></div>`);
+  const box = $('#sheet');
+  const cnt = () => { const c = $('#im_cnt'); if (c) c.textContent = `${box.querySelectorAll('[data-im]:checked').length}개 고름`; };
+  cnt();
+  box.addEventListener('change', async ev => {
+    const t = ev.target;
+    if (t.dataset.im !== undefined) cnt();
+    if (t.name === 'im_kind') { IMP.kind = t.value; box.querySelectorAll('.kindopt').forEach(l => l.classList.toggle('on', l.querySelector('input').checked)); }
+    if (t.id === 'im_file' && t.files[0]) {
+      const f = t.files[0]; const txt = await f.text();
+      IMP.parsed = parseICS(txt); IMP.src = 'ics'; IMP.name = IMP.parsed.calName || f.name.replace(/\.ics$/i, '');
+      IMP.items = icsToItems(IMP.parsed, IMP.from, IMP.to); IMP.step = 'preview'; impSheet();
+    }
+    if ((t.id === 'im_from' || t.id === 'im_to') && t.value) {
+      IMP.from = val('im_from'); IMP.to = val('im_to'); IMP.name = val('im_name') || IMP.name;
+      if (IMP.src === 'ics') { IMP.items = icsToItems(IMP.parsed, IMP.from, IMP.to); impSheet(); } else if (IMP.calId) impFetchGoogle(IMP.calId, IMP.name);
+    }
+  });
+}
+async function impFetchGoogle(calId, name) {
+  const msg = $('#im_msg'); if (msg) msg.textContent = '구글 캘린더에서 받아 오는 중…';
+  try {
+    let tok = gTokGet(GREAD_SCOPE); if (!tok) throw new Error('구글 허락이 끝났어요. 다시 눌러 주세요');
+    const all = []; let pt = '';
+    do {
+      const p = new URLSearchParams({ singleEvents: 'true', orderBy: 'startTime', maxResults: '2500', timeMin: `${IMP.from}T00:00:00+09:00`, timeMax: `${addDays(IMP.to, 1)}T00:00:00+09:00`, timeZone: 'Asia/Seoul' }); if (pt) p.set('pageToken', pt);
+      const j = await gReq(tok, `/calendars/${encodeURIComponent(calId)}/events?${p}`); (j.items || []).forEach(g => all.push(g)); pt = j.nextPageToken || '';
+    } while (pt && all.length < 5000);
+    IMP.calId = calId; IMP.src = 'google'; IMP.name = name; IMP.items = all.map(gToItem).filter(Boolean).filter(x => x.date >= IMP.from && x.date <= IMP.to); IMP.step = 'preview'; impSheet();
+  } catch (e) { if (msg) msg.textContent = ''; toast('가져오지 못했어요: ' + e.message); }
+}
+async function impRun() {
+  const box = $('#sheet'); const pick = [...box.querySelectorAll('[data-im]:checked')].map(x => IMP.items[+x.dataset.im]);
+  if (!pick.length) return toast('가져올 일정을 골라 주세요');
+  const name = val('im_name') || IMP.name || '가져온 일정', kind = IMP.kind;
+  const msg = $('#im_msg'); msg.textContent = `${pick.length}개 넣는 중…`;
+  const bref = doc(collection(db, 'imports')), bid = bref.id;
+  const rows = pick.map(x => ({ ref: doc(collection(db, 'events')), data: { ...x, kind, memo: '', staffId: '', imgCount: 0, by: S.me.email, byName: myName(), importBatch: bid, source: IMP.src } }));
+  try {
+    for (let i = 0; i < rows.length; i += 400) { const b = writeBatch(db); rows.slice(i, i + 400).forEach(r => b.set(r.ref, r.data)); await b.commit(); msg.textContent = `${Math.min(rows.length, i + 400)} / ${rows.length}`; }
+    const meta = { name, count: rows.length, src: IMP.src, from: IMP.from, to: IMP.to, at: new Date().toISOString(), by: S.me.email, byName: myName() };
+    await setDoc(bref, meta);
+    rows.forEach(r => R.events.push({ id: r.ref.id, ...r.data }));
+    (IMP.batches || (IMP.batches = [])).unshift({ id: bid, ...meta });
+    IMP.step = 'pick'; IMP.items = null; IMP.cals = null;
+    closeSheet(); toast(`${rows.length}개를 가져왔어요 · 캘린더 → 가져오기에서 묶음째 지울 수 있어요`); gcalSoon(); paint();
+  } catch (e) { msg.textContent = ''; toast('가져오지 못했어요: ' + errMsg(e)); }
+}
+async function impDel(bid) {
+  try {
+    let ids = (R.events || []).filter(e => e.importBatch === bid).map(e => e.id);
+    try { const s = await getDocs(query(collection(db, 'events'), where('importBatch', '==', bid))); ids = [...new Set([...ids, ...s.docs.map(d => d.id)])]; } catch { /* 가진 것만 */ }
+    for (let i = 0; i < ids.length; i += 400) { const b = writeBatch(db); ids.slice(i, i + 400).forEach(id => b.delete(doc(db, 'events', id))); await b.commit(); }
+    await deleteDoc(doc(db, 'imports', bid));
+    R.events = (R.events || []).filter(e => e.importBatch !== bid);
+    IMP.batches = (IMP.batches || []).filter(b => b.id !== bid);
+    toast(`${ids.length}개를 지웠어요`); gcalSoon(); IMP.step = 'pick'; impSheet(); softPaint();
+  } catch (e) { toast('지우지 못했어요: ' + errMsg(e)); }
+}
+
+/* ---------- 내 구글 캘린더에 넣기 (선생님마다) ----------
+   목자의 삶에서 쓴 방식: 내 구글 캘린더에 '조이코너' 캘린더를 따로 하나 만들고 그곳에만 써요.
+   권한은 '앱이 만든 캘린더만' (calendar.app.created) — 다른 캘린더는 못 보고 못 건드려요.
+   제목 · 시간 · 장소만 넣어요. 서버가 없어서 구글 허락은 1시간 — 그 뒤 바뀐 게 있으면 [맞추기]. */
+const GC = { doc: undefined, busy: false, again: false, t: null, msg: '' };
+async function gcalLoad() {
+  if (GC.doc !== undefined) return GC.doc;
+  GC.doc = null;
+  try { const s = await getDoc(doc(db, 'gcal', S.me.email)); GC.doc = s.exists() ? s.data() : null; } catch { GC.doc = null; }
+  return GC.doc;
+}
+const gcalOn = () => !!(GC.doc && GC.doc.on);
+const gcalOpts = () => Object.assign({ events: true, turns: true }, (GC.doc && GC.doc.opts) || {});
+function gEvBody(e) {
+  const allDay = e.allDay !== undefined ? e.allDay : !e.time, end = e.endDate && e.endDate > e.date ? e.endDate : e.date;
+  const r = { summary: e.title || '일정', location: e.place || '', description: '조이코너 노트에서 넣은 일정이에요', transparency: allDay ? 'transparent' : 'opaque' };
+  if (allDay || !e.time) { r.start = { date: e.date }; r.end = { date: addDays(end, 1) }; }
+  else {
+    let et = e.endTime || (end > e.date ? e.time : plusHour(e.time));
+    if (end === e.date && et <= e.time) et = e.time;
+    r.start = { dateTime: `${e.date}T${e.time}:00`, timeZone: 'Asia/Seoul' }; r.end = { dateTime: `${end}T${et}:00`, timeZone: 'Asia/Seoul' };
+  }
+  return r;
+}
+function myTurnsOn(s) {
+  const me = myName(); if (!me || !s || s.noService) return [];
+  const L = TURN_KEYS.filter(([k]) => hasName(s[k], me)).map(([, l]) => l);
+  if (s.offering && hasName(s.offering, me)) L.push('헌금기도');
+  return L;
+}
+function gcalWant() {
+  const o = gcalOpts(), today = ymd(new Date()), from = addDays(today, -31), to = addDays(today, 400), out = {};
+  const mineStaff = (S.staff.find(x => x.email === S.me.email) || {}).id;
+  if (o.events) (R.events || []).forEach(e => {
+    const end = e.endDate || e.date; if (end < from || e.date > to) return;
+    if (e.kind === '부재' && e.by !== S.me.email && e.staffId !== mineStaff) return;
+    out['e' + e.id] = gEvBody(e);
+  });
+  if (o.turns) S.schedule.forEach(s => {
+    if (s.date < from || s.date > to) return;
+    const m = myTurnsOn(s); if (!m.length) return;
+    out['t' + s.date] = { summary: `조이코너 · ${m.join(' · ')}`, location: '', description: `${s.story ? '성경이야기: ' + s.story + '\n' : ''}조이코너 노트의 내 주일 순서예요`, start: { date: s.date }, end: { date: addDays(s.date, 1) }, transparency: 'transparent' };
+  });
+  return out;
+}
+const gHash = o => String(hash(JSON.stringify(o)));
+function gcalPlan() {
+  const want = gcalWant(), have = (GC.doc && GC.doc.items) || {}, ops = [];
+  Object.keys(want).forEach(k => { const h = gHash(want[k]); if (!have[k]) ops.push({ k, op: 'add', body: want[k], h }); else if (have[k].h !== h) ops.push({ k, op: 'put', body: want[k], h, gid: have[k].id }); });
+  Object.keys(have).forEach(k => { if (!want[k]) ops.push({ k, op: 'del', gid: have[k].id }); });
+  return ops;
+}
+const gcalPending = () => gcalOn() && Array.isArray(R.events) ? gcalPlan().length : 0;
+// 일정이 바뀌면 조금 뒤에 구글에도 보내요 (허락이 남아 있을 때만 — 없으면 [맞추기]가 떠요)
+function gcalSoon() {
+  if (!gcalOn()) return;
+  clearTimeout(GC.t);
+  GC.t = setTimeout(() => { if (gTokGet(GCAL_SCOPE)) gcalSync(); else softPaint(); }, 1200);
+}
+async function gcalSync() {
+  if (!gcalOn()) return;
+  if (GC.busy) { GC.again = true; return; }
+  const tok = gTokGet(GCAL_SCOPE); if (!tok) { softPaint(); return; }
+  GC.busy = true; GC.msg = '구글 캘린더와 맞추는 중…'; softPaint();
+  const d = GC.doc, items = { ...(d.items || {}) };
+  let done = 0, fail = 0;
+  try {
+    if (!GC.checked && d.calId) { try { await gReq(tok, `/calendars/${encodeURIComponent(d.calId)}`); } catch (e) { if (e.status === 404 || e.status === 410) { d.calId = ''; Object.keys(items).forEach(k => delete items[k]); } else throw e; } GC.checked = true; }
+    if (!d.calId) {
+      const c = await gReq(tok, '/calendars', { method: 'POST', body: { summary: '조이코너', description: '조이코너 노트 앱이 넣는 일정이에요. 앱에서 고치면 여기도 따라 바뀌어요.', timeZone: 'Asia/Seoul' } });
+      d.calId = c.id; GC.checked = true;
+      gReq(tok, `/users/me/calendarList/${encodeURIComponent(c.id)}?colorRgbFormat=true`, { method: 'PATCH', body: { backgroundColor: '#C62828', foregroundColor: '#FFFFFF' } }).catch(() => { });
+    }
+    d.items = items;
+    const ops = gcalPlan(), cal = `/calendars/${encodeURIComponent(d.calId)}/events`;
+    const run = async o => {
+      try {
+        if (o.op === 'add') { const r = await gReq(tok, cal, { method: 'POST', body: o.body }); items[o.k] = { id: r.id, h: o.h }; }
+        else if (o.op === 'put') { try { await gReq(tok, `${cal}/${encodeURIComponent(o.gid)}`, { method: 'PUT', body: o.body }); items[o.k] = { id: o.gid, h: o.h }; } catch (e) { if (e.status !== 404 && e.status !== 410) throw e; const r = await gReq(tok, cal, { method: 'POST', body: o.body }); items[o.k] = { id: r.id, h: o.h }; } }
+        else { try { await gReq(tok, `${cal}/${encodeURIComponent(o.gid)}`, { method: 'DELETE' }); } catch (e) { if (e.status !== 404 && e.status !== 410) throw e; } delete items[o.k]; }
+        done++;
+      } catch (e) { if (e.status === 401) throw e; fail++; }
+    };
+    for (let i = 0; i < ops.length; i += 4) { await Promise.all(ops.slice(i, i + 4).map(run)); if (ops.length > 8) { GC.msg = `구글 캘린더와 맞추는 중… ${Math.min(ops.length, i + 4)}/${ops.length}`; softPaint(); } }
+    d.on = true; d.at = new Date().toISOString(); d.items = items;
+    await setDoc(doc(db, 'gcal', S.me.email), { on: true, calId: d.calId, items, opts: gcalOpts(), at: d.at });
+    GC.msg = fail ? `${fail}개는 보내지 못했어요 — 다시 맞추기를 눌러 주세요` : '';
+    if (done && GC.loud) toast(`구글 캘린더에 ${done}개를 맞췄어요`);
+  } catch (e) {
+    if (e.status === 401) { gTokDrop(GCAL_SCOPE); GC.msg = ''; }
+    else { GC.msg = '구글 캘린더와 맞추지 못했어요: ' + e.message; }
+    d.items = items;
+    setDoc(doc(db, 'gcal', S.me.email), { on: true, calId: d.calId || '', items, opts: gcalOpts(), at: d.at || '' }).catch(() => { });
+  } finally {
+    GC.busy = false; GC.loud = false; softPaint();
+    if (GC.again) { GC.again = false; gcalSync(); }
+  }
+}
+async function gcalConnect() {
+  try {
+    await gAsk(GCAL_SCOPE);
+    await gcalLoad();
+    GC.doc = Object.assign({ items: {}, calId: '' }, GC.doc || {}, { on: true });
+    GC.loud = true; GC.checked = false;
+    await gcalSync();
+    if (!GC.msg) toast('연결했어요 · 구글 캘린더에 "조이코너" 캘린더가 생겼어요');
+    paint();
+  } catch (e) { toast(e.message); }
+}
+async function gcalFix() {
+  try { if (!gTokGet(GCAL_SCOPE)) await gAsk(GCAL_SCOPE); GC.loud = true; await gcalSync(); paint(); } catch (e) { toast(e.message); }
+}
+async function gcalOff() {
+  try {
+    let tok = gTokGet(GCAL_SCOPE); if (!tok) tok = await gAsk(GCAL_SCOPE);
+    if (GC.doc && GC.doc.calId) { try { await gReq(tok, `/calendars/${encodeURIComponent(GC.doc.calId)}`, { method: 'DELETE' }); } catch (e) { if (e.status !== 404 && e.status !== 410) throw e; } }
+    try { google.accounts.oauth2.revoke(tok, () => { }); } catch { /* 괜찮아요 */ }
+    gTokDrop(GCAL_SCOPE);
+    await setDoc(doc(db, 'gcal', S.me.email), { on: false, calId: '', items: {}, opts: gcalOpts(), at: new Date().toISOString() });
+    GC.doc = { on: false, calId: '', items: {}, opts: gcalOpts() };
+    closeSheet(); toast('연결을 끊고 구글의 "조이코너" 캘린더도 지웠어요'); paint();
+  } catch (e) { toast('끊지 못했어요: ' + e.message); }
+}
+function gcalBanner() {
+  if (!gcalOn()) return '';
+  if (GC.busy || GC.msg) return `<section class="card banner soft full"><div class="bnrow">${svg('<path d="M21 12a9 9 0 1 1-3-6.7M21 4v5h-5"/>', 20, 1.9)}<span class="grow">${esc(GC.msg || '구글 캘린더와 맞추는 중…')}</span>${GC.busy ? '' : '<button class="ghost sm" data-act="gcalFix">다시 맞추기</button>'}</div></section>`;
+  const n = gcalPending(); if (!n) return '';
+  return `<section class="card banner soft full"><div class="bnrow">${svg('<rect x="3" y="4" width="18" height="17" rx="3"/><path d="M3 9h18M8 2v4M16 2v4"/>', 20, 1.9)}<span class="grow"><b>구글 캘린더에 아직 안 보낸 변경 ${n}개</b><span class="s2">한 번 누르면 맞춰져요</span></span><button class="pri sm" data-act="gcalFix">맞추기</button></div></section>`;
+}
+function gcalCard() {
+  const on = gcalOn(), o = gcalOpts(), n = Object.keys((GC.doc && GC.doc.items) || {}).length;
+  return `<section class="card gccard"><div class="lbl"><span>내 구글 캘린더</span>${on ? `<span class="chip sm" style="background:#DDF1E3;color:#1E6B3E">연결됨</span>` : ''}</div>
+${on ? `<div class="sub">구글 캘린더의 <b>조이코너</b> 캘린더에 ${n}개가 들어 있어요.${GC.doc.at ? ` 마지막 맞춤 ${esc(GC.doc.at.slice(5, 16).replace('T', ' ').replace('-', '/'))}` : ''}</div>
+<div class="gcopts"><label class="switch"><input type="checkbox" data-gopt="events" ${o.events ? 'checked' : ''}><span class="sw"></span><b>교사실 일정</b></label><label class="switch"><input type="checkbox" data-gopt="turns" ${o.turns ? 'checked' : ''}><span class="sw"></span><b>내 주일 순서</b></label></div>
+<div class="btns"><button class="sec" data-act="gcalFix">지금 맞추기</button><button class="ghost danger" data-act="gcalOffAsk">연결 끊기</button></div>`
+      : `<div class="sub">교사실 일정과 내 주일 순서를 내 구글 캘린더에 자동으로 넣어요. 앱에서 고치면 구글도 따라 바뀌고, 알림은 구글 캘린더가 울려 줘요. 제목 · 시간 · 장소만 들어가요.</div><button class="sec" data-act="gcalConnect">구글 캘린더 연결하기</button>`}</section>`;
+}
+function gcalSettingsCard() {
+  if (!isAdminMe()) return '';
+  return `<section class="card"><div class="lbl"><span>구글 연결 설정</span><span class="s2">관리자</span></div><div class="sub">선생님들이 "내 구글 캘린더"를 연결하고, 관리자가 "구글 캘린더에서 바로 가져오기"를 쓰려면 한 번 넣어 주세요. 만드는 방법은 안내 파일에 있어요. 이 값은 공개돼도 괜찮아요.</div><label class="fld">OAuth 클라이언트 ID<input class="in" id="cfg_cid" value="${esc(CFG.gcalClientId || '')}" placeholder="0000-xxxx.apps.googleusercontent.com"></label><button class="sec" data-act="cfgSave">저장</button></section>`;
+}
+
+/* ---------- 버튼 ---------- */
+Object.assign(ACT, {
+  holSheet: () => holSheet(),
+  holLoad: d => holLoad(d.id),
+  holApply: async d => {
+    if (String(d.id).includes(',')) { for (const y of String(d.id).split(',')) await ACT.holApply({ id: y, quiet: 1 }); return; }
+    const y = d.id; let got = HOL.pending && String(HOL.pending.y) === String(y) ? HOL.pending.got : (HOL.chk && (HOL.chk.list.find(x => String(x.y) === String(y)) || {}).got);
+    if (!got) got = await fetchHolidays(y);
+    if (!got) return toast('공휴일 자료를 받지 못했어요');
+    try { await holSave(y, got); if (HOL.chk) HOL.chk.list = HOL.chk.list.filter(x => String(x.y) !== String(y)); HOL.pending = null; toast(`${y}년 공휴일 ${Object.keys(got.days).length}일을 넣었어요`); if ($('#sheet') && $('#holPrev')) holSheet(); paint(); } catch (e) { toast('넣지 못했어요: ' + errMsg(e)); }
+  },
+  holDel: async d => { try { await deleteDoc(doc(db, 'holidays', String(d.id))); HOL.y[String(d.id)] = null; holSheet(); paint(); toast('지웠어요'); } catch (e) { toast('지우지 못했어요: ' + errMsg(e)); } },
+  impSheet: () => { IMP.step = 'pick'; IMP.items = null; impSheet(); },
+  impBack: () => { IMP.step = 'pick'; IMP.items = null; impSheet(); },
+  impAll: d => { document.querySelectorAll('#sheet [data-im]').forEach(x => { x.checked = d.id === '1'; }); const c = $('#im_cnt'); if (c) c.textContent = `${document.querySelectorAll('#sheet [data-im]:checked').length}개 고름`; },
+  impGoogle: async () => {
+    try {
+      await loadCfg();
+      let tok = gTokGet(GREAD_SCOPE); if (!tok) tok = await gAsk(GREAD_SCOPE);
+      const j = await gReq(tok, '/users/me/calendarList?minAccessRole=reader&maxResults=250');
+      IMP.cals = (j.items || []).sort((a, b) => (b.primary ? 1 : 0) - (a.primary ? 1 : 0) || ko(a.summary || '', b.summary || '')); impSheet();
+    } catch (e) { toast(e.message); }
+  },
+  impCal: d => { const c = (IMP.cals || []).find(x => x.id === d.id) || {}; impFetchGoogle(d.id, c.summaryOverride || c.summary || '구글 캘린더'); },
+  impRun: () => impRun(),
+  impDelAsk: d => { const b = (IMP.batches || []).find(x => x.id === d.id) || {}; const n = (R.events || []).filter(e => e.importBatch === d.id).length; sheet(`<div class="ttl" style="font-size:22px">묶음 지우기</div><div class="sub">"${esc(b.name || '가져온 일정')}"으로 가져온 일정 ${n}개를 모두 지울까요? 가져온 뒤 사진을 붙인 일정도 함께 지워져요.</div><div class="btns"><button class="pri danger" data-act="impDel" data-id="${d.id}">${n}개 지우기</button><button class="sec" data-act="impSheet">돌아가기</button></div>`); },
+  impDel: d => impDel(d.id),
+  gcalConnect: () => gcalConnect(),
+  gcalFix: () => gcalFix(),
+  gcalOffAsk: () => sheet(`<div class="ttl" style="font-size:22px">구글 캘린더 연결 끊기</div><div class="sub">내 구글 캘린더의 "조이코너" 캘린더와 그 안의 일정이 지워져요. 앱의 일정은 그대로예요.</div><div class="btns"><button class="pri danger" data-act="gcalOff">끊기</button><button class="sec" data-act="sheetClose">취소</button></div>`),
+  gcalOff: () => gcalOff(),
+  cfgSave: async () => { const v = val('cfg_cid'); if (v && !/\.apps\.googleusercontent\.com$/.test(v)) return toast('클라이언트 ID는 .apps.googleusercontent.com 으로 끝나요'); try { await setDoc(doc(db, 'config', 'app'), { gcalClientId: v }, { merge: true }); CFG.gcalClientId = v; if (v) loadGIS().catch(() => { }); toast('저장했어요'); } catch (e) { toast('저장하지 못했어요: ' + errMsg(e)); } }
+});
+appEl.addEventListener('change', e => {
+  const k = e.target.dataset && e.target.dataset.gopt; if (!k || !GC.doc) return;
+  GC.doc.opts = { ...gcalOpts(), [k]: e.target.checked };
+  setDoc(doc(db, 'gcal', S.me.email), { opts: GC.doc.opts }, { merge: true }).catch(() => { });
+  if (gTokGet(GCAL_SCOPE)) gcalSync(); else paint();
+});
