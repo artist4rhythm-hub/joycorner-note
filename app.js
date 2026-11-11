@@ -317,7 +317,7 @@ ${S.me.owner ? `<section class="card"><div class="lbl"><span>사용 현황</span
 
 function vStaffList() {
   const total = S.staff.length, linked = S.staff.filter(x => x.email).length;
-  const row = (st, c) => `<button class="row" data-act="staff" data-id="${st.id}"><span class="grow"><span class="nm">${esc(st.name)}${c ? ` <span class="tag ${(st.classRole || {})[c] === '담임' ? '' : 'g'}">${esc((st.classRole || {})[c] || '보조')}</span>` : ''}${st.role === 'admin' || st.role === 'director' ? ` <span class="tag">${roleLabel(st)}</span>` : ''}</span><span class="sub">${esc((st.duties || []).join(' · ') || '맡은 역할 없음')}</span></span><span class="chip sm" style="${st.email ? 'background:#DDF1E3;color:#1E6B3E' : ''}">${st.email ? '구글 연결됨' : '연결 전'}</span></button>`;
+  const row = (st, c) => `<button class="row" data-act="staff" data-id="${st.id}"><span class="grow"><span class="nm">${esc(st.name)}${c ? ` <span class="tag ${(st.classRole || {})[c] === '담임' ? '' : 'g'}">${esc((st.classRole || {})[c] || '보조')}</span>` : ''}${st.role === 'admin' || st.role === 'director' ? ` <span class="tag">${roleLabel(st)}</span>` : ''}</span><span class="sub">${esc((Array.isArray(W.duties) ? dutiesOf(st.name).map(x => x.role) : (st.duties || [])).join(' · ') || '맡은 역할 없음')}</span></span><span class="chip sm" style="${st.email ? 'background:#DDF1E3;color:#1E6B3E' : ''}">${st.email ? '구글 연결됨' : '연결 전'}</span></button>`;
   const cls = Object.values(S.classes).sort((a, b) => a.age - b.age);
   const groups = cls.map(cl => {
     const l = S.staff.filter(x => (x.classes || []).includes(cl.id)).sort((a, b) => ((a.classRole || {})[cl.id] === '담임' ? 0 : 1) - ((b.classRole || {})[cl.id] === '담임' ? 0 : 1));
@@ -326,11 +326,12 @@ function vStaffList() {
   const dirs = S.staff.filter(x => x.role === 'director');
   const helpers = S.staff.filter(x => x.kind === 'helper');
   const free = S.staff.filter(x => !(x.classes || []).length && x.role !== 'director' && x.kind !== 'helper');
+  if (!Array.isArray(W.duties)) loadDuties().then(() => softPaint());
   return `<section class="card"><div class="lbl"><span>교사 명단</span><span class="s2">구글 연결 ${linked}/${total}</span></div>
 <div class="sub">명단을 먼저 만들어 두고, 구글 계정은 나중에 연결하면 돼요. 연결 전에는 수퍼관리자·디렉터·시스템 관리자가 내용을 고쳐요. 디렉터는 수퍼관리자가, 시스템 관리자는 디렉터가 정해요.</div>
-${dirs.length ? `<div class="lbl" style="margin-top:6px">디렉터 (조이코너 전체 관리)</div><div class="list">${dirs.map(x => row(x)).join('')}</div>` : ''}${groups}${free.length ? `<div class="lbl" style="margin-top:6px">반 없음</div><div class="list">${free.map(x => row(x)).join('')}</div>` : ''}${helpers.length ? `<div class="lbl" style="margin-top:6px">헬퍼 선생님 (일일·외부)</div><div class="list">${helpers.map(x => row(x)).join('')}</div>` : ''}
+${dirs.length ? `<div class="lbl" style="margin-top:6px">디렉터 (조이코너 전체 관리)</div><div class="list">${dirs.map(x => row(x)).join('')}</div>` : ''}${groups}${free.length ? `<div class="lbl" style="margin-top:6px">반 없음</div><div class="list">${free.map(x => row(x)).join('')}</div>` : ''}${helpers.length ? `<div class="lbl" style="margin-top:6px">헬퍼 선생님 풀 · 필요할 때 요청 (일일 · 외부)</div><div class="list">${helpers.map(x => row(x)).join('')}</div>` : ''}
 ${total ? '' : '<div class="sub">아직 명단이 없어요. 시트 데이터를 가져오면 15명이 들어와요.</div>'}
-<button class="sec" data-act="staff">+ 교사 추가</button></section>`;
+${leftDrawer()}<button class="sec" data-act="staff">+ 교사 추가</button></section>`;
 }
 
 /* ---------- 그리기 ---------- */
@@ -490,7 +491,7 @@ function staffSheet(id) {
 <label class="fld">구글 계정 이메일 (나중에 넣어도 돼요)<input class="in" id="s_email" type="email" value="${esc(st.email || '')}" placeholder="example@gmail.com"></label>
 <div class="s2">이메일을 넣으면 그 구글 계정으로 로그인할 수 있어요. 지우면 로그인이 막혀요.</div>
 <div class="btns"><button class="pri" data-act="saveStaff">저장</button><button class="sec" data-act="sheetClose">취소</button></div>
-${id ? '<button class="ghost danger" data-act="delStaffAsk">명단에서 빼기</button>' : ''}`);
+${id ? '<button class="ghost danger" data-act="staffLeaveAsk">그만두신 선생님으로 옮기기</button>' : ''}`);
 }
 async function saveStaff() {
   const id = S.editStaff, old = id ? S.staff.find(x => x.id === id) : {};
@@ -612,7 +613,7 @@ function vWorship() {
 ${W.tab === 'duty' ? '' : `<div class="weekbar"><button data-act="wweek" data-n="-7" aria-label="지난 주">◀</button><b>${dd.getFullYear() !== new Date().getFullYear() ? dd.getFullYear() + '년 ' : ''}${dd.getMonth() + 1}월 ${dd.getDate()}일 주일${d === nextSunday() ? ' · 이번 주' : ''}</b><button data-act="wweek" data-n="7" aria-label="다음 주">▶</button></div>`}`;
   let body = '<div class="sub">불러오는 중…</div>';
   if (ready) body = W.tab === 'week' ? wWeek(d) : W.tab === 'sermon' ? wSermon(d) : wSongs(d);
-  return `<div class="scroll ${W.tab === 'week' ? 'cols' : 'narrow'}">${head}${body}</div>${nav('worship')}`;
+  return `<div class="scroll cols">${head}${body}</div>${nav('worship')}`;
 }
 
 /* 이번 주 */
@@ -626,6 +627,7 @@ function wSermon(d) {
   const past = W.sermons.filter(x => x.date !== d).sort((a, b) => ko(b.date, a.date)).slice(0, 30);
   return `${list.map(sermonCard).join('') || `<section class="card"><div class="sub">${s.story ? `이번 주 이야기 <b>${esc(s.story)}</b>${s.preacher ? ' · ' + esc(s.preacher) : ''}<br>` : ''}아직 올라온 설교가 없어요.</div></section>`}
 ${list.some(x => x.authorEmail === S.me.email) ? '' : '<button class="cta" data-act="sermonNew">설교 올리기</button>'}
+${matCard(d)}
 ${story && (story.notes || story.links) ? `<section class="card"><div class="lbl"><span>설교 참고 · 표준 순서 ${story.no}번</span></div>${story.notes ? `<div class="post">${linkify(story.notes)}</div>` : ''}${story.links ? `<div class="lbl"><span>참고 설교 영상</span></div><div class="post">${linkify(story.links)}</div>` : ''}</section>` : ''}
 ${past.length ? `<section class="card"><div class="lbl"><span>지난 설교</span></div><div class="list">${past.map(p => `<button class="row" data-act="wgo" data-id="${p.date}" style="min-height:56px"><span class="grow"><span class="nm" style="font-size:17px">${esc(p.title || '제목 없음')}</span><span class="sub">${fmtMD(p.date)} · ${esc(p.authorName || '')}</span></span><span class="tag ${p.status === 'done' ? 'g' : ''}">${statusLabel(p.status)}</span></button>`).join('')}</div></section>` : ''}`;
 }
@@ -727,9 +729,10 @@ async function dutyDel() {
 }
 
 /* ---------- 교사실 (공지 · 캘린더 · 업무 분담 · 조직도 · 통계) ---------- */
-const APP_VERSION = 'v12';
+const APP_VERSION = 'v13';
 const APP_DATE = '2026-11-11';
 const CHANGELOG = [
+  { v: 'v13', date: '11월 11일', items: ['"지금 새로고침"이 눌리지 않던 것 고침 (새 파일을 확실히 받아서 다시 열어요)', '모든 선생님이 모든 반 아이를 보고, 누구나 어느 반이든 출석 체크', '주일 자료 링크: 설교 슬라이드 · OX 퀴즈 · 활동지 · BGM · 영상 (파일은 공용 구글 드라이브, 앱에는 링크만)', '업무 분담을 구역별 역할 카드 보드로 · 역할에서 빼면 메모와 교사 카드의 맡은 일에서도 빠져요', '교사 카드 빼기 → "그만두신 선생님" 보관함 (디렉터 · 관리자만, 되돌리기 가능)', '조직도에 모든 선생님 (헬퍼 선생님은 따로 풀로)', '예배 · 교사실 화면 폭과 위쪽 탭을 모두 같게, 캘린더 "다가오는 3주" 목록 정리'] },
   { v: 'v12', date: '11월 11일', items: ['자료 내려받기: 아이 명단 · 출석부 · 생일 달력 · 교사 명단 · 업무 분담 · 순서표 · 일정 · 주일 인원 · 찬양을 PDF나 엑셀로', '전체 자료를 엑셀 한 파일로 (관리자)', '연간 일정 한 번에 넣기: 엑셀 양식 내려받기 → 채워서 올리기 → 바뀌는 것 확인 → 적용', '홈 위쪽에 앱 버전 (누르면 업데이트 기록)', '일정에 "내용" 칸 (제목 바로 아래, 캘린더 목록에도 첫 줄이 보여요)'] },
   { v: 'v11', date: '11월 11일', items: ['카톡 교사방 기록 가져오기: 주일 찬양 5년치 · 주일 인원 · 올해 행사 (있는 값은 그대로, 빈칸만)', '교사실 → 통계: 주일 인원 막대 그래프 · 해마다 비교 · 이번 주 넣기', '예배 → 악보: 지난 찬양 찾기 (언제 · 몇 번 · 키 · 빠르기)', '곡마다 악기 · 빠르기(♩) 칸'] },
   { v: 'v10', date: '11월 11일', items: ['처음 여는 속도: 휴대폰에 남은 것으로 먼저 보여 주고 새 것은 뒤에서 받아요', '화면마다 필요한 것만 받아요 (출석 기록은 그 반만, 순서표는 연 달만)', '일정 넣기 창을 세로 화면에 맞게 정리 (시작 · 끝 한 줄씩)', '공휴일: 해마다 불러오기 · 대체·임시공휴일이 바뀌면 관리자에게 알림', '바깥 캘린더 가져오기 (관리자): .ics 파일 또는 구글 캘린더에서 바로 · 묶음째 지우기', '내 구글 캘린더 연결: 교사실 일정과 내 주일 순서가 "조이코너" 캘린더로'] },
@@ -1277,6 +1280,7 @@ function rDuty() {
   const awayNote = away.length ? `<div class="note full"><b>${fmtMD(sun)} 부재</b> · ${away.map(n => { const bk = [...new Set(dutiesOf(n).flatMap(x => x.backup || []))]; return `${esc(n)}${bk.length ? ` → 대신 ${bk.map(esc).join(', ')}` : ''}`; }).join(' / ')}</div>` : '';
   const top = `${awayNote}${empty.length ? `<div class="note full soft">담당이 비어 있는 자리 · ${empty.map(x => esc(x.role)).join(', ')}</div>` : ''}`;
   if (R.dutyView === 'people') return toggle + top + dutyPeople();
+  if (true) return toggle + top + rDutyBoard() + (admin ? '<button class="sec full" data-act="dutyEdit">+ 역할 추가</button>' : '') + (list.length ? '' : '<div class="sub full">업무 분담이 아직 없어요. 설정에서 joycorner-extra.json을 가져와 주세요.</div>');
   const secs = ['예배 전', '예배 시', '예배 후'];
   R.open = R.open || {};
   return `${toggle}${top}<div class="tablewrap full"><table class="dtable"><thead><tr><th>역할</th><th>담당</th><th class="hide-m">부재 시</th>${admin ? '<th class="w1"></th>' : ''}</tr></thead>
@@ -1304,9 +1308,11 @@ async function dutySave() {
   const id = W.editDuty, old = id ? W.duties.find(y => y.id === id) : null;
   const role = val('u_role'); if (!role) return toast('역할을 적어 주세요');
   const split = v => v.split(',').map(t => t.trim()).filter(Boolean);
-  const data = { section: val('u_sec'), area: val('u_area') || role, role, desc: $('#u_desc').value.trim(), people: [...SP.du_people], backup: [...SP.du_backup], note: $('#u_note').value.trim(), order: old ? old.order : Math.max(0, ...W.duties.map(y => y.order || 0)) + 1 };
+  const removed = old ? [...(old.people || []), ...(old.backup || [])].filter(n => !SP.du_people.includes(n) && !SP.du_backup.includes(n)) : [];
+  let note0 = $('#u_note').value.trim(); removed.forEach(n => { note0 = stripName(note0, n); });
+  const data = { section: val('u_sec'), area: val('u_area') || role, role, desc: $('#u_desc').value.trim(), people: [...SP.du_people], backup: [...SP.du_backup], note: note0, order: old ? old.order : Math.max(0, ...W.duties.map(y => y.order || 0)) + 1 };
   const ref = id ? doc(db, 'duties', id) : doc(collection(db, 'duties'));
-  try { await setDoc(ref, data); if (old) Object.assign(old, data); else W.duties.push({ id: ref.id, ...data }); W.duties.sort((a, b) => (a.order ?? 999) - (b.order ?? 999)); closeSheet(); toast('저장했어요'); paint(); } catch (e) { toast('저장하지 못했어요: ' + errMsg(e)); }
+  try { await setDoc(ref, data); if (old) Object.assign(old, data); else W.duties.push({ id: ref.id, ...data }); W.duties.sort((a, b) => (a.order ?? 999) - (b.order ?? 999)); closeSheet(); toast('저장했어요'); paint(); syncStaffDuties([...removed, ...data.people, ...(old ? old.people || [] : [])]).then(() => softPaint()); } catch (e) { toast('저장하지 못했어요: ' + errMsg(e)); }
 }
 
 /* ---------- 조직도 ---------- */
@@ -1318,10 +1324,11 @@ function rOrg() {
   const teams = {}; (W.duties || []).forEach(x => { (teams[x.area] ||= []).push(x); });
   const teamBoxes = Object.entries(teams).map(([area, l]) => `<div class="obox team"><div class="ohead"><b>${esc(area)}</b></div>${l.map(x => `<div class="olbl">${esc(x.role)}</div>${(x.people || []).length ? chips(x.people) : '<em class="need">담당 필요</em>'}`).join('')}</div>`).join('');
   const rows = cls.map(c => { const cs = classStaff(c.id); const n = S.kids[c.id] ? activeKids(c.id).length : null; const a = S.kids[c.id] ? classAvg(c.id) : null; return `<tr><td><b>${esc(c.name)}</b></td><td class="ppl">${cs.homeroom.map(x => staffChip(x)).join('') || '-'}</td><td class="ppl">${cs.assistants.map(x => staffChip(x)).join('') || '-'}</td><td>${n ?? '-'}</td><td>${a === null ? '-' : Math.round(a * 100) + '%'}</td></tr>`; }).join('');
-  return `<section class="card full org"><div class="otop"><div class="obox root"><img src="logo-white.png" alt="조이코너" class="ologo"><span>교사 ${S.staff.length}명 · 아이 ${allKids().filter(k => (k.status || 'active') === 'active').length}명${S.me.role === 'admin' ? '' : ' (내 반)'}</span></div></div>
+  return `<section class="card full org"><div class="otop"><div class="obox root"><img src="logo-white.png" alt="조이코너" class="ologo"><span>교사 ${S.staff.filter(x => x.kind !== 'helper').length}명 · 아이 ${allKids().filter(k => (k.status || 'active') === 'active').length}명</span></div></div>
 <div class="oline"></div><div class="otop"><div class="obox dir"><div class="ohead"><b>디렉터</b></div>${chips(dirs.map(x => x.name))}</div></div>
 ${admins.length ? `<div class="oline"></div><div class="otop"><div class="obox adm"><div class="ohead"><b>관리자</b></div>${chips(admins.map(x => x.name))}</div></div>` : ''}
-<div class="oline"></div><div class="orow">${classBoxes}</div></section>
+<div class="oline"></div><div class="orow">${classBoxes}</div>
+${(() => { const shown = new Set([...dirs, ...admins].map(x => x.name)); cls.forEach(c => { const cs = classStaff(c.id); [...cs.homeroom, ...cs.assistants].forEach(n => shown.add(n)); }); const rest = S.staff.filter(x => x.kind !== 'helper' && !shown.has(x.name)); return rest.length ? `<div class="orow"><div class="obox wide"><div class="ohead"><b>함께 섬기는 선생님</b><span class="s2">반 없음 · ${rest.length}명</span></div>${chips(rest.map(x => x.name))}</div></div>` : ''; })()}</section>
 <section class="card full"><div class="lbl"><span>반별 한눈에</span></div><div class="tablewrap"><table class="dtable"><thead><tr><th>반</th><th>담임</th><th>보조</th><th>아이</th><th>4주 출석</th></tr></thead><tbody>${rows}</tbody></table></div></section>
 <section class="card full"><div class="lbl"><span>사역팀</span><span class="s2">업무 분담 기준</span></div><div class="orow teams">${teamBoxes || '<div class="sub">업무 분담을 가져오면 사역팀이 보여요.</div>'}</div></section>`;
 }
@@ -1404,7 +1411,7 @@ async function checkVersion() {
     const j = await r.json();
     if (j.v && j.v !== APP_VERSION && !document.getElementById('newver')) {
       const b = document.createElement('div'); b.id = 'newver'; b.className = 'newver';
-      b.innerHTML = `<span>새 버전 <b>${esc(j.v)}</b>이 나왔어요</span><button data-act="reload">지금 새로고침</button>`;
+      b.innerHTML = `<span>새 버전 <b>${esc(j.v)}</b>이 나왔어요</span><button data-act="reload" data-v="${esc(j.v)}">지금 새로고침</button>`;
       document.body.prepend(b);
     }
   } catch { /* 오프라인 */ }
@@ -1709,7 +1716,7 @@ function wWeek(d) {
   return `<div class="full">${sundayCard(s)}</div>
 ${away.length ? `<section class="card"><div class="lbl"><span>이번 주 부재</span></div>${away.map(st => `<div class="hrow">${staffChip(st.name)}${awayHandover(st)}</div>`).join('')}</section>` : ''}
 <div class="statgrid full"><button class="stat" data-act="wtab" data-id="sermon">${ico('preacher', 22)}<span><b>${sermons.length ? statusLabel(sermons[0].status) : '아직 없음'}</b><small>설교${sermons.length ? ' · ' + esc(sermons[0].authorName || '') : ''}</small></span></button>
-<button class="stat" data-act="wtab" data-id="songs">${svg(ICON.music, 22, 1.8)}<span><b>${songs.length}곡</b><small>악보${songs.length ? ' · 넘겨 보기' : ''}</small></span></button></div>`;
+<button class="stat" data-act="wtab" data-id="songs">${svg(ICON.music, 22, 1.8)}<span><b>${songs.length}곡</b><small>악보${songs.length ? ' · 넘겨 보기' : ''}</small></span></button></div>${matCard(d)}`;
 }
 function dayTurnsHtml(d) {
   const s = schedFor(d);
@@ -1817,8 +1824,8 @@ ${R.range ? `<div class="rangebar">${svg('<path d="M4 7h16M4 12h16M4 17h10"/>', 
 ${cells.slice(0, weeks * 7).map(d => { const it = itemsOn(d); const out = d.slice(0, 7) !== R.month; const inR = rng && d >= rng[0] && d <= rng[1]; const s = schedFor(d); const mine = s && TURN_KEYS.some(([k]) => hasName(s[k], myName())); return `<button class="cday ${holName(d) ? 'hol' : ''} ${out ? 'out' : ''} ${d === today ? 'today' : ''} ${d === R.day ? 'sel' : ''} ${parseD(d).getDay() === 0 ? 'sun' : ''} ${inR ? 'inrange' : ''}" data-act="calDay" data-id="${d}"><span class="dn">${parseD(d).getDate()}${mine ? '<i class="mydot" title="내 순서"></i>' : ''}</span><span class="dots">${it.slice(0, 4).map(x => `<i class="cdot ${x.kind}"></i>`).join('')}</span><span class="clab">${it.slice(0, 3).map(x => `<em class="${x.kind} ${x.span ? 'span' : ''}">${x.span && !x.first && parseD(d).getDay() !== 0 ? '&nbsp;' : esc(x.label)}</em>`).join('')}</span></button>`; }).join('')}</div>
 <div class="legend"><span><i class="cdot hol"></i>공휴일</span><span><i class="cdot sun"></i>주일</span><span><i class="cdot evt"></i>행사</span><span><i class="cdot meet"></i>회의·교육</span><span><i class="cdot away"></i>부재</span><span><i class="cdot bday"></i>생일</span><span><i class="mydot"></i>내 순서</span></div>
 <div class="s2">${matchMedia('(pointer:fine)').matches ? '날짜를 끌어서 고르면 기간 일정을 바로 넣어요.' : '날짜를 길게 누른 뒤 끝 날짜를 누르면 기간 일정을 넣어요.'}</div></section>
-<div class="calside"><section class="card"><div class="lbl"><span>${dd.getMonth() + 1}월 ${dd.getDate()}일 ${DOW[dd.getDay()]}요일</span><button class="linkbtn" data-act="eventNew">+ 일정</button></div>${day.filter(x => x.kind !== 'sun').length ? day.filter(x => x.kind !== 'sun').map(x => itemRow(x)).join('') : (schedFor(R.day) ? '' : '<div class="sub">일정이 없어요.</div>')}${schedFor(R.day) ? `<div class="mtop">${sundayCard(schedFor(R.day))}</div>` : ''}</section>
-<section class="card"><div class="lbl"><span>다가오는 3주</span></div>${upcoming.length ? upcoming.slice(0, 12).map(x => itemRow(x, true)).join('') : '<div class="sub">다가오는 행사·생일이 없어요.</div>'}</section>${gcalCard()}</div></div>`;
+<div class="calside"><section class="card"><div class="lbl"><span>${dd.getMonth() + 1}월 ${dd.getDate()}일 ${DOW[dd.getDay()]}요일</span><button class="linkbtn" data-act="eventNew">+ 일정</button></div>${day.filter(x => x.kind !== 'sun').length ? day.filter(x => x.kind !== 'sun').map(x => agendaRow(x)).join('') : (schedFor(R.day) ? '' : '<div class="sub">일정이 없어요.</div>')}${schedFor(R.day) ? `<div class="mtop">${sundayCard(schedFor(R.day))}</div>` : ''}</section>
+<section class="card"><div class="lbl"><span>다가오는 3주</span></div>${upcoming.length ? `<div class="agenda">${upcoming.slice(0, 12).map(x => agendaRow(x, true)).join('')}</div>` : '<div class="sub">다가오는 행사·생일이 없어요.</div>'}</section>${gcalCard()}</div></div>`;
 }
 /* 끌어서 기간 고르기 (마우스) · 길게 눌러 고르기 (터치) */
 const CD = { on: false };
@@ -2123,9 +2130,7 @@ else onAuthStateChanged(auth, start);
 /* ---------- 빠르게 열기: 휴대폰에 남아 있는 것(캐시)으로 먼저 그리고, 서버 것은 뒤에서 받아 바꿔요 ---------- */
 const qDocs = async (ref, cache) => { try { const s = await (cache ? getDocsFromCache(ref) : getDocs(ref)); return s.docs.map(d => ({ id: d.id, ...d.data() })); } catch { return null; } };
 const ATT = {};
-function kidRefs() {
-  return S.me.role === 'admin' ? [collection(db, 'children')] : (S.me.classes || []).map(c => query(collection(db, 'children'), where('classId', '==', c)));
-}
+function kidRefs() { return [collection(db, 'children')]; }  // v13 — 모든 선생님이 모든 반 아이들을 봐요
 async function fetchCore(cache) {
   const [cs, ks, sc, st] = await Promise.all([
     qDocs(collection(db, 'classes'), cache),
@@ -2137,11 +2142,11 @@ async function fetchCore(cache) {
 }
 function applyCore({ cs, ks, sc, st }) {
   if (cs) { S.classes = {}; cs.forEach(x => { S.classes[x.id] = x; }); }
-  S.myClasses = (S.me.role === 'admin' ? Object.keys(S.classes) : (S.me.classes || []).filter(c => S.classes[c])).sort();
-  if (!S.myClasses.includes(S.cur)) { const saved = lsGet('jc_cur'); S.cur = S.myClasses.includes(saved) ? saved : S.myClasses[0] || null; }
+  S.myClasses = Object.keys(S.classes).sort();
+  if (!S.myClasses.includes(S.cur)) { const saved = lsGet('jc_cur'), own = (S.me.classes || []).find(c => S.classes[c]); S.cur = S.myClasses.includes(saved) ? saved : own || S.myClasses[0] || null; }
   if (ks) { const by = {}; S.myClasses.forEach(c => { by[c] = []; }); ks.forEach(k => { if (by[k.classId]) by[k.classId].push(k); }); S.kids = by; }
   if (sc) S.schedule = sc.sort((a, b) => ko(a.date, b.date));
-  if (st) S.staff = st.sort((a, b) => (a.order ?? 999) - (b.order ?? 999) || ko(a.name, b.name));
+  if (st) { const all = st.sort((a, b) => (a.order ?? 999) - (b.order ?? 999) || ko(a.name, b.name)); S.staff = all.filter(x => x.status !== 'left'); S.staffLeft = all.filter(x => x.status === 'left'); }
   const mine = S.staff.find(x => x.email && x.email === S.me.email); if (mine) S.me.name = mine.name;
 }
 async function loadAtt(c, cache) {
@@ -3175,3 +3180,136 @@ Object.assign(ACT, {
 appEl.addEventListener('change', e => { if (e.target.id === 'bulkFile' && e.target.files[0]) { bulkRead(e.target.files[0]); e.target.value = ''; } });
 
 VIEWS.export = vExport;
+
+/* ================= v13 · 새로고침 고침 · 모든 반 열람 · 자료 링크 · 업무 분담 보드 · 그만두신 선생님 ================= */
+
+/* ---------- 새 버전: 캐시까지 새로 받아서 다시 열기 ---------- */
+async function hardReload(v) {
+  const b = document.querySelector('#newver button'); if (b) { b.disabled = true; b.textContent = '받는 중…'; }
+  try { await Promise.all(['index.html', 'app.js?v=' + (v || Date.now()), 'app.js', 'version.json'].map(u => fetch(u, { cache: 'reload' }).catch(() => { }))); } catch { /* 괜찮아요 */ }
+  try { if (window.caches) { const ks = await caches.keys(); await Promise.all(ks.map(k => caches.delete(k))); } } catch { /* 없음 */ }
+  location.replace(location.pathname + '?r=' + Date.now() + location.hash);
+}
+document.addEventListener('click', e => { const b = e.target.closest('#newver button'); if (b) { e.preventDefault(); hardReload(b.dataset.v); } });
+
+/* ---------- 업무 분담: 보드 (구역마다 역할 카드) ---------- */
+function rDutyBoard() {
+  const me = myName(), list = W.duties || [], admin = isAdminMe();
+  const sun = nextSunday(), away = awayOn(sun).map(s => s.name);
+  const secs = ['예배 전', '예배 시', '예배 후'];
+  const pc = (n, cls = '') => staffChip(n, `${cls} ${n === me ? 'mine' : ''} ${away.includes(n) ? 'away' : ''}`);
+  const tile = x => {
+    const ppl = x.people || [], bk = x.backup || [], open = R.open && R.open[x.id];
+    return `<article class="dtile ${ppl.length ? '' : 'need'} ${ppl.includes(me) ? 'mine' : ''}">
+<header data-act="dutyOpen" data-id="${x.id}"><span class="tt">${x.area && x.area !== x.role ? `<small>${esc(x.area)}</small>` : ''}<b>${esc(x.role)}</b></span>${admin ? `<button class="editbtn" data-act="dutyEdit" data-id="${x.id}" aria-label="${esc(x.role)} 고치기">${svg('<path d="M4 20h4L19 9l-4-4L4 16z"/>', 15, 1.8)}</button>` : ''}</header>
+<div class="dppl">${ppl.length ? ppl.map(n => pc(n)).join('') : '<span class="needtag">담당 필요</span>'}</div>
+${bk.length ? `<div class="dbk"><span>부재 시</span>${bk.map(n => pc(n, 'sm2')).join('')}</div>` : ''}
+${open && (x.desc || x.note) ? `<div class="ddesc">${esc(x.desc || '')}${x.note ? `<br>※ ${esc(x.note)}` : ''}</div>` : ''}</article>`;
+  };
+  return `<div class="dboard full">${secs.map(sec => { const l = list.filter(x => (x.section || '예배 시') === sec); if (!l.length) return ''; return `<section class="dsec"><div class="dsechead"><b>${sec}</b><span class="s2">역할 ${l.length} · 비어 있음 ${l.filter(x => !(x.people || []).length).length}</span></div><div class="dgrid">${l.map(tile).join('')}</div></section>`; }).join('')}</div>
+<div class="s2 full">역할 이름을 누르면 하는 일이 펼쳐져요${admin ? ' · 연필을 누르면 고쳐요' : ''} · 내 이름은 빨간 테두리</div>`;
+}
+
+/* ---------- 역할에서 뺀 사람은 메모 글과 교사 카드의 '맡은 일'에서도 빼요 ---------- */
+function stripName(text, n) {
+  if (!text || !n) return text || '';
+  const esc2 = n.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  let t = String(text).replace(new RegExp(`(^|[\\s,·/:(])${esc2}(?=$|[\\s,·/)])`, 'g'), '$1');
+  t = t.replace(/\(\s*\)/g, '').replace(/\s*[,·/]\s*(?=[,·/)]|$)/g, '').replace(/([:(])\s*[,·/]\s*/g, '$1 ').replace(/[^.\n:]*:\s*(?=$|\n|\.)/g, '').replace(/\s{2,}/g, ' ').trim();
+  return t.replace(/[,·/:]\s*$/, '').replace(/^\s*[,·/:]\s*/, '').trim();
+}
+async function syncStaffDuties(names) {
+  const b = writeBatch(db); let n = 0;
+  [...new Set(names)].forEach(name => {
+    const st = S.staff.find(x => x.name === name); if (!st) return;
+    const roles = dutiesOf(name).map(x => x.role);
+    if (JSON.stringify(roles) !== JSON.stringify(st.duties || [])) { st.duties = roles; b.update(doc(db, 'staff', st.id), { duties: roles }); n++; }
+  });
+  if (n) await b.commit().catch(() => { });
+}
+
+/* ---------- 그만두신 선생님 (보관함) ---------- */
+async function staffLeave(id) {
+  const st = S.staff.find(x => x.id === id); if (!st) return;
+  try {
+    const patch = { status: 'left', leftAt: ymd(new Date()), prevClasses: st.classes || [], prevClassRole: st.classRole || {}, classes: [], classRole: {} };
+    const b = writeBatch(db);
+    b.set(doc(db, 'staff', id), patch, { merge: true });
+    if (!Array.isArray(W.duties)) await loadDuties();
+    (W.duties || []).forEach(x => {
+      const p = (x.people || []).filter(n => n !== st.name), k = (x.backup || []).filter(n => n !== st.name);
+      if (p.length !== (x.people || []).length || k.length !== (x.backup || []).length) { const note = stripName(x.note, st.name); b.update(doc(db, 'duties', x.id), { people: p, backup: k, note }); Object.assign(x, { people: p, backup: k, note }); }
+    });
+    await b.commit();
+    if (st.email && st.email !== OWNER_EMAIL.toLowerCase()) await deleteDoc(doc(db, 'teachers', st.email)).catch(() => { });
+    Object.assign(st, patch);
+    S.staffLeft = [st, ...(S.staffLeft || [])]; S.staff = S.staff.filter(x => x.id !== id);
+    closeSheet(); toast(`${st.name} 선생님을 '그만두신 선생님'으로 옮겼어요 · 업무 분담에서도 뺐어요`); paint();
+  } catch (e) { toast('옮기지 못했어요: ' + errMsg(e)); }
+}
+async function staffBack(id) {
+  const st = (S.staffLeft || []).find(x => x.id === id); if (!st) return;
+  try {
+    const patch = { status: 'active', leftAt: '', classes: st.prevClasses || [], classRole: st.prevClassRole || {} };
+    await setDoc(doc(db, 'staff', id), patch, { merge: true });
+    if (st.email) await setDoc(doc(db, 'teachers', st.email), { name: st.name, role: st.role === 'director' || st.role === 'admin' ? st.role : 'teacher', classes: patch.classes }, { merge: true }).catch(() => { });
+    Object.assign(st, patch); S.staffLeft = S.staffLeft.filter(x => x.id !== id); S.staff.push(st); S.staff.sort((a, b) => (a.order ?? 999) - (b.order ?? 999) || ko(a.name, b.name));
+    toast(`${st.name} 선생님이 다시 명단에 들어왔어요 · 업무 분담은 새로 정해 주세요`); paint();
+  } catch (e) { toast('되돌리지 못했어요: ' + errMsg(e)); }
+}
+async function staffPurge(id) {
+  const st = (S.staffLeft || []).find(x => x.id === id); if (!st) return;
+  try { await deleteDoc(doc(db, 'staff', id)); await deleteDoc(doc(db, 'staffPhotos', id)).catch(() => { }); S.staffLeft = S.staffLeft.filter(x => x.id !== id); closeSheet(); toast('완전히 지웠어요'); paint(); }
+  catch (e) { toast('지우지 못했어요: ' + errMsg(e)); }
+}
+function leftDrawer() {
+  if (!isAdminMe() || !(S.staffLeft || []).length) return '';
+  return `<details class="drawer"><summary><b>그만두신 선생님</b><span class="s2">${S.staffLeft.length}명 · 디렉터 · 관리자만 보여요</span></summary><div class="list">${S.staffLeft.map(st => `<div class="row leftrow"><span class="grow"><span class="nm">${esc(st.name)}</span><span class="sub">${st.leftAt ? esc(st.leftAt.replace(/-/g, '.')) + ' 보관' : ''}${(st.prevClasses || []).length ? ' · 전에 ' + st.prevClasses.map(c => clsName(c)).join(', ') : ''}</span></span><button class="ghost sm" data-act="staffBack" data-id="${st.id}">다시 명단에</button><button class="ghost sm danger" data-act="staffPurgeAsk" data-id="${st.id}">완전히 지우기</button></div>`).join('')}</div></details>`;
+}
+
+/* ---------- 주일 자료 링크 (슬라이드 · OX 퀴즈 · 활동지 · BGM · 영상) ---------- */
+const MAT = { by: {}, all: null };
+const MAT_KINDS = [['slide', '설교 슬라이드', '#C62828'], ['quiz', 'OX 퀴즈', '#7B4FB8'], ['doc', '활동지 · 문서', '#3A6EA5'], ['bgm', 'BGM', '#2E9D8F'], ['video', '영상', '#E08A00'], ['etc', '기타', '#6B5646']];
+const MAT_IC = { slide: '<rect x="3" y="4" width="18" height="13" rx="2"/><path d="M8 21h8M12 17v4"/>', quiz: '<circle cx="8" cy="12" r="4"/><path d="M15 8l6 8M21 8l-6 8"/>', doc: '<path d="M6 3h9l4 4v14H6z"/><path d="M14 3v5h5M9 13h7M9 17h5"/>', bgm: '<path d="M9 18V5l11-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="17" cy="16" r="3"/>', video: '<rect x="3" y="5" width="18" height="14" rx="3"/><path d="M10 9l5 3-5 3z"/>', etc: '<path d="M10 13a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-1 1"/><path d="M14 11a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l1-1"/>' };
+const matSite = u => { try { const h = new URL(u).hostname; return /docs\.google\.com/.test(h) ? (/presentation/.test(u) ? '구글 슬라이드' : /document/.test(u) ? '구글 문서' : /spreadsheets/.test(u) ? '구글 시트' : '구글 문서') : /drive\.google\.com/.test(h) ? '구글 드라이브' : /youtu/.test(h) ? '유튜브' : /canva/.test(h) ? '캔바' : /notion/.test(h) ? '노션' : /dropbox/.test(h) ? '드롭박스' : /onedrive|sharepoint|1drv/.test(h) ? '원드라이브' : h.replace(/^www\./, ''); } catch { return ''; } };
+async function loadMat(d) {
+  if (MAT.by[d]) return MAT.by[d];
+  MAT.by[d] = [];
+  try { const s = await getDocs(query(collection(db, 'materials'), where('date', '==', d))); MAT.by[d] = s.docs.map(x => ({ id: x.id, ...x.data() })).sort((a, b) => (MAT_KINDS.findIndex(k => k[0] === a.kind) - MAT_KINDS.findIndex(k => k[0] === b.kind)) || ko(a.at || '', b.at || '')); } catch { MAT.by[d] = []; }
+  return MAT.by[d];
+}
+function matCard(d) {
+  if (!MAT.by[d]) { loadMat(d).then(() => softPaint()); }
+  const l = MAT.by[d] || [];
+  return `<section class="card matcard"><div class="lbl"><span>이번 주 자료</span><button class="linkbtn" data-act="matNew">+ 자료 링크</button></div>
+${l.length ? `<div class="matlist">${l.map(m => { const k = MAT_KINDS.find(x => x[0] === m.kind) || MAT_KINDS[5]; return `<div class="matrow"><a class="matlink" href="${esc(m.url)}" target="_blank" rel="noopener"><span class="matic" style="background:${k[2]}">${svg(MAT_IC[k[0]], 18, 1.9)}</span><span class="grow"><b>${esc(m.title || k[1])}</b><small>${esc(k[1])} · ${esc(matSite(m.url))} · ${esc(m.byName || '')}</small></span><span class="chev">↗</span></a>${m.by === S.me.email || isAdminMe() ? `<button class="editbtn" data-act="matDel" data-id="${m.id}" data-d="${d}" aria-label="지우기">${svg('<path d="M5 7h14M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/>', 15, 1.8)}</button>` : ''}</div>`; }).join('')}</div>` : '<div class="sub">설교 슬라이드 · OX 퀴즈 · 활동지 · BGM 링크를 모아 두는 곳이에요. 파일은 공용 구글 드라이브에 두고 링크만 넣어요.</div>'}</section>`;
+}
+function matSheet() {
+  sheet(`<div class="ttl" style="font-size:24px">자료 링크 넣기 · ${fmtMD(W.date)}</div>
+<div class="fld">종류</div><div class="kindgrid">${MAT_KINDS.map(([k, l], i) => `<label class="kindopt ${i === 0 ? 'on' : ''}"><input type="radio" name="m_kind" value="${k}" ${i === 0 ? 'checked' : ''}>${l}</label>`).join('')}</div>
+<label class="fld">링크<input class="in" id="m_url" inputmode="url" placeholder="https://docs.google.com/presentation/…"></label>
+<label class="fld">이름 <span class="s2">(비우면 종류 이름으로)</span><input class="in" id="m_title" placeholder="예: 다윗과 골리앗 슬라이드"></label>
+<div class="s2">구글 드라이브에서 파일 → 공유 → '링크가 있는 모든 사용자' 또는 조이코너 선생님들께 공유한 뒤 링크를 복사해 붙여넣어요.</div>
+<div class="btns"><button class="pri" data-act="matSave">넣기</button><button class="sec" data-act="sheetClose">취소</button></div>`);
+  const box = $('#sheet'); box.addEventListener('change', ev => { if (ev.target.name === 'm_kind') box.querySelectorAll('.kindopt').forEach(l => l.classList.toggle('on', l.querySelector('input').checked)); });
+}
+async function matSave() {
+  const url = val('m_url'); if (!/^https?:\/\/\S+$/.test(url)) return toast('https:// 로 시작하는 링크를 넣어 주세요');
+  const kind = (document.querySelector('input[name=m_kind]:checked') || {}).value || 'etc';
+  const d = W.date, data = { date: d, kind, url, title: val('m_title'), by: S.me.email, byName: myName(), at: new Date().toISOString() };
+  try { const r = doc(collection(db, 'materials')); await setDoc(r, data); (MAT.by[d] ||= []).push({ id: r.id, ...data }); closeSheet(); toast('넣었어요'); paint(); } catch (e) { toast('넣지 못했어요: ' + errMsg(e)); }
+}
+
+/* ---------- 캘린더 목록: 날짜 + 내용 한 줄 (다가오는 3주 · 그날) ---------- */
+const agendaRow = (x, showDate) => { const dd = parseD(x.d); return `<button class="arow" ${itemAct(x)}>${showDate ? `<span class="adate ${dd.getDay() === 0 || x.kind === 'hol' ? 'red' : ''}"><b>${dd.getMonth() + 1}/${dd.getDate()}</b><small>${DOW[dd.getDay()]}</small></span>` : ''}<i class="cdot ${x.kind}"></i><span class="grow"><b>${esc(x.label)}</b>${x.sub ? `<small>${esc(x.sub)}</small>` : ''}</span><span class="chev">›</span></button>`; };
+
+Object.assign(ACT, {
+  staffLeaveAsk: () => { const st = S.staff.find(x => x.id === S.editStaff); if (!st) return; sheet(`<div class="ttl" style="font-size:22px">${esc(st.name)} 선생님을 '그만두신 선생님'으로 옮길까요?</div><div class="sub">교사 명단 · 조직도 · 업무 분담에서 빠지고, 구글 로그인도 막혀요. 기록은 남아 있어서 디렉터 · 관리자가 설정 → 교사 명단 아래 '그만두신 선생님'에서 언제든 되돌릴 수 있어요.</div><div class="btns"><button class="pri" data-act="staffLeave" data-id="${st.id}">옮기기</button><button class="sec" data-act="sheetClose">취소</button></div>`); },
+  staffLeave: d => staffLeave(d.id),
+  staffBack: d => staffBack(d.id),
+  staffPurgeAsk: d => { const st = (S.staffLeft || []).find(x => x.id === d.id); sheet(`<div class="ttl" style="font-size:22px">${esc(st ? st.name : '')} 선생님 카드를 완전히 지울까요?</div><div class="sub">사진과 카드가 지워지고 되돌릴 수 없어요. 그동안 쓴 공지 · 설교 · 기록은 남아요.</div><div class="btns"><button class="pri danger" data-act="staffPurge" data-id="${d.id}">완전히 지우기</button><button class="sec" data-act="sheetClose">취소</button></div>`); },
+  staffPurge: d => staffPurge(d.id),
+  matNew: () => matSheet(),
+  matSave: () => matSave(),
+  matDel: async d => { try { await deleteDoc(doc(db, 'materials', d.id)); MAT.by[d.d] = (MAT.by[d.d] || []).filter(x => x.id !== d.id); paint(); toast('지웠어요'); } catch (e) { toast('지우지 못했어요: ' + errMsg(e)); } }
+});

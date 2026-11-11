@@ -9,7 +9,7 @@
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="favicon-64.png" type="image/png">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
-<link rel="modulepreload" href="app.js">
+<link rel="modulepreload" href="app.js?v=v13">
 <link rel="modulepreload" href="firebase-config.js">
 <link rel="modulepreload" href="https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js" crossorigin>
 <link rel="modulepreload" href="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js" crossorigin>
@@ -245,7 +245,7 @@ b,strong,th,.lbl,.tab.on,.chip,.tag,.sec,.ghost,.seg button{font-weight:400}
   .scroll{padding:28px max(32px,calc((100% - 1320px)/2)) 48px}
   .scroll.cols{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));align-items:start;align-content:start;gap:18px}
   .scroll.cols>.hd,.scroll.cols>.seg,.scroll.cols>.ttl,.scroll.cols>.weekbar,.scroll.cols>.full,.scroll.cols>.center,.scroll.cols>.photos,.scroll.cols>.chips,.scroll.cols>.note,.scroll.cols>.rowtop,.scroll.cols>.s2,.scroll.cols>.sub,.scroll.cols>.cta,.scroll.cols>.vcard{grid-column:1/-1}
-  .scroll.cols>.seg{justify-self:start;max-width:640px;width:100%;overflow:visible;min-height:48px}
+  .scroll.cols>.seg{justify-self:stretch;max-width:none;width:100%;overflow:visible;min-height:48px}
   .scroll.narrow{padding-left:max(32px,calc((100% - 860px)/2));padding-right:max(32px,calc((100% - 860px)/2))}
   .seg button{flex:1 1 auto}
   .ahead{padding:18px max(32px,calc((100% - 1320px)/2)) 12px!important}
@@ -699,10 +699,41 @@ input[type=date].in::-webkit-date-and-time-value,input[type=time].in::-webkit-da
 .bkrow:last-child{border-bottom:0}.bkrow .d{font-size:13px;color:#8A5A2B}
 .bkrow .grow{display:flex;flex-wrap:wrap;gap:4px 12px;min-width:0}.bkrow .grow small{font-size:12px;color:#6B5646;width:100%}
 .bkc{font-size:13px}.bkc small{display:block;font-size:11px;color:#8A5A2B}.bkc s{color:#9A8676}.bkc b{font-weight:400;color:#1E6B3E}
+
+/* ===== v13 ===== */
+.dboard{display:flex;flex-direction:column;gap:18px}
+.dsechead{display:flex;align-items:baseline;gap:10px;margin:0 2px 8px}.dsechead b{font-size:18px;font-weight:400;color:#8E1B1B}
+.dgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:10px}
+.dtile{background:#fff;border:2px solid #EBD9B8;border-radius:20px;padding:10px 12px 12px;display:flex;flex-direction:column;gap:8px;min-width:0}
+.dtile.mine{border-color:#C62828;box-shadow:0 0 0 2px #FDE3E1}
+.dtile.need{border-style:dashed;border-color:#E8A39C;background:#FFFBFA}
+.dtile header{display:flex;align-items:flex-start;gap:6px;cursor:pointer}
+.dtile header .tt{flex:1;display:flex;flex-direction:column;min-width:0}
+.dtile header small{font-size:11px;color:#A07B55}.dtile header b{font-size:17px;font-weight:400;line-height:1.25}
+.dtile .editbtn{width:32px;height:32px;flex:none}
+.dppl{display:flex;flex-wrap:wrap;gap:5px}
+.needtag{font-size:13px;color:#B3261E;background:#FDE3E1;border-radius:12px;padding:3px 10px}
+.dbk{display:flex;flex-wrap:wrap;align-items:center;gap:4px;font-size:12px;color:#8A5A2B;border-top:1px dashed #F0E2C8;padding-top:7px}
+.dbk>span{margin-right:2px}.schip.sm2{transform:scale(.9);transform-origin:left center}
+.ddesc{font-size:13px;color:#6B5646;line-height:1.55;background:#FFFBF3;border-radius:12px;padding:8px 10px}
+.leftrow{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.obox.wide{flex:1 1 100%;max-width:none}
+.agenda{display:flex;flex-direction:column}
+.arow{display:flex;align-items:center;gap:10px;width:100%;text-align:left;background:none;border:0;border-bottom:1px solid #F5EBD8;padding:10px 2px;cursor:pointer;font-family:inherit;color:inherit}
+.arow:last-child{border-bottom:0}.arow:hover{background:#FFFBF3}
+.adate{display:flex;flex-direction:column;align-items:center;justify-content:center;width:46px;height:46px;flex:none;border-radius:14px;background:#FFF6E5;line-height:1.05}
+.adate b{font-size:15px;font-weight:400}.adate small{font-size:11px;color:#8A5A2B}.adate.red b,.adate.red small{color:#C62828}
+.arow .grow{flex:1;display:flex;flex-direction:column;gap:2px;min-width:0}.arow .grow b{font-size:16px;font-weight:400;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.arow .grow small{font-size:12px;color:#6B5646;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.arow .cdot{flex:none}
+.matlist{display:flex;flex-direction:column;gap:6px}
+.matrow{display:flex;align-items:center;gap:6px}
+.matlink{flex:1;display:flex;align-items:center;gap:10px;min-width:0;text-decoration:none;color:inherit;background:#FFFBF3;border:1px solid #F0E2C8;border-radius:16px;padding:8px 12px}
+.matic{width:36px;height:36px;border-radius:12px;color:#fff;display:flex;align-items:center;justify-content:center;flex:none}
+.matlink .grow{flex:1;display:flex;flex-direction:column;min-width:0}.matlink b{font-weight:400;font-size:16px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.matlink small{font-size:12px;color:#6B5646}
 </style>
 </head>
 <body>
 <div id="app"></div>
-<script type="module" src="app.js"></script>
+<script type="module" src="app.js?v=v13"></script>
 </body>
 </html>
