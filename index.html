@@ -446,6 +446,107 @@ div.heroph{cursor:default}
 .hcol{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%;gap:3px}
 .hcol i{display:block;width:100%;background:#E8A9A5;border-radius:4px 4px 0 0;min-height:2px}.hcol span{font-size:10px;color:#6B5646;height:12px}
 @media (min-width:720px){.cday .mytag{display:inline-block;margin-top:auto}}
+/* ===== v8 · 오와 열 ===== */
+.seg{display:grid!important;grid-auto-flow:column;grid-auto-columns:minmax(76px,1fr);overflow-x:auto;scrollbar-width:none;width:100%}
+.seg::-webkit-scrollbar{display:none}
+.seg button{white-space:nowrap;padding:0 10px}
+.scroll.cols>.seg{justify-self:stretch!important;max-width:none!important}
+.ahead .seg{max-width:none!important}
+.dash{color:#C9A77A}
+.ic{display:inline-flex;width:28px;height:28px;border-radius:9px;background:#FDE3E1;color:#C62828;align-items:center;justify-content:center;flex:none}
+/* 얼굴 타일 */
+.tilegrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px}
+.tile{display:flex;align-items:center;gap:10px;background:#fff;border:1px solid #F0E2C8;border-radius:16px;padding:7px 10px 7px 7px;min-height:52px;text-align:left;font-family:inherit;color:#3B2A1E;cursor:pointer;position:relative;min-width:0}
+.tile.txt{cursor:default}
+.tile .tt{display:flex;flex-direction:column;min-width:0;line-height:1.25}
+.tile .tt b{font-weight:400;font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tile .tt span{font-size:12px;color:#8A6A4A;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tile .avw{margin-top:0}
+.tile.sel{opacity:.5;border-style:dashed}
+.tile.sel.on{opacity:1;border:2px solid #C62828;border-style:solid;padding:6px 9px 6px 6px}
+.tile .tick{position:absolute;right:8px;top:8px;width:20px;height:20px;border-radius:50%;background:#EFE4D2;color:#fff;display:flex;align-items:center;justify-content:center}
+.tile.sel.on .tick{background:#C62828}
+.chipcol{display:flex;flex-wrap:wrap;gap:4px}
+.chipcol .schip{margin:0}
+/* 주일 카드 */
+.sunday{background:#fff;border:1px solid #F0E2C8;border-radius:22px;padding:14px;display:flex;flex-direction:column;gap:10px;box-shadow:0 10px 24px -20px rgba(80,50,20,.35);content-visibility:auto;contain-intrinsic-size:360px}
+.sunday.now{border:2px solid #C62828}
+.sunday.off{opacity:.6}
+.sunday header{display:flex;align-items:center;gap:10px}
+.sd{display:flex;flex-direction:column;align-items:center;justify-content:center;min-width:52px;height:52px;border-radius:14px;background:#FFF1D6;flex:none;line-height:1.1}
+.sd b{font-size:18px;font-weight:400}.sd small{font-size:11px;color:#A0703F}
+.sd.sm{min-width:52px;height:38px}
+.sunday.now .sd{background:#FFE08A}
+.sunday .st{flex:1;min-width:0;font-size:16px}
+.rrows{display:flex;flex-direction:column}
+.rrow{display:grid;grid-template-columns:118px 1fr;align-items:center;gap:8px;padding:6px 0;border-top:1px dashed #F3E7D2}
+.rrow:first-child{border-top:0}
+.rrow.me{background:#FFF7DA;border-radius:12px;padding-left:6px;padding-right:6px}
+.rl{display:flex;align-items:center;gap:8px;font-size:14px;color:#6B5646;flex-wrap:wrap}
+.rl em{font-style:normal;font-size:11px;color:#A0703F;width:100%;padding-left:36px;margin-top:-4px}
+.rv{min-width:0}
+.rv .tile{min-height:44px;padding:4px 10px 4px 4px;max-width:220px}
+.sungrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px}
+/* 순서표 */
+.catbar{display:grid;grid-auto-flow:column;grid-auto-columns:minmax(78px,1fr);gap:6px;overflow-x:auto;scrollbar-width:none;padding-bottom:2px}
+.catbar::-webkit-scrollbar{display:none}
+.cat{display:flex;flex-direction:column;align-items:center;gap:4px;border:1px solid #F0E2C8;background:#fff;border-radius:16px;padding:8px 4px;font-family:inherit;font-size:13px;color:#6B5646;cursor:pointer;white-space:nowrap}
+.cat.on{background:#C62828;border-color:#C62828;color:#fff}.cat.on .ic{background:rgba(255,255,255,.2);color:#fff}
+.yearbar{display:flex;gap:6px}.yearbar button{border:1px solid #F0E2C8;background:#fff;border-radius:999px;padding:6px 14px;font-family:inherit;cursor:pointer;color:#6B5646}
+.yearbar button.on{background:#3B2A1E;color:#fff;border-color:#3B2A1E}
+.drawer{background:#fff;border:1px solid #F0E2C8;border-radius:22px;padding:4px 14px;box-shadow:0 10px 24px -22px rgba(80,50,20,.35)}
+.drawer>summary{list-style:none;display:flex;align-items:center;gap:10px;min-height:54px;cursor:pointer;flex-wrap:wrap}
+.drawer>summary::-webkit-details-marker{display:none}
+.drawer>summary::after{content:'';width:10px;height:10px;border-right:2px solid #C9A77A;border-bottom:2px solid #C9A77A;transform:rotate(45deg);margin-left:auto;transition:transform .2s}
+.drawer[open]>summary::after{transform:rotate(-135deg)}
+.drawer[open]{padding-bottom:14px}
+.drawer>summary b{font-weight:400;font-size:17px}.drawer>summary .to{color:#C62828}
+.mname{font-size:20px}
+.minis{display:flex;gap:2px;margin-left:8px}.minis img,.minis .mono{border:2px solid #fff;border-radius:50%}
+.drawer.soft{background:#FFFBF3}
+.tlist{display:flex;flex-direction:column}
+.trow2{display:grid;grid-template-columns:60px minmax(0,1fr) minmax(0,1.2fr) auto;align-items:center;gap:10px;padding:8px 0;border-top:1px dashed #F3E7D2}
+.trow2:first-child{border-top:0}
+.trow2.now .sd{background:#FFE08A}
+.trow2 .rl{font-size:14px}
+.trow2 .tx{min-width:0}
+/* 숫자 카드 */
+.statgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:10px}
+.stat{display:flex;align-items:center;gap:12px;background:#fff;border:1px solid #F0E2C8;border-radius:18px;padding:12px 14px;font-family:inherit;color:#3B2A1E;cursor:pointer;text-align:left}
+.stat.flat{cursor:default}
+.stat span{display:flex;flex-direction:column}.stat b{font-weight:400;font-size:20px}.stat b small{font-size:13px;color:#A0703F}.stat small{font-size:12px;color:#8A6A4A}
+/* 사람별 카드 */
+.pgrid2{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:12px}
+.pcard2{background:#fff;border:1px solid #F0E2C8;border-radius:22px;padding:14px;display:flex;flex-direction:column;gap:12px;box-shadow:0 10px 24px -22px rgba(80,50,20,.35);content-visibility:auto;contain-intrinsic-size:220px}
+.pcard2.me{border:2px solid #C62828}
+.phead{display:flex;align-items:center;gap:12px;border:0;background:none;padding:0;font-family:inherit;color:inherit;text-align:left;cursor:pointer}
+.phead .tt{display:flex;flex-direction:column;flex:1;min-width:0}.phead .tt b{font-weight:400;font-size:19px}.phead .tt span{font-size:12px;color:#8A6A4A}
+.pstats{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.pstats span{display:flex;align-items:center;gap:6px;background:#FFFBF3;border-radius:12px;padding:8px 10px;font-size:12px;color:#8A6A4A}
+.pstats b{font-weight:400;font-size:18px;color:#3B2A1E}
+.pstats svg{color:#C62828;flex:none}
+.rolegrid{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.rolegrid span{background:#F6EAD3;border-radius:10px;padding:6px 8px;font-size:13px;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+/* 캘린더 기간 */
+.cday.inrange{background:#FDE3E1!important;outline:2px solid #E8A9A5}
+.rangebar{display:flex;align-items:center;gap:8px;background:#FDE3E1;color:#8E1B1B;border-radius:14px;padding:8px 12px;font-size:14px}
+.rangebar span{flex:1}
+.mydot{display:inline-block;width:8px;height:8px;border-radius:50%;background:#C62828;margin-left:4px;vertical-align:middle}
+.cday .clab em.span{border-radius:0;margin:0 -6px;padding-left:8px}
+.mtop{margin-top:10px}
+.cgrid{user-select:none;-webkit-user-select:none}
+@media (max-width:719px){
+  .rrow{grid-template-columns:96px 1fr}
+  .trow2{grid-template-columns:56px minmax(0,1fr) auto;grid-template-areas:"d v e" "d x x"}
+  .trow2 .sd{grid-area:d}.trow2 .tv{grid-area:v}.trow2 .tx{grid-area:x}.trow2 .editbtn{grid-area:e}
+  .trow2 .rl{grid-area:v}
+  .tilegrid{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .pgrid2{grid-template-columns:1fr}
+  .sungrid{grid-template-columns:1fr}
+  .statgrid{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+@media (min-width:1100px){.tilegrid{grid-template-columns:repeat(auto-fill,minmax(170px,1fr))}}
+.pastwrap{display:flex;flex-direction:column;gap:10px}.pastwrap .drawer{box-shadow:none}
 </style>
 </head>
 <body>
