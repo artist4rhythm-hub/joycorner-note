@@ -547,6 +547,30 @@ div.heroph{cursor:default}
 }
 @media (min-width:1100px){.tilegrid{grid-template-columns:repeat(auto-fill,minmax(170px,1fr))}}
 .pastwrap{display:flex;flex-direction:column;gap:10px}.pastwrap .drawer{box-shadow:none}
+/* ===== v9 ===== */
+.cdot.off{background:#3B2A1E}
+.cday .clab em.off{background:#3B2A1E;color:#fff}
+.kindgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(96px,1fr));gap:6px}
+.kindopt{display:flex;align-items:center;gap:6px;justify-content:center;border:1px solid #F0E2C8;background:#fff;border-radius:14px;min-height:44px;cursor:pointer;font-size:14px}
+.kindopt input{position:absolute;opacity:0;pointer-events:none}
+.kindopt.on{border:2px solid #C62828;background:#FFF4F3}
+.timebox{display:flex;flex-direction:column;gap:10px;background:#FFFBF3;border:1px solid #F0E2C8;border-radius:18px;padding:12px}
+.switch{display:flex;align-items:center;gap:10px;cursor:pointer;min-height:44px}
+.switch input{position:absolute;opacity:0}
+.switch .sw{width:46px;height:28px;border-radius:14px;background:#E3D3B8;position:relative;transition:background .2s;flex:none}
+.switch .sw::after{content:'';position:absolute;top:3px;left:3px;width:22px;height:22px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.2);transition:left .2s}
+.switch input:checked+.sw{background:#C62828}.switch input:checked+.sw::after{left:21px}
+.switch b{font-weight:400;font-size:16px}
+.quickt{display:flex;flex-wrap:wrap;gap:6px;align-items:center}.quickt .chip{cursor:pointer;border:1px solid #F0E2C8;background:#fff}
+input[type=time].in,input[type=date].in{font-family:inherit}
+.toolbar{display:flex;flex-wrap:wrap;gap:8px}
+.toolbar .sec{display:inline-flex;align-items:center;gap:4px}
+.addrow{display:flex;align-items:center;justify-content:center;gap:6px;width:100%;min-height:44px;border:2px dashed #E3C9A0;background:#FFFBF3;border-radius:14px;color:#8A5A2B;font-family:inherit;cursor:pointer;margin-bottom:10px}
+.evchips{display:flex;flex-wrap:wrap;gap:6px}
+.evchip{display:inline-flex;align-items:center;gap:6px;border:1px solid #F0E2C8;background:#FFFBF3;border-radius:12px;padding:5px 10px;font-family:inherit;font-size:13px;color:#3B2A1E;cursor:pointer}
+.evchip small{color:#8A6A4A;font-size:11px}
+.evchip.off{background:#3B2A1E;color:#fff;border-color:#3B2A1E}.evchip.off small{color:#ddd}
+.offnote{background:#F3ECE2;border-radius:14px;padding:12px;text-align:center;color:#6B5646}
 </style>
 </head>
 <body>

@@ -743,9 +743,10 @@ async function dutyDel() {
 }
 
 /* ---------- 교사실 (공지 · 캘린더 · 업무 분담 · 조직도 · 통계) ---------- */
-const APP_VERSION = 'v8';
+const APP_VERSION = 'v9';
 const APP_DATE = '2026-11-10';
 const CHANGELOG = [
+  { v: 'v9', date: '11월 11일', items: ['일정: 종일 또는 몇 시부터 몇 시까지', '순서표: 날짜 더하기 · 한 해 빈 주일 한 번에 만들기', '캘린더의 "예배 없음" 일정이 순서표·예배 탭에 함께 반영돼요', '주일 카드에 그날 일정이 함께 보여요', '눈 깜빡임: 두 번 → 다음, 세 번 → 이전'] },
   { v: 'v8', date: '11월 11일', items: ['순서표를 월별 서랍과 주일 카드로 정리 (아이콘 · 맡은 횟수 타일)', '헌금기도도 아이 얼굴 카드와 나이로', '선생님 색이 겹치지 않게, 사진을 넣으면 사진으로', '업무 분담 사람별 카드 · 반 올리기 화면을 가나다순 격자로', '위쪽 메뉴 칸 길이를 모든 화면에서 같게', '캘린더 기간 일정: 끌어서 고르기(컴퓨터) · 길게 눌러 고르기(폰)', '사진은 화면에 보일 때 불러와서 더 빨라졌어요'] },
   { v: 'v7', date: '11월 10일', items: ['권한 정리: 수퍼관리자 · 디렉터 · 시스템 관리자(데이터 담당) · 교사 · 헬퍼 선생님', '교사 돌봄 기록은 디렉터와 쓴 사람만 봐요', '이름 칸을 선생님 카드 고르기로 (업무 분담 · 주일 담당), 헬퍼 선생님 카드 바로 만들기', '교사실 순서표: 설교·기도 인도·챈트·율동·기타·헌금기도를 종류별로 한눈에, 사전 점검 표시', '캘린더에 주일 담당이 자동으로 보여요 · 내 순서 표시', '선생님 카드 사진을 눌러 바로 바꾸기', '사용 현황(수퍼관리자), 연도별 백업, 새해 반 올리기(디렉터)', '줄 바꿈 때 낱말이 끊기지 않게 정리'] },
   { v: 'v6', date: '11월 10일', items: ['조이코너 로고로 앱 아이콘을 바꿨어요', '사진은 10장까지, ‹ ›로 보는 순서를 정해요 (악보·공지·일정)', '악보 넘겨 보기: 전체 화면, 옆으로 밀어 넘기기, 페달·키보드, 눈 깜빡임(실험)', '교사 영혼 카드: 맡은 일, 다가오는 순서, 부재 시 대신할 분, 돌봄 기록', '업무 분담·조직도의 이름이 영혼 카드로 열려요', '캘린더 일정 상세: 사진·댓글, 부재 알리기, 설교 일정 누를 때 오류 고침', '도우미와 홈 화면 바로가기 안내, 새 버전 알림'] },
@@ -1014,7 +1015,7 @@ async function startBlink() {
   const video = document.createElement('video'); video.playsInline = true; video.muted = true; video.srcObject = stream; await video.play();
   box.innerHTML = ''; box.appendChild(video);
   const st = document.createElement('div'); st.className = 'vcamst'; box.appendChild(st);
-  const HINT = '두 번 깜빡 → 다음 · 길게 감기 → 이전';
+  const HINT = '두 번 깜빡 → 다음 · 세 번 깜빡 → 이전';
   st.textContent = HINT;
   const cam = VW.cam = { stream, video, lm, raf: 0, closed: false, t0: 0, last1: 0, cool: 0, lastT: -1, st, HINT };
   const btn = VW.el.querySelector('[data-v=blink]'); if (btn) btn.classList.add('on');
@@ -1033,8 +1034,16 @@ async function startBlink() {
         else if (cam.closed && sc < 0.35) {
           cam.closed = false; const dur = now - cam.t0;
           if (now > cam.cool) {
-            if (dur >= 700 && dur < 3000) { cam.last1 = 0; cam.cool = now + 900; vGo(-1); camFlash('◀ 이전 장'); }
-            else if (dur < 450) { if (now - cam.last1 < 800) { cam.last1 = 0; cam.cool = now + 900; vGo(1); camFlash('다음 장 ▶'); } else cam.last1 = now; }
+            if (dur < 500) {
+              cam.n = (now - (cam.lastEnd || 0) < 700) ? (cam.n || 0) + 1 : 1; cam.lastEnd = now;
+              clearTimeout(cam.tm);
+              cam.tm = setTimeout(() => {
+                if (VW.cam !== cam) return;
+                const n = cam.n; cam.n = 0;
+                if (n === 2) { cam.cool = performance.now() + 700; vGo(1); camFlash('다음 장 ▶'); }
+                else if (n >= 3) { cam.cool = performance.now() + 700; vGo(-1); camFlash('◀ 이전 장'); }
+              }, 650);
+            }
           }
         }
       } else box.classList.add('noface');
@@ -1178,19 +1187,11 @@ function vEvent() {
   return `<div class="scroll narrow"><div class="hd"><button class="back" data-act="calBack">← 캘린더</button>${can ? `<button class="sec sm2" data-act="eventEdit" data-id="${e.id}">고치기</button>` : ''}</div>
 <article class="article"><div class="eyebrow"><i class="cdot ${KIND_CLASS[e.kind] || 'evt'}"></i> ${esc(e.kind || '행사')} · 올린 사람 ${esc(e.byName || '')}</div>
 <h1 class="atitle">${esc(e.title)}</h1>
-<div class="when"><div><b>${fmtMD(e.date)} ${DOW[parseD(e.date).getDay()]}요일${e.endDate && e.endDate > e.date ? ` – ${fmtMD(e.endDate)} ${DOW[parseD(e.endDate).getDay()]}요일` : ''}</b>${e.time ? ` · ${esc(e.time)}` : ''}${e.place ? `<div class="sub">${esc(e.place)}</div>` : ''}</div><div class="btns"><a class="ghost alink sm2" href="${gcalUrl(e)}" target="_blank" rel="noopener">구글 캘린더에 추가</a></div></div>
+<div class="when"><div><b>${fmtMD(e.date)} ${DOW[parseD(e.date).getDay()]}요일${e.endDate && e.endDate > e.date ? ` – ${fmtMD(e.endDate)} ${DOW[parseD(e.endDate).getDay()]}요일` : ''}</b> · ${esc(timeText(e))}${e.place ? `<div class="sub">${esc(e.place)}</div>` : ''}</div><div class="btns"><a class="ghost alink sm2" href="${gcalUrl(e)}" target="_blank" rel="noopener">구글 캘린더에 추가</a></div></div>
 ${st ? `<div class="chips">${staffChip(st.name)}</div>${awayHandover(st)}` : ''}
 ${gallery('eventImages', e.id, e.imgCount, e.title)}
 ${e.memo ? `<div class="post">${linkify(e.memo)}</div>` : ''}</article>
 ${commentBlock(e.id, 'event')}</div>${nav('room')}`;
-}
-async function eventDel() {
-  const id = R.editEvent, e = R.events.find(x => x.id === id); if (!e) return;
-  try {
-    for (let i = 0; i < (e.imgCount || 0); i++) await deleteDoc(doc(db, 'eventImages', `${id}_${i}`)).catch(() => { });
-    await deleteDoc(doc(db, 'events', id)); R.events = R.events.filter(x => x.id !== id); closeSheet(); toast('지웠어요');
-    if (S.route === 'event') { R.tab = 'cal'; go('room'); } else paint();
-  } catch (err) { toast('지우지 못했어요: ' + errMsg(err)); }
 }
 
 /* ---------- 교사 영혼 카드 ---------- */
@@ -1350,7 +1351,7 @@ const HELP = [
   { id: 'attend', t: '출석 체크', ic: 'att', c: HC.att, go: 'attend', steps: [['아래 [출석] 누르기', '이번 주일 날짜로 열려요. ◀ ▶로 지난 주일도 고칠 수 있어요.'], ['친구 사진 한 번 누르기', '초록색이 되면 출석이에요. 다시 누르면 취소돼요.'], ['저절로 저장', '따로 저장 버튼이 없어요. 인터넷이 약하면 연결될 때 올라가요.']], tips: ['[전원 출석]을 누른 뒤 안 온 친구만 다시 눌러도 돼요', '새로 온 친구는 맨 아래 [새로 온 친구 등록]'] },
   { id: 'kids', t: '친구들 · 아이 카드', ic: 'kids', c: HC.kids, go: 'friends', steps: [['[친구들]에서 이름 누르기', '아이 카드가 열려요.'], ['사진 넣기', '대표 사진 1장과 추가 사진 2장을 넣을 수 있어요. 얼굴이 가운데 오게 맞춰요.'], ['돌봄 기록', '통화·문자·심방·기도제목을 골라 적어요. 기도제목은 위에 따로 모여요.']], tips: ['2주 이상 못 온 친구는 홈 [돌봄이 필요해요]에 보여요'] },
   { id: 'worship', t: '설교 · 악보', ic: 'music', c: HC.music, go: 'worship', steps: [['[예배] → 설교', '대본·퀴즈·자료 링크를 올리고 [점검 요청]을 누르면 디렉터가 확인해요.'], ['[예배] → 악보', '곡마다 악보 사진을 10장까지 올리고 ‹ ›로 순서를 정해요.'], ['악보 넘겨 보기', '위 빨간 버튼을 누르면 전체 화면으로 열려요.']] },
-  { id: 'score', t: '악보 넘기기', ic: 'score', c: HC.score, go: 'worship', steps: [['옆으로 밀기', '왼쪽으로 밀면 다음 장, 오른쪽으로 밀면 이전 장이에요. 맨 앞·맨 끝에서는 멈춰요.'], ['화면 양쪽 누르기', '오른쪽 가장자리는 다음, 왼쪽 가장자리는 이전, 가운데는 닫기예요.'], ['위아래로 밀기', '창이 닫혀요. 두 손가락으로 벌리면 크게 볼 수 있어요.'], ['페달 · 키보드', '블루투스 악보 페달(→, ↓, PageDown)과 키보드 화살표로도 넘어가요.'], ['눈 깜빡임 (실험)', '눈 모양 버튼을 누르고 카메라를 허용하면, 두 번 빠르게 깜빡일 때 다음 장, 1초쯤 감았다 뜨면 이전 장이에요. 영상은 휴대폰 안에서만 쓰여요.']], tips: ['악보를 보는 동안 화면이 꺼지지 않아요', '눈 깜빡임은 밝은 곳에서 얼굴이 화면 정면에 있을 때 잘 돼요'] },
+  { id: 'score', t: '악보 넘기기', ic: 'score', c: HC.score, go: 'worship', steps: [['옆으로 밀기', '왼쪽으로 밀면 다음 장, 오른쪽으로 밀면 이전 장이에요. 맨 앞·맨 끝에서는 멈춰요.'], ['화면 양쪽 누르기', '오른쪽 가장자리는 다음, 왼쪽 가장자리는 이전, 가운데는 닫기예요.'], ['위아래로 밀기', '창이 닫혀요. 두 손가락으로 벌리면 크게 볼 수 있어요.'], ['페달 · 키보드', '블루투스 악보 페달(→, ↓, PageDown)과 키보드 화살표로도 넘어가요.'], ['눈 깜빡임 (실험)', '눈 모양 버튼을 누르고 카메라를 허용하면, 두 번 빠르게 깜빡이면 다음 장, 세 번 빠르게 깜빡이면 이전 장이에요. 한 번 깜빡이는 건 넘어가지 않아요. 영상은 휴대폰 안에서만 쓰여요.']], tips: ['악보를 보는 동안 화면이 꺼지지 않아요', '눈 깜빡임은 밝은 곳에서 얼굴이 화면 정면에 있을 때 잘 돼요'] },
   { id: 'room', t: '교사실 · 공지 · 캘린더', ic: 'room', c: HC.room, go: 'room', steps: [['공지', '디렉터·관리자가 행사 안내를 사진·링크와 함께 올리고, 모두 댓글을 달 수 있어요.'], ['캘린더', '주일·행사·회의·부재·생일이 한 달 판에 보여요. 날짜를 누르고 [+ 일정]으로 올려요.'], ['일정 상세', '일정을 누르면 사진과 댓글이 있어요. [구글 캘린더에 추가]도 돼요.']] },
   { id: 'staff', t: '교사 영혼 카드 · 업무 분담', ic: 'staff', c: HC.staff, go: 'room', steps: [['이름을 누르면 카드', '업무 분담·조직도·캘린더의 선생님 이름을 누르면 영혼 카드가 열려요.'], ['맡은 일 한눈에', '역할, 다가오는 순서, 부재 시 대신할 분이 정리돼 있어요.'], ['부재 알리기', '못 오는 주일을 알리면 캘린더와 업무 분담에 대신할 분이 보여요.']], tips: ['교사 돌봄 기록은 쓴 사람과 디렉터만 봐요'] },
   { id: 'privacy', t: '누가 무엇을 보나', ic: 'lock', c: HC.lock },
@@ -1716,7 +1717,7 @@ function sundayCard(s, opts = {}) {
   const d = parseD(s.date), now = s.date === nextSunday();
   const keys = ['preacher', 'pray', 'nation', 'chant', 'dance', 'guitar', 'offering'];
   return `<article class="sunday ${now ? 'now' : ''} ${s.noService ? 'off' : ''}"><header><span class="sd"><b>${d.getMonth() + 1}/${d.getDate()}</b><small>주일</small></span><span class="st">${esc(s.story || (s.noService ? '조이코너 예배 없음' : '이야기 미정'))}</span>${now ? '<span class="tag">이번 주</span>' : ''}${checkBadge(s)}${isAdminMe() && !opts.noEdit ? `<button class="editbtn" data-act="schedEditDate" data-id="${s.date}" aria-label="${d.getMonth() + 1}월 ${d.getDate()}일 담당 고치기">${svg('<path d="M4 20h4L19 9l-4-4L4 16z"/>', 16, 1.8)}</button>` : ''}</header>
-${s.noService ? '' : `<div class="rrows">${sundayRows(s, keys)}</div>`}</article>`;
+${sundayEventsHtml(s.date)}${s.noService ? `<div class="offnote">${esc(s.noServiceNote || '이 주일은 조이코너 예배가 없어요')}</div>` : `<div class="rrows">${sundayRows(s, keys)}</div>`}</article>`;
 }
 function wWeek(d) {
   const s = schedFor(d) || { date: d };
@@ -1740,10 +1741,11 @@ function rTurns() {
   R.turnYear = R.turnYear || ymd(new Date()).slice(0, 4);
   R.openM = R.openM || {};
   const today = ymd(new Date()), me = myName(), Y = R.turnYear;
-  const years = [...new Set(S.schedule.map(r => r.date.slice(0, 4)))].sort();
+  const thisY = ymd(new Date()).slice(0, 4);
+  const years = [...new Set([...S.schedule.map(r => r.date.slice(0, 4)), thisY, String(Number(thisY) + 1)])].sort();
   const cats = [['all', '전체'], ['preacher', '설교'], ['pray', '중보기도'], ['nation', '나라 기도'], ['chant', '챈트'], ['dance', '율동'], ['guitar', '기타'], ['offering', '헌금기도'], ['mine', '내 순서']];
   const head = `<div class="catbar full">${cats.map(([k, l]) => `<button class="cat ${R.turnCat === k ? 'on' : ''}" data-act="turnCat" data-id="${k}">${ico(k, 20)}<span>${l}</span></button>`).join('')}</div>
-<div class="yearbar full">${years.map(y => `<button class="${y === Y ? 'on' : ''}" data-act="turnYear" data-id="${y}">${y}년</button>`).join('')}</div>`;
+<div class="yearbar full">${years.map(y => `<button class="${y === Y ? 'on' : ''}" data-act="turnYear" data-id="${y}">${y}년</button>`).join('')}</div>${turnTools(Y)}`;
   const rows = S.schedule.filter(r => r.date.slice(0, 4) === Y);
   const byMonth = {}; rows.forEach(r => { (byMonth[Number(r.date.slice(5, 7))] ||= []).push(r); });
   const curM = today.slice(0, 4) === Y ? Number(today.slice(5, 7)) : 0;
@@ -1768,7 +1770,7 @@ ${other.length ? `<div class="splbl">초청 · 그 밖에</div><div class="tileg
   };
   const months = Object.keys(byMonth).map(Number).sort((a, b) => a - b);
   const mini = list => { const names = [...new Set(list.flatMap(r => k === 'all' || k === 'mine' ? splitNames(r.preacher) : splitNames(r[k])))].filter(n => S.staff.some(s => s.name === n)).slice(0, 5); return names.map(n => staffAv(S.staff.find(s => s.name === n), 22)).join(''); };
-  const drawerM = m => `<details class="drawer full" data-dr="${Y}-${m}" ${isOpen(m) ? 'open' : ''}><summary><span class="mname">${MONTHS[m - 1]}</span><span class="s2">주일 ${byMonth[m].length}번${m === curM ? ' · 이번 달' : ''}</span><span class="minis">${mini(byMonth[m])}</span></summary>${monthBody(m, byMonth[m])}</details>`;
+  const drawerM = m => { const miss = isAdminMe() ? sundaysOfYear(Y, m).filter(d => !schedFor(d)).length : 0; return `<details class="drawer full" data-dr="${Y}-${m}" ${isOpen(m) ? 'open' : ''}><summary><span class="mname">${MONTHS[m - 1]}</span><span class="s2">주일 ${byMonth[m].length}번${m === curM ? ' · 이번 달' : ''}</span><span class="minis">${mini(byMonth[m])}</span></summary>${miss ? `<button class="addrow" data-act="turnFillM" data-id="${Y}-${m}">${svg('<path d="M12 5v14M5 12h14"/>', 16, 2.2)} 이 달 빈 주일 ${miss}번 더하기</button>` : ''}${monthBody(m, byMonth[m])}</details>`; };
   const ahead = curM ? months.filter(m => m >= curM) : months, past = curM ? months.filter(m => m < curM) : [];
   return `${head}${summary}${ahead.map(drawerM).join('')}${past.length ? `<details class="drawer full soft" data-dr="${Y}-past" ${R.openM[Y + '-past'] ? 'open' : ''}><summary><span class="mname">지난 달</span><span class="s2">${MONTHS[past[0] - 1]} – ${MONTHS[past[past.length - 1] - 1]}</span></summary><div class="pastwrap">${past.slice().reverse().map(drawerM).join('')}</div></details>` : ''}${months.length ? '' : '<div class="sub full">이 해의 일정표가 없어요.</div>'}`;
 }
@@ -1813,17 +1815,6 @@ ${plan.map(p => `<details class="drawer full" open><summary><b>${esc(p.c.name)}<
 
 /* ---------- 캘린더: 기간 일정 ---------- */
 const evSpan = e => e.endDate && e.endDate > e.date ? [e.date, e.endDate] : [e.date, e.date];
-function itemsOn(d) {
-  const out = [];
-  const s = schedFor(d);
-  if (s) out.push({ d, kind: 'sun', label: s.noService ? '조이코너 예배 없음' : (s.story || '주일 예배'), sub: s.preacher ? '설교 ' + s.preacher : '' });
-  (R.notices || []).filter(n => n.eventDate === d).forEach(n => out.push({ d, kind: 'evt', label: n.title, sub: n.eventTime || '', notice: n.id }));
-  (R.events || []).filter(e => { const [a, b] = evSpan(e); return a <= d && d <= b; }).forEach(e => { const [a, b] = evSpan(e); out.push({ d, kind: KIND_CLASS[e.kind] || 'evt', label: e.title, sub: [a !== b ? `${fmtShort(a)}–${fmtShort(b)}` : '', e.time, e.place].filter(Boolean).join(' · '), event: e.id, span: a !== b, first: d === a }); });
-  const md = d.slice(5);
-  allKids().filter(k => (k.status || 'active') === 'active' && k.birth && k.birth.slice(5) === md).forEach(k => out.push({ d, kind: 'bday', label: k.name + ' 생일', sub: (S.classes[k.classId] || {}).name || '', kid: k.id }));
-  S.staff.filter(st => st.birth && st.birth.slice(5) === md).forEach(st => out.push({ d, kind: 'bday', label: st.name + ' 선생님 생일', sub: '', staff: st.id }));
-  return out;
-}
 const fmtShort = s => `${parseD(s).getMonth() + 1}/${parseD(s).getDate()}`;
 function rCal() {
   const today = ymd(new Date());
@@ -1867,47 +1858,147 @@ function calDayPick(id) {
   if (R.range && !R.range.end) { const [a, b] = [R.range.start, id].sort(); R.range = null; paint(); return eventSheet(null, { date: a, endDate: b === a ? '' : b }); }
   R.day = id; R.month = id.slice(0, 7); paint();
 }
+
+/* ================= v9 · 시간 · 주일 추가 · 캘린더 연동 ================= */
+
+/* ---------- 시간 ---------- */
+function timeText(e) {
+  if (!e) return '';
+  if (e.allDay || (!e.time && !e.endTime)) return '종일';
+  return e.endTime ? `${e.time}–${e.endTime}` : e.time;
+}
 function gcalUrl(e) {
-  const d = (e.date || '').replace(/-/g, '');
+  const D = s => s.replace(/-/g, '');
+  const end = e.endDate && e.endDate > e.date ? e.endDate : e.date;
+  const tm = s => { const m = /^(\d{1,2}):(\d{2})/.exec(s || ''); return m ? `${pad(m[1])}${m[2]}00` : ''; };
   let dates;
-  const m = /^(\d{1,2}):(\d{2})/.exec(e.time || '');
-  if (e.endDate && e.endDate > e.date) dates = `${d}/${addDays(e.endDate, 1).replace(/-/g, '')}`;
-  else if (m) { const st = `${d}T${pad(m[1])}${m[2]}00`; const end = new Date(parseD(e.date).getTime()); end.setHours(Number(m[1]) + 1, Number(m[2])); dates = `${st}/${ymd(end).replace(/-/g, '')}T${pad(end.getHours())}${pad(end.getMinutes())}00`; }
-  else dates = `${d}/${addDays(e.date, 1).replace(/-/g, '')}`;
+  if (e.allDay || !tm(e.time)) dates = `${D(e.date)}/${D(addDays(end, 1))}`;
+  else {
+    let et = tm(e.endTime);
+    if (!et) { const h = Number(e.time.split(':')[0]) + 1; et = `${pad(Math.min(h, 23))}${e.time.split(':')[1]}00`; }
+    dates = `${D(e.date)}T${tm(e.time)}/${D(end)}T${et}`;
+  }
   const p = new URLSearchParams({ action: 'TEMPLATE', text: e.title || '', dates, details: (e.memo || '').slice(0, 500), location: e.place || '', ctz: 'Asia/Seoul' });
   return 'https://calendar.google.com/calendar/render?' + p.toString();
 }
+function itemsOn(d) {
+  const out = [];
+  const s = schedFor(d);
+  if (s && !(s.noService && s.noServiceBy && (R.events || []).some(e => e.id === s.noServiceBy))) out.push({ d, kind: s.noService ? 'off' : 'sun', label: s.noService ? (s.noServiceNote || '조이코너 예배 없음') : (s.story || '주일 예배'), sub: s.noService ? '' : (s.preacher ? '설교 ' + s.preacher : '') });
+  (R.notices || []).filter(n => n.eventDate === d).forEach(n => out.push({ d, kind: 'evt', label: n.title, sub: n.eventTime || '', notice: n.id }));
+  (R.events || []).filter(e => { const [a, b] = evSpan(e); return a <= d && d <= b; }).forEach(e => { const [a, b] = evSpan(e); out.push({ d, kind: e.kind === '예배 없음' ? 'off' : (KIND_CLASS[e.kind] || 'evt'), label: e.title, sub: [a !== b ? `${fmtShort(a)}–${fmtShort(b)}` : '', timeText(e), e.place].filter(Boolean).join(' · '), event: e.id, span: a !== b, first: d === a }); });
+  const md = d.slice(5);
+  allKids().filter(k => (k.status || 'active') === 'active' && k.birth && k.birth.slice(5) === md).forEach(k => out.push({ d, kind: 'bday', label: k.name + ' 생일', sub: (S.classes[k.classId] || {}).name || '', kid: k.id }));
+  S.staff.filter(st => st.birth && st.birth.slice(5) === md).forEach(st => out.push({ d, kind: 'bday', label: st.name + ' 선생님 생일', sub: '', staff: st.id }));
+  return out;
+}
+const dayEvents = d => itemsOn(d).filter(x => x.notice || x.event);
+
+/* ---------- 일정 넣기 (종일 / 몇 시부터 몇 시까지) ---------- */
 async function eventSheet(id, preset) {
-  const e = id ? R.events.find(x => x.id === id) : Object.assign({ title: '', date: R.day || ymd(new Date()), endDate: '', time: '', place: '', memo: '', kind: '행사', imgCount: 0 }, preset || {});
+  const e = id ? R.events.find(x => x.id === id) : Object.assign({ title: '', date: R.day || ymd(new Date()), endDate: '', allDay: true, time: '', endTime: '', place: '', memo: '', kind: '행사', imgCount: 0 }, preset || {});
   if (!e) return;
+  const allDay = e.allDay !== undefined ? e.allDay : !e.time;
   R.editEvent = id || null; R.editPreset = preset || null;
   pkInit('event', id ? await loadImgs('eventImages', id, e.imgCount) : [], 'photo');
+  const kinds = ['행사', '회의', '교육', '부재', '기타'].concat(isAdminMe() ? ['예배 없음'] : []);
   sheet(`<div class="ttl" style="font-size:24px">${id ? '일정 고치기' : (e.kind === '부재' ? '부재 알리기' : '일정 추가')}</div>
-<label class="fld">제목<input class="in" id="e2_title" value="${esc(e.title)}"></label>
-<div class="two"><label class="fld">시작 날짜<input class="in" type="date" id="e2_date" value="${esc(e.date)}"></label><label class="fld">끝 날짜 (하루면 비워 두세요)<input class="in" type="date" id="e2_end" value="${esc(e.endDate || '')}"></label></div>
-<div class="two"><label class="fld">시간<input class="in" id="e2_time" value="${esc(e.time || '')}" placeholder="예: 13:30"></label><label class="fld">종류<select class="in" id="e2_kind">${['행사', '회의', '교육', '부재', '기타'].map(k => `<option ${e.kind === k ? 'selected' : ''}>${k}</option>`).join('')}</select></label></div>
+<label class="fld">제목<input class="in" id="e2_title" value="${esc(e.title)}" placeholder="예: 교사 리트릿"></label>
+<div class="fld">종류</div><div class="kindgrid">${kinds.map(k => `<label class="kindopt ${e.kind === k ? 'on' : ''}"><input type="radio" name="e2_kind" value="${k}" ${e.kind === k ? 'checked' : ''}><i class="cdot ${k === '예배 없음' ? 'off' : (KIND_CLASS[k] || 'evt')}"></i>${k}</label>`).join('')}</div>
+<div class="s2" id="e2_offnote" ${e.kind === '예배 없음' ? '' : 'hidden'}>이 기간의 주일은 순서표와 예배 탭에 "조이코너 예배 없음"으로 함께 바뀌어요.</div>
+<div class="timebox">
+<div class="two"><label class="fld">시작 날짜<input class="in" type="date" id="e2_date" value="${esc(e.date)}"></label><label class="fld">끝 날짜 <span class="s2">(하루면 비워 두세요)</span><input class="in" type="date" id="e2_end" value="${esc(e.endDate || '')}"></label></div>
+<label class="switch"><input type="checkbox" id="e2_allday" ${allDay ? 'checked' : ''}><span class="sw"></span><b>종일</b><span class="s2">시간 없이 하루 종일</span></label>
+<div class="two" id="e2_times" ${allDay ? 'hidden' : ''}><label class="fld">시작 시간<input class="in" type="time" id="e2_time" value="${esc(e.time || '')}" step="300"></label><label class="fld">끝 시간<input class="in" type="time" id="e2_etime" value="${esc(e.endTime || '')}" step="300"></label></div>
+<div class="quickt" id="e2_quick" ${allDay ? 'hidden' : ''}>${['09:00', '11:00', '12:00', '13:30', '15:00', '19:30'].map(t => `<button type="button" class="chip sm" data-act="quickTime" data-id="${t}">${t}</button>`).join('')}<span class="s2">시작 시간을 누르면 끝 시간은 1시간 뒤로 맞춰져요</span></div>
+</div>
 <label class="fld">장소<input class="in" id="e2_place" value="${esc(e.place || '')}"></label>
 <label class="fld">메모<textarea id="e2_memo" style="min-height:70px">${esc(e.memo || '')}</textarea></label>
 <div class="fld">사진 (최대 10장)</div>${pkHtml('event')}
 <div class="sub" id="e2_msg"></div>
 <div class="btns"><button class="pri" data-act="eventSave">저장</button><button class="sec" data-act="sheetClose">취소</button></div>
 ${id ? '<button class="ghost danger" data-act="eventDel">일정 지우기</button>' : ''}`);
+  const box = $('#sheet');
+  box.addEventListener('change', ev => {
+    if (ev.target.id === 'e2_allday') { const on = ev.target.checked; $('#e2_times').hidden = on; $('#e2_quick').hidden = on; }
+    if (ev.target.name === 'e2_kind') { box.querySelectorAll('.kindopt').forEach(l => l.classList.toggle('on', l.querySelector('input').checked)); $('#e2_offnote').hidden = ev.target.value !== '예배 없음'; }
+    if (ev.target.id === 'e2_time' && ev.target.value && !$('#e2_etime').value) $('#e2_etime').value = plusHour(ev.target.value);
+  });
+}
+const plusHour = t => { const [h, m] = t.split(':').map(Number); return `${pad(Math.min(23, h + 1))}:${pad(m)}`; };
+function sundaysIn(a, b) { const out = []; let d = parseD(a); const end = parseD(b || a); d.setDate(d.getDate() + ((7 - d.getDay()) % 7)); while (d <= end) { out.push(ymd(d)); d.setDate(d.getDate() + 7); } return out; }
+async function linkNoService(eventId, oldEv, newEv) {
+  const oldS = oldEv && oldEv.kind === '예배 없음' ? sundaysIn(...evSpan(oldEv)) : [];
+  const newS = newEv && newEv.kind === '예배 없음' ? sundaysIn(...evSpan(newEv)) : [];
+  const b = writeBatch(db); let n = 0;
+  oldS.filter(d => !newS.includes(d)).forEach(d => { const s = schedFor(d); if (s && s.noServiceBy === eventId) { b.set(doc(db, 'schedule', d), { noService: false, noServiceBy: '', noServiceNote: '' }, { merge: true }); Object.assign(s, { noService: false, noServiceBy: '', noServiceNote: '' }); n++; } });
+  newS.forEach(d => { const patch = { date: d, noService: true, noServiceBy: eventId, noServiceNote: newEv.title }; b.set(doc(db, 'schedule', d), patch, { merge: true }); const s = schedFor(d); if (s) Object.assign(s, patch); else { S.schedule.push({ id: d, ...patch }); S.schedule.sort((x, y) => ko(x.date, y.date)); } n++; });
+  if (n) await b.commit();
+  return newS.length;
 }
 async function eventSave() {
   if (PK.event && PK.event.busy) return toast('사진을 준비하고 있어요. 잠시만요');
-  const id = R.editEvent, old = id ? R.events.find(x => x.id === id) : null, pre = R.editPreset || {};
+  const id = R.editEvent, old = id ? { ...R.events.find(x => x.id === id) } : null, pre = R.editPreset || {};
   const title = val('e2_title'); if (!title) return toast('제목을 적어 주세요');
   const date = val('e2_date') || R.day; let endDate = val('e2_end'); if (endDate && endDate <= date) endDate = '';
+  const allDay = $('#e2_allday').checked, time = allDay ? '' : val('e2_time'), endTime = allDay ? '' : val('e2_etime');
+  if (!allDay && !time) return toast('시작 시간을 넣거나 "종일"을 켜 주세요');
+  if (!allDay && endTime && !endDate && endTime <= time) return toast('끝 시간이 시작 시간보다 늦어야 해요');
+  const kind = (document.querySelector('input[name=e2_kind]:checked') || {}).value || '행사';
   const ref = id ? doc(db, 'events', id) : doc(collection(db, 'events'));
-  const data = { title, date, endDate, time: val('e2_time'), kind: val('e2_kind'), place: val('e2_place'), memo: $('#e2_memo').value.trim(), staffId: old ? (old.staffId || '') : (pre.staffId || ''), imgCount: 0, by: old ? old.by : S.me.email, byName: old ? old.byName : myName() };
+  const data = { title, date, endDate, allDay, time, endTime, kind, place: val('e2_place'), memo: $('#e2_memo').value.trim(), staffId: old ? (old.staffId || '') : (pre.staffId || ''), imgCount: 0, by: old ? old.by : S.me.email, byName: old ? old.byName : myName() };
   const msg = $('#e2_msg'); msg.textContent = '저장 중…';
   try {
     data.imgCount = await pkSave('event', 'eventImages', ref.id, { eventId: ref.id }, old ? old.imgCount : 0);
     await setDoc(ref, data);
-    if (old) Object.assign(old, data); else R.events.push({ id: ref.id, ...data });
+    const live = R.events.find(x => x.id === ref.id);
+    if (live) Object.assign(live, data); else R.events.push({ id: ref.id, ...data });
+    let linked = 0;
+    if (isAdminMe() && (kind === '예배 없음' || (old && old.kind === '예배 없음'))) linked = await linkNoService(ref.id, old, data);
     R.day = data.date; R.month = data.date.slice(0, 7);
-    closeSheet(); toast('저장했어요'); if (S.route === 'event' && S.arg === ref.id) paint(); else if (S.route === 'staff' || (S.route === 'room' && R.tab === 'cal')) paint(); else go('event/' + ref.id);
+    closeSheet(); toast(linked ? `저장했어요 · 주일 ${linked}번을 "예배 없음"으로 바꿨어요` : '저장했어요');
+    if (S.route === 'event' && S.arg === ref.id) paint(); else if (S.route === 'staff' || (S.route === 'room' && R.tab === 'cal')) paint(); else go('event/' + ref.id);
   } catch (err) { msg.textContent = ''; toast('저장하지 못했어요: ' + errMsg(err)); }
+}
+async function eventDel() {
+  const id = R.editEvent, e = R.events.find(x => x.id === id); if (!e) return;
+  try {
+    for (let i = 0; i < (e.imgCount || 0); i++) await deleteDoc(doc(db, 'eventImages', `${id}_${i}`)).catch(() => { });
+    if (e.kind === '예배 없음' && isAdminMe()) await linkNoService(id, e, null);
+    await deleteDoc(doc(db, 'events', id)); R.events = R.events.filter(x => x.id !== id); closeSheet(); toast('지웠어요');
+    if (S.route === 'event') { R.tab = 'cal'; go('room'); } else paint();
+  } catch (err) { toast('지우지 못했어요: ' + errMsg(err)); }
+}
+
+/* ---------- 순서표에 주일 더하기 ---------- */
+function sundaysOfYear(y, m) {
+  const out = []; const d = new Date(Number(y), m ? m - 1 : 0, 1); d.setDate(d.getDate() + ((7 - d.getDay()) % 7));
+  while (d.getFullYear() === Number(y) && (!m || d.getMonth() === m - 1)) { out.push(ymd(d)); d.setDate(d.getDate() + 7); }
+  return out;
+}
+async function fillSundays(dates) {
+  const miss = dates.filter(d => !schedFor(d)); if (!miss.length) return toast('이미 다 있어요');
+  try {
+    for (let i = 0; i < miss.length; i += 400) { const b = writeBatch(db); miss.slice(i, i + 400).forEach(d => b.set(doc(db, 'schedule', d), { date: d }, { merge: true })); await b.commit(); }
+    miss.forEach(d => S.schedule.push({ id: d, date: d })); S.schedule.sort((a, b) => ko(a.date, b.date));
+    toast(`주일 ${miss.length}번을 만들었어요. 카드의 연필을 눌러 채워 주세요`); paint();
+  } catch (e) { toast('만들지 못했어요: ' + errMsg(e)); }
+}
+function turnAddSheet() {
+  let d = nextSunday(); while (schedFor(d)) d = addDays(d, 7);
+  sheet(`<div class="ttl" style="font-size:24px">일정표에 날짜 더하기</div>
+<div class="sub">보통은 주일이에요. 특별 예배처럼 다른 날도 넣을 수 있어요.</div>
+<label class="fld">날짜<input class="in" type="date" id="ta_date" value="${d}"></label>
+<div class="btns"><button class="pri" data-act="turnAddGo">담당 넣기</button><button class="sec" data-act="sheetClose">취소</button></div>`);
+}
+function turnTools(Y) {
+  if (!isAdminMe()) return '';
+  const miss = sundaysOfYear(Y).filter(d => !schedFor(d)).length;
+  return `<div class="toolbar full"><button class="sec sm2" data-act="turnAdd">${svg('<path d="M12 5v14M5 12h14"/>', 16, 2.2)} 날짜 더하기</button>${miss ? `<button class="ghost sm2" data-act="turnFill" data-id="${Y}">${Y}년 빈 주일 ${miss}번 만들기</button>` : ''}</div>`;
+}
+function sundayEventsHtml(d) {
+  const ev = dayEvents(d); if (!ev.length) return '';
+  return `<div class="evchips">${ev.map(x => `<button class="evchip ${x.kind}" ${itemAct(x)}><i class="cdot ${x.kind}"></i>${esc(x.label)}${x.sub ? `<small>${esc(x.sub)}</small>` : ''}</button>`).join('')}</div>`;
 }
 
 /* ---------- 클릭 처리 ---------- */
@@ -1948,6 +2039,9 @@ const ACT = {
   calMonth: d => { const [y, m] = R.month.split('-').map(Number); const n = new Date(y, m - 1 + Number(d.n), 1); R.month = `${n.getFullYear()}-${pad(n.getMonth() + 1)}`; paint(); },
   calDay: d => calDayPick(d.id), rangeCancel: () => { R.range = null; paint(); },
   turnYear: d => { R.turnYear = d.id; paint(); },
+  turnAdd: turnAddSheet, turnAddGo: () => { const d = val('ta_date'); if (!d) return toast('날짜를 골라 주세요'); closeSheet(); schedSheet(d); },
+  turnFill: d => fillSundays(sundaysOfYear(d.id)), turnFillM: d => { const [y, m] = d.id.split('-'); fillSundays(sundaysOfYear(y, Number(m))); },
+  quickTime: d => { const t = $('#e2_time'), e = $('#e2_etime'); if (t) t.value = d.id; if (e) e.value = plusHour(d.id); },
   calGo: d => { R.tab = 'cal'; R.day = d.id; R.month = d.id.slice(0, 7); go('room'); },
   eventNew: () => eventSheet(null), eventEdit: d => eventSheet(d.id), eventSave, eventDel,
   dutyView: d => { R.dutyView = d.id; paint(); },
