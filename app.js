@@ -188,7 +188,7 @@ function vAttend() {
 <div class="scroll" style="padding-top:8px">${classChips()}
 <div class="story">${sch ? (sch.noService ? '이 주일은 조이코너 예배가 없어요' : '오늘의 이야기 · ' + esc(sch.story || '')) : ''}${S.pending ? ' · 인터넷이 연결되면 저절로 올라가요' : ''}</div>
 <div style="display:flex;align-items:center;justify-content:space-between;gap:8px"><p class="hint">한 번 누르면 출석, 다시 누르면 취소</p><button class="ghost" style="min-height:40px;padding:0 14px;font-size:13px;flex:none" data-act="clearAsk">다시 하기</button></div>
-<div class="grid">${kids.map(k => { const on = marks[k.id] === 'p'; return `<button class="kid ${on ? 'on' : ''}" data-act="toggle" data-id="${k.id}" aria-pressed="${on}"><span class="stamp">${svg(ICON.check, 18, 3)}</span>${avatar(k, 64)}<b class="nm">${esc(k.name)}</b><span class="st">${on ? '왔어요' : '아직'}</span></button>`; }).join('')}</div>
+<div class="grid">${kids.map(k => { const on = marks[k.id] === 'p'; return `<button class="kid ${on ? 'on' : ''} ${k.gender ? 'g-' + k.gender : ''}" data-act="toggle" data-id="${k.id}" aria-pressed="${on}"><span class="stamp">${svg(ICON.check, 18, 3)}</span><span class="kav">${avatar(k, 84)}</span><b class="nm">${esc(k.name)}${genderMark(k)}</b><span class="st">${on ? '왔어요' : '아직'}</span></button>`; }).join('')}</div>
 <button class="addkid" data-act="addKid">+ 새로 온 친구 등록</button><button class="ghost" data-act="go" data-to="stats">출석 통계 보기</button></div>${nav('attend')}`;
 }
 function ensureAttWatch() {
@@ -223,7 +223,8 @@ function vFriends() {
     const n = streak(c, k);
     return `<button class="row" data-act="kid" data-id="${k.id}" data-name="${esc(k.name)}">${avatar(k, 48)}<span class="grow"><span class="nm">${esc(k.name)}</span><span class="sub">${k.birth ? k.birth.replace(/-/g, '.') + ' 생' : '생일 모름'}</span></span>${n >= 2 ? `<span class="tag">${n}주 결석</span>` : ''}${(k.flags || []).filter(f => f !== '장기결석').map(f => `<span class="tag g">${esc(f)}</span>`).join('')}</button>`;
   };
-  return `<div class="scroll"><div class="ttl">친구들</div>${classChips()}
+  const noG = activeKids(c).filter(k => !k.gender).length;
+  return `<div class="scroll"><div class="ttl">친구들</div>${classChips()}${noG ? `<button class="gnote" data-act="gBulk">${svg('<circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/>', 18, 1.9)}<span>남자 · 여자 아직 모르는 친구 <b>${noG}명</b></span><span class="chev">정하기 ›</span></button>` : ''}
 <input class="search" id="q" type="search" placeholder="이름으로 찾기" autocomplete="off">
 <div class="list klist" id="klist">${kids.map(row).join('')}</div>
 ${arch.length ? (S.showArchived ? `<div class="lbl">함께하지 않는 친구</div><div class="list">${arch.map(row).join('')}</div>` : `<button class="ghost" data-act="showArch">함께하지 않는 친구 ${arch.length}명 보기</button>`) : ''}
@@ -251,14 +252,14 @@ function vKid() {
   const c = k.classId, kd = S.kidData && S.kidFor === k.id ? S.kidData : null, fam = S.fam[k.familyId] || kd?.fam;
   const slot = (s, cls, label) => {
     const src = kd?.photos?.[s] || (s === 'main' ? k.thumb : null);
-    return `<button class="slot ${cls}" data-act="photo" data-slot="${s}" aria-label="${label} 사진 바꾸기">${src ? `<img src="${src}" alt="${esc(k.name)} ${label}">` : `사진 넣기`}<span class="plus">+</span></button>`;
+    return src ? `<div class="slot has ${cls}"><button class="sview" data-act="kidZoom" data-slot="${s}" aria-label="${label} 사진 크게 보기" style="--bg:url('${src}')"><img src="${src}" alt="${esc(k.name)} ${label}"></button><button class="plus" data-act="photo" data-slot="${s}" aria-label="${label} 사진 바꾸기">+</button></div>` : `<button class="slot ${cls}" data-act="photo" data-slot="${s}" aria-label="${label} 사진 넣기">사진 넣기<span class="plus">+</span></button>`;
   };
   const ds = recorded(c).slice(-8);
   const p = (who, nm, cell, tel, role) => nm ? `<div class="person"><div><b>${esc(nm)}</b> <span class="sub">${role}</span>${cell ? `<div class="cell">${esc(/^\d?[A-Za-z]?\d+$/.test(cell) ? '셀 ' + cell : cell)}</div>` : ''}</div>${tel ? `<div class="contact"><a href="tel:${esc(tel)}">전화</a><a href="sms:${esc(tel)}">문자</a></div>` : ''}</div>` : '';
   const n = streak(c, k);
   return `<div class="scroll cols"><div class="hd"><button class="back" data-act="back">← 친구들</button><button class="sec" data-act="editKid" style="min-height:44px">고치기</button></div>
 <div class="rowtop"><div><div class="ttl">${esc(k.name)}</div><div class="sub">${esc(S.classes[c]?.name || '')} · ${k.birth ? k.birth.replace(/-/g, '.') + ' 생' : '생일 모름'}</div></div></div>
-<div class="chips">${n >= 2 ? `<span class="tag">${n}주째 결석</span>` : ''}${(k.flags || []).map(f => `<span class="tag g">${esc(f)}</span>`).join('')}${k.remark ? `<span class="chip sm">${esc(k.remark)}</span>` : ''}</div>
+<div class="chips gchips">${genderPick(k)}${n >= 2 ? `<span class="tag">${n}주째 결석</span>` : ''}${(k.flags || []).map(f => `<span class="tag g">${esc(f)}</span>`).join('')}${k.remark ? `<span class="chip sm">${esc(k.remark)}</span>` : ''}</div>
 ${k.note ? `<div class="note">${esc(k.note)}</div>` : ''}
 <div class="photos">${slot('main', 'main', '대표')}${slot('1', '', '추가1')}${slot('2', '', '추가2')}</div>
 <section class="card"><div class="lbl"><span>최근 출석</span></div>${ds.length ? `<div class="dots">${ds.map(d => { const v = S.att[c][d][k.id] === 'p' ? 'p' : 'a'; const dd = parseD(d); return `<div class="dot"><i class="${(k.since && d < k.since) ? '' : v}"></i>${dd.getMonth() + 1}/${dd.getDate()}</div>`; }).join('')}</div><div class="sub">초록은 왔어요, 분홍은 못 왔어요</div>` : `<div class="sub">아직 출석 기록이 없어요.</div>`}</section>
@@ -415,6 +416,7 @@ function editKidSheet() {
   sheet(`<div class="ttl" style="font-size:24px">${esc(k.name)} 고치기</div>
 <label class="fld">이름<input class="in" id="e_name" value="${esc(k.name)}"></label>
 <label class="fld">생일<input class="in" id="e_birth" type="date" value="${esc(k.birth || '')}"></label>
+<div class="fld">성별</div><div class="seg gseg">${[['m', '남자 아이'], ['f', '여자 아이'], ['', '모름']].map(([v, l]) => `<button type="button" class="${(k.gender || '') === v ? 'on' : ''}" data-act="gsel" data-id="${v}">${l}</button>`).join('')}</div><input type="hidden" id="e_gender" value="${esc(k.gender || '')}">
 <label class="fld">메모<input class="in" id="e_remark" value="${esc(k.remark || '')}" placeholder="예: 알레르기, 좋아하는 것"></label>
 <label class="chk"><input type="checkbox" id="e_long" ${(k.flags || []).includes('장기결석') ? 'checked' : ''}>장기결석으로 표시</label>
 <div class="two"><label class="fld">아버지<input class="in" id="e_fn" value="${esc(f.father || '')}"></label><label class="fld">아버지 연락처<input class="in" id="e_ft" type="tel" value="${esc(f.fatherTel || '')}"></label></div>
@@ -426,7 +428,7 @@ ${admin ? `<div class="two"><label class="fld">반<select class="in" id="e_cls">
 async function saveKid() {
   const k = findKid(S.arg), name = val('e_name'); if (!name) return toast('이름을 적어 주세요');
   const flags = (k.flags || []).filter(x => x !== '장기결석'); if ($('#e_long').checked) flags.push('장기결석');
-  const patch = { name, birth: val('e_birth'), remark: val('e_remark'), flags };
+  const patch = { name, birth: val('e_birth'), remark: val('e_remark'), flags, gender: val('e_gender') };
   const admin = S.me.role === 'admin'; const oldClass = k.classId;
   if (admin) { patch.classId = val('e_cls') || k.classId; patch.status = val('e_status') || 'active'; }
   const fpatch = { father: val('e_fn'), fatherTel: val('e_ft'), fatherCell: val('e_fc'), mother: val('e_mn'), motherTel: val('e_mt'), motherCell: val('e_mc') };
@@ -729,9 +731,10 @@ async function dutyDel() {
 }
 
 /* ---------- 교사실 (공지 · 캘린더 · 업무 분담 · 조직도 · 통계) ---------- */
-const APP_VERSION = 'v13';
+const APP_VERSION = 'v14';
 const APP_DATE = '2026-11-11';
 const CHANGELOG = [
+  { v: 'v14', date: '11월 11일', items: ['순서표에서 "기타" 빼기 (찬양팀이 맡아요)', '출석 카드: 사진을 크게, 이름과 가운데 정렬', '남자 · 여자 표시: 아이 카드에서 한 번 누르거나, 친구들 → "아직 모르는 친구 정하기"로 한꺼번에', '아이 카드 사진이 잘리지 않게 원본 비율로, 누르면 크게 보기'] },
   { v: 'v13', date: '11월 11일', items: ['"지금 새로고침"이 눌리지 않던 것 고침 (새 파일을 확실히 받아서 다시 열어요)', '모든 선생님이 모든 반 아이를 보고, 누구나 어느 반이든 출석 체크', '주일 자료 링크: 설교 슬라이드 · OX 퀴즈 · 활동지 · BGM · 영상 (파일은 공용 구글 드라이브, 앱에는 링크만)', '업무 분담을 구역별 역할 카드 보드로 · 역할에서 빼면 메모와 교사 카드의 맡은 일에서도 빠져요', '교사 카드 빼기 → "그만두신 선생님" 보관함 (디렉터 · 관리자만, 되돌리기 가능)', '조직도에 모든 선생님 (헬퍼 선생님은 따로 풀로)', '예배 · 교사실 화면 폭과 위쪽 탭을 모두 같게, 캘린더 "다가오는 3주" 목록 정리'] },
   { v: 'v12', date: '11월 11일', items: ['자료 내려받기: 아이 명단 · 출석부 · 생일 달력 · 교사 명단 · 업무 분담 · 순서표 · 일정 · 주일 인원 · 찬양을 PDF나 엑셀로', '전체 자료를 엑셀 한 파일로 (관리자)', '연간 일정 한 번에 넣기: 엑셀 양식 내려받기 → 채워서 올리기 → 바뀌는 것 확인 → 적용', '홈 위쪽에 앱 버전 (누르면 업데이트 기록)', '일정에 "내용" 칸 (제목 바로 아래, 캘린더 목록에도 첫 줄이 보여요)'] },
   { v: 'v11', date: '11월 11일', items: ['카톡 교사방 기록 가져오기: 주일 찬양 5년치 · 주일 인원 · 올해 행사 (있는 값은 그대로, 빈칸만)', '교사실 → 통계: 주일 인원 막대 그래프 · 해마다 비교 · 이번 주 넣기', '예배 → 악보: 지난 찬양 찾기 (언제 · 몇 번 · 키 · 빠르기)', '곡마다 악기 · 빠르기(♩) 칸'] },
@@ -1454,7 +1457,7 @@ async function spNew(id, textOnly) {
 const spVal = id => (SP[id] || []).join(', ');
 
 /* ---------- 주일 담당 (일정표) ---------- */
-const TURN_KEYS = [['preacher', '설교'], ['pray', '중보기도 인도'], ['nation', '성전건축·나라 기도'], ['chant', '챈트'], ['dance', '율동'], ['guitar', '기타·메트로놈']];
+const TURN_KEYS = [['preacher', '설교'], ['pray', '중보기도 인도'], ['nation', '성전건축·나라 기도'], ['chant', '챈트'], ['dance', '율동']];  // v14 — 기타는 찬양팀이 맡아서 순서표에서 뺐어요
 function schedSheet(dateArg) {
   const d = typeof dateArg === 'string' && /^\d{4}-/.test(dateArg) ? dateArg : W.date;
   S.schedDate = d;
@@ -1705,7 +1708,7 @@ function namesHtml(v) {
 }
 function sundayCard(s, opts = {}) {
   const d = parseD(s.date), now = s.date === nextSunday();
-  const keys = ['preacher', 'pray', 'nation', 'chant', 'dance', 'guitar', 'offering'];
+  const keys = ['preacher', 'pray', 'nation', 'chant', 'dance', 'offering'];
   return `<article class="sunday ${now ? 'now' : ''} ${s.noService ? 'off' : ''}"><header><span class="sd"><b>${d.getMonth() + 1}/${d.getDate()}</b><small>주일</small></span><span class="st">${esc(s.story || (s.noService ? '조이코너 예배 없음' : '이야기 미정'))}</span>${holName(s.date) ? `<span class="tag hol">${esc(holName(s.date))}</span>` : ''}${now ? '<span class="tag">이번 주</span>' : ''}${checkBadge(s)}${isAdminMe() && !opts.noEdit ? `<button class="editbtn" data-act="schedEditDate" data-id="${s.date}" aria-label="${d.getMonth() + 1}월 ${d.getDate()}일 담당 고치기">${svg('<path d="M4 20h4L19 9l-4-4L4 16z"/>', 16, 1.8)}</button>` : ''}</header>
 ${sundayEventsHtml(s.date)}${s.noService ? `<div class="offnote">${esc(s.noServiceNote || '이 주일은 조이코너 예배가 없어요')}</div>` : `<div class="rrows">${sundayRows(s, keys)}</div>`}</article>`;
 }
@@ -1721,7 +1724,7 @@ ${away.length ? `<section class="card"><div class="lbl"><span>이번 주 부재<
 function dayTurnsHtml(d) {
   const s = schedFor(d);
   if (!s || s.noService) return '';
-  return `<div class="dayturns"><div class="splbl">주일 담당</div><div class="rrows">${sundayRows(s, ['preacher', 'pray', 'nation', 'chant', 'dance', 'guitar', 'offering'])}</div></div>`;
+  return `<div class="dayturns"><div class="splbl">주일 담당</div><div class="rrows">${sundayRows(s, ['preacher', 'pray', 'nation', 'chant', 'dance', 'offering'])}</div></div>`;
 }
 
 /* ---------- 순서표: 월별 서랍 ---------- */
@@ -1733,7 +1736,7 @@ function rTurns() {
   const today = ymd(new Date()), me = myName(), Y = R.turnYear;
   const thisY = ymd(new Date()).slice(0, 4);
   const years = [...new Set([...S.schedule.map(r => r.date.slice(0, 4)), thisY, String(Number(thisY) + 1)])].sort();
-  const cats = [['all', '전체'], ['preacher', '설교'], ['pray', '중보기도'], ['nation', '나라 기도'], ['chant', '챈트'], ['dance', '율동'], ['guitar', '기타'], ['offering', '헌금기도'], ['mine', '내 순서']];
+  const cats = [['all', '전체'], ['preacher', '설교'], ['pray', '중보기도'], ['nation', '나라 기도'], ['chant', '챈트'], ['dance', '율동'], ['offering', '헌금기도'], ['mine', '내 순서']];
   const head = `<div class="catbar full">${cats.map(([k, l]) => `<button class="cat ${R.turnCat === k ? 'on' : ''}" data-act="turnCat" data-id="${k}">${ico(k, 20)}<span>${l}</span></button>`).join('')}</div>
 <div class="yearbar full">${years.map(y => `<button class="${y === Y ? 'on' : ''}" data-act="turnYear" data-id="${y}">${y}년</button>`).join('')}</div>${turnTools(Y)}`;
   const rows = S.schedule.filter(r => r.date.slice(0, 4) === Y);
@@ -2945,7 +2948,7 @@ const EXP = [
     need: () => { SONGS_ALL.rows = null; return loadSongsAll(); },
     tables: () => { const by = {}; (SONGS_ALL.rows || []).filter(s => (s.date || '').startsWith(String(EX.year))).forEach(s => (by[s.date] ||= []).push(s)); const ds = Object.keys(by).sort(); return [{ title: `${EX.year}년 주일 찬양 ${ds.length}주`, cols: [['주일', 8], ['순서', 5], ['곡', 30], ['악기', 7], ['키', 6], ['빠르기', 7], ['메모', 24]], rows: ds.flatMap(d => by[d].sort((a, b) => (a.order || 0) - (b.order || 0)).map((s, i) => [i ? '' : d.slice(5).replace('-', '/'), i + 1, s.title || '', s.inst || '', s.key || '', s.bpm ? '♩' + s.bpm : '', s.memo || ''])), compact: true }]; } }
 ];
-const SCH_COLS = [['date', '날짜', 8], ['dow', '요일', 5], ['story', '성경이야기', 24], ['preacher', '설교', 12], ['pray', '중보기도 인도', 12], ['nation', '나라 기도', 12], ['chant', '챈트', 14], ['verse', '챈트 말씀', 12], ['dance', '율동', 14], ['guitar', '기타·메트로놈', 12], ['offering', '헌금기도 가정', 12], ['noService', '예배 없음', 8], ['noServiceNote', '예배 없음 사유', 16]];
+const SCH_COLS = [['date', '날짜', 8], ['dow', '요일', 5], ['story', '성경이야기', 24], ['preacher', '설교', 12], ['pray', '중보기도 인도', 12], ['nation', '나라 기도', 12], ['chant', '챈트', 14], ['verse', '챈트 말씀', 12], ['dance', '율동', 14], ['offering', '헌금기도 가정', 12], ['noService', '예배 없음', 8], ['noServiceNote', '예배 없음 사유', 16]];
 
 /* ---------- PDF (인쇄 → PDF로 저장) ---------- */
 function pdfHtml(title, sub, tables, orient) {
@@ -3312,4 +3315,35 @@ Object.assign(ACT, {
   matNew: () => matSheet(),
   matSave: () => matSave(),
   matDel: async d => { try { await deleteDoc(doc(db, 'materials', d.id)); MAT.by[d.d] = (MAT.by[d.d] || []).filter(x => x.id !== d.id); paint(); toast('지웠어요'); } catch (e) { toast('지우지 못했어요: ' + errMsg(e)); } }
+});
+
+/* ================= v14 · 성별 · 아이 사진 크게 보기 ================= */
+const genderMark = k => k.gender === 'm' ? '<i class="gm m" title="남자 아이">남</i>' : k.gender === 'f' ? '<i class="gm f" title="여자 아이">여</i>' : '';
+const genderPick = k => `<span class="gpick">${[['m', '남자'], ['f', '여자']].map(([v, l]) => `<button class="gbtn ${v} ${k.gender === v ? 'on' : ''}" data-act="gSet" data-id="${k.id}" data-g="${v}">${l}</button>`).join('')}</span>`;
+async function gSet(id, g) {
+  const k = findKid(id); if (!k) return;
+  const v = k.gender === g ? '' : g;
+  try { await updateDoc(doc(db, 'children', id), { gender: v }); k.gender = v; softPaint(); if (document.getElementById('gbulk')) gBulkSheet(); }
+  catch (e) { toast('저장하지 못했어요: ' + errMsg(e)); }
+}
+function gBulkSheet() {
+  const c = S.cur, l = activeKids(c).filter(k => !k.gender || GB.done.has(k.id));
+  sheet(`<div id="gbulk"><div class="ttl" style="font-size:24px">${esc(clsName(c))} · 남자 · 여자 정하기</div><div class="sub">사진을 보고 눌러 주세요. 누르는 순간 저장돼요. 헷갈리면 비워 두셔도 돼요.</div>
+<div class="glist">${l.map(k => `<div class="grow2">${avatar(k, 52)}<b>${esc(k.name)}</b>${genderPick(k)}</div>`).join('') || '<div class="sub">모두 정했어요.</div>'}</div>
+<div class="btns"><button class="pri" data-act="sheetClose">다 했어요</button></div></div>`);
+}
+const GB = { done: new Set() };
+function kidZoom(slot) {
+  const k = findKid(S.arg), kd = S.kidData && S.kidFor === k.id ? S.kidData : null;
+  const src = kd?.photos?.[slot] || (slot === 'main' ? k.thumb : null); if (!src) return;
+  const el = document.createElement('div'); el.className = 'lbox'; el.innerHTML = `<img src="${src}" alt=""><button class="lbx" aria-label="닫기">×</button>`;
+  el.addEventListener('click', () => { el.remove(); history.state && history.state.lbox && history.back(); });
+  document.body.appendChild(el); history.pushState({ lbox: 1 }, '');
+  const pop = () => { el.remove(); window.removeEventListener('popstate', pop); }; window.addEventListener('popstate', pop);
+}
+Object.assign(ACT, {
+  gSet: d => { GB.done.add(d.id); gSet(d.id, d.g); },
+  gBulk: () => { GB.done = new Set(); gBulkSheet(); },
+  gsel: d => { $('#e_gender').value = d.id; document.querySelectorAll('.gseg button').forEach(b => b.classList.toggle('on', b.dataset.id === d.id)); },
+  kidZoom: d => kidZoom(d.slot)
 });

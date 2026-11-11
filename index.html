@@ -9,7 +9,7 @@
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="favicon-64.png" type="image/png">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
-<link rel="modulepreload" href="app.js?v=v13">
+<link rel="modulepreload" href="app.js?v=v14">
 <link rel="modulepreload" href="firebase-config.js">
 <link rel="modulepreload" href="https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js" crossorigin>
 <link rel="modulepreload" href="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js" crossorigin>
@@ -730,10 +730,43 @@ input[type=date].in::-webkit-date-and-time-value,input[type=time].in::-webkit-da
 .matlink{flex:1;display:flex;align-items:center;gap:10px;min-width:0;text-decoration:none;color:inherit;background:#FFFBF3;border:1px solid #F0E2C8;border-radius:16px;padding:8px 12px}
 .matic{width:36px;height:36px;border-radius:12px;color:#fff;display:flex;align-items:center;justify-content:center;flex:none}
 .matlink .grow{flex:1;display:flex;flex-direction:column;min-width:0}.matlink b{font-weight:400;font-size:16px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.matlink small{font-size:12px;color:#6B5646}
+
+/* ===== v14 ===== */
+.kid{justify-content:center;gap:6px;min-height:0;padding:16px 8px 14px}
+.kid .kav{display:flex;align-items:center;justify-content:center}
+.kid .kav .ph,.kid .kav .avw{width:72px!important;height:72px!important}
+.kid .kav .avw .av{transform:scale(1.125)!important}
+.kid .nm{display:inline-flex;align-items:center;gap:4px;line-height:1.2;margin-top:2px}
+.kid .st{line-height:1}
+@media (min-width:720px){.kid{padding:18px 10px 16px;gap:8px}.kid .kav .ph,.kid .kav .avw{width:84px!important;height:84px!important}.kid .kav .avw .av{transform:scale(1.3125)!important}}
+.kid.g-m .kav .ph{box-shadow:0 0 0 3px #CFE3F7}.kid.g-f .kav .ph{box-shadow:0 0 0 3px #F9D4DF}
+.gm{font-style:normal;font-family:inherit;font-size:11px;line-height:1;padding:3px 5px;border-radius:7px;font-weight:700}
+.gm.m{background:#E3EFFB;color:#2F6DB0}.gm.f{background:#FCE4EC;color:#C2185B}
+.gpick{display:inline-flex;gap:4px}
+.gbtn{min-height:34px;padding:0 14px;border-radius:17px;border:1px solid #EBD9B8;background:#fff;color:#8A5A2B;font-family:inherit;font-size:14px;cursor:pointer}
+.gbtn.m.on{background:#2F6DB0;border-color:#2F6DB0;color:#fff}.gbtn.f.on{background:#C2185B;border-color:#C2185B;color:#fff}
+.gchips{align-items:center}
+.gnote{display:flex;align-items:center;gap:8px;width:100%;margin:4px 0 12px;padding:12px 14px;border-radius:18px;border:1px dashed #D9B98A;background:#FFFBF3;color:#6B5646;font-family:inherit;font-size:15px;cursor:pointer;text-align:left}
+.gnote svg{color:#C62828;flex:none}.gnote span:nth-child(2){flex:1}.gnote b{color:#C62828;font-weight:400}.gnote .chev{font-size:14px;color:#C62828}
+.glist{display:flex;flex-direction:column;border:1px solid #F0E2C8;border-radius:16px;background:#fff;max-height:58vh;overflow-y:auto}
+.grow2{display:flex;align-items:center;gap:10px;padding:8px 12px;border-bottom:1px solid #F5EBD8}.grow2:last-child{border-bottom:0}.grow2 b{flex:1;font-weight:400;font-size:17px}
+.gseg{max-width:420px}
+.slot.has{border-style:solid;border-color:#EBD9B8;padding:0}
+.slot .sview{position:absolute;inset:0;border:0;padding:0;cursor:zoom-in;background:#2B2018;overflow:hidden}
+.slot .sview::before{content:"";position:absolute;inset:-20px;background:var(--bg) center/cover;filter:blur(18px) brightness(.85);transform:scale(1.1)}
+.slot .sview img{position:relative;width:100%;height:100%;object-fit:contain}
+.slot.has .plus{border:0;cursor:pointer;z-index:2;font-family:inherit}
+.photos{height:auto;aspect-ratio:auto}
+.photos .slot.main{min-height:300px}
+@media (min-width:720px){.photos{height:420px}}
+@media (max-width:719px){.photos{height:320px}}
+.lbox{position:fixed;inset:0;z-index:80;background:rgba(20,12,6,.92);display:flex;align-items:center;justify-content:center;padding:16px;cursor:zoom-out}
+.lbox img{max-width:100%;max-height:100%;object-fit:contain;border-radius:12px}
+.lbx{position:absolute;top:14px;right:14px;width:44px;height:44px;border-radius:50%;border:0;background:rgba(255,255,255,.15);color:#fff;font-size:28px;line-height:44px;cursor:pointer}
 </style>
 </head>
 <body>
 <div id="app"></div>
-<script type="module" src="app.js?v=v13"></script>
+<script type="module" src="app.js?v=v14"></script>
 </body>
 </html>
