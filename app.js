@@ -82,7 +82,7 @@ function streak(c, kid) {
 }
 const careList = c => activeKids(c)
   .map(k => ({ k, n: streak(c, k) }))
-  .filter(x => x.n >= 2 || (x.k.flags || []).includes('장기결석'))
+  .filter(x => x.n >= 2)
   .sort((a, b) => b.n - a.n);
 function kidRate(c, kid, weeks = 8) {
   const ds = recorded(c).slice(-weeks).filter(d => !kid.since || d >= kid.since);
@@ -168,7 +168,7 @@ function vHome() {
 <button class="cta" data-act="go" data-to="attend">${svg(ICON.checkc, 28, 2.4)}출석 시작하기</button></section>
 ${nextS ? `<section class="card"><div class="lbl"><span>${diff <= 7 ? '이번 주일' : '다음 주일'} · ${fmtMD(nextS.date)}</span></div><div class="big">${esc(nextS.story || (nextS.noService ? '조이코너 예배 없음' : '이야기 준비 중'))}</div><div class="meta">${nextS.preacher ? `<span>설교 ${esc(nextS.preacher)}</span>` : ''}${nextS.offering ? `<span>헌금기도 ${esc(nextS.offering)} 가정</span>` : ''}${nextS.pray ? `<span>중보기도 ${esc(nextS.pray)}</span>` : ''}</div></section>` : ''}
 ${(() => { const me = S.me.name || ''; if (!me || !nextS) return ''; const L = { preacher: '성경이야기 설교', pray: '중보기도 인도', nation: '성전건축·나라 기도', chant: '챈트', dance: '율동', guitar: '기타·메트로놈' }; const m = Object.entries(L).filter(([k]) => hasName(nextS[k], me)).map(([, l]) => l); return m.length ? `<section class="card" style="border-color:#C62828"><div class="lbl"><span>${fmtMD(nextS.date)} 내 담당</span></div><div class="chips">${m.map(x => `<span class="chip">${x}</span>`).join('')}</div><button class="ghost" data-act="go" data-to="worship">주일 예배 보기</button></section>` : ''; })()}
-<section class="card"><div class="lbl"><span>돌봄이 필요해요</span></div>${care.length ? `<div class="carerow">${care.map(x => `<button class="carekid" data-act="kid" data-id="${x.k.id}">${avatar(x.k, 56)}<b>${esc(x.k.name)}</b><span class="tag">${x.n >= 2 ? x.n + '주 결석' : '장기결석'}</span></button>`).join('')}</div>` : `<div class="sub">지금은 걱정되는 친구가 없어요. 감사해요!</div>`}</section>
+<section class="card"><div class="lbl"><span>돌봄이 필요해요</span></div>${care.length ? `<div class="carerow">${care.map(x => `<button class="carekid" data-act="kid" data-id="${x.k.id}">${avatar(x.k, 56)}<b>${esc(x.k.name)}</b>${absTag(x.n)}</button>`).join('')}</div>` : `<div class="sub">지금은 걱정되는 친구가 없어요. 감사해요!</div>`}</section>
 <section class="card"><div class="lbl"><span>곧 생일이에요</span></div>${bdays.length ? bdays.map(x => `<div class="bday"><span class="d">${x.label}</span><span>${esc(x.k.name)}${x.days === 0 ? ' · 오늘!' : ''}</span></div>`).join('') : `<div class="sub">45일 안에 생일인 친구가 없어요.</div>`}</section>
 
 ${homeNoticeCard()}${homeEventsCard()}${versionCard()}
@@ -221,7 +221,7 @@ function vFriends() {
   const kids = activeKids(c), arch = (S.kids[c] || []).filter(k => (k.status || 'active') !== 'active').sort((a, b) => ko(a.name, b.name));
   const row = k => {
     const n = streak(c, k);
-    return `<button class="row" data-act="kid" data-id="${k.id}" data-name="${esc(k.name)}">${avatar(k, 48)}<span class="grow"><span class="nm">${esc(k.name)}</span><span class="sub">${k.birth ? k.birth.replace(/-/g, '.') + ' 생' : '생일 모름'}</span></span>${n >= 2 ? `<span class="tag">${n}주 결석</span>` : ''}${(k.flags || []).filter(f => f !== '장기결석').map(f => `<span class="tag g">${esc(f)}</span>`).join('')}</button>`;
+    return `<button class="row" data-act="kid" data-id="${k.id}" data-name="${esc(k.name)}">${avatar(k, 48)}<span class="grow"><span class="nm">${esc(k.name)}</span><span class="sub">${k.birth ? k.birth.replace(/-/g, '.') + ' 생' : '생일 모름'}</span></span><span class="tagbox">${absTag(n)}${kidTags(k)}</span></button>`;
   };
   const noG = activeKids(c).filter(k => !k.gender).length;
   return `<div class="scroll"><div class="ttl">친구들</div>${classChips()}${noG ? `<button class="gnote" data-act="gBulk">${svg('<circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/>', 18, 1.9)}<span>남자 · 여자 아직 모르는 친구 <b>${noG}명</b></span><span class="chev">정하기 ›</span></button>` : ''}
@@ -259,7 +259,8 @@ function vKid() {
   const n = streak(c, k);
   return `<div class="scroll cols"><div class="hd"><button class="back" data-act="back">← 친구들</button><button class="sec" data-act="editKid" style="min-height:44px">고치기</button></div>
 <div class="rowtop"><div><div class="ttl">${esc(k.name)}</div><div class="sub">${esc(S.classes[c]?.name || '')} · ${k.birth ? k.birth.replace(/-/g, '.') + ' 생' : '생일 모름'}</div></div></div>
-<div class="chips gchips">${genderPick(k)}${n >= 2 ? `<span class="tag">${n}주째 결석</span>` : ''}${(k.flags || []).map(f => `<span class="tag g">${esc(f)}</span>`).join('')}${k.remark ? `<span class="chip sm">${esc(k.remark)}</span>` : ''}</div>
+<div class="chips gchips">${genderPick(k)}${absTag(n, true)}${kidTags(k)}<button class="tagedit" data-act="tagSheet">${svg('<path d="M4 20h4L19 9l-4-4L4 16z"/>', 14, 2)}표시 고치기</button></div>
+${k.remark && !TAG_AUTO.includes(k.remark) && !(k.flags || []).includes(k.remark) ? `<div class="note sm">메모 · ${esc(k.remark)}</div>` : ''}
 ${k.note ? `<div class="note">${esc(k.note)}</div>` : ''}
 <div class="photos">${slot('main', 'main', '대표')}${slot('1', '', '추가1')}${slot('2', '', '추가2')}</div>
 <section class="card"><div class="lbl"><span>최근 출석</span></div>${ds.length ? `<div class="dots">${ds.map(d => { const v = S.att[c][d][k.id] === 'p' ? 'p' : 'a'; const dd = parseD(d); return `<div class="dot"><i class="${(k.since && d < k.since) ? '' : v}"></i>${dd.getMonth() + 1}/${dd.getDate()}</div>`; }).join('')}</div><div class="sub">초록은 왔어요, 분홍은 못 왔어요</div>` : `<div class="sub">아직 출석 기록이 없어요.</div>`}</section>
@@ -418,7 +419,7 @@ function editKidSheet() {
 <label class="fld">생일<input class="in" id="e_birth" type="date" value="${esc(k.birth || '')}"></label>
 <div class="fld">성별</div><div class="seg gseg">${[['m', '남자 아이'], ['f', '여자 아이'], ['', '모름']].map(([v, l]) => `<button type="button" class="${(k.gender || '') === v ? 'on' : ''}" data-act="gsel" data-id="${v}">${l}</button>`).join('')}</div><input type="hidden" id="e_gender" value="${esc(k.gender || '')}">
 <label class="fld">메모<input class="in" id="e_remark" value="${esc(k.remark || '')}" placeholder="예: 알레르기, 좋아하는 것"></label>
-<label class="chk"><input type="checkbox" id="e_long" ${(k.flags || []).includes('장기결석') ? 'checked' : ''}>장기결석으로 표시</label>
+
 <div class="two"><label class="fld">아버지<input class="in" id="e_fn" value="${esc(f.father || '')}"></label><label class="fld">아버지 연락처<input class="in" id="e_ft" type="tel" value="${esc(f.fatherTel || '')}"></label></div>
 <div class="two"><label class="fld">어머니<input class="in" id="e_mn" value="${esc(f.mother || '')}"></label><label class="fld">어머니 연락처<input class="in" id="e_mt" type="tel" value="${esc(f.motherTel || '')}"></label></div>
 <div class="two"><label class="fld">아버지 셀<input class="in" id="e_fc" value="${esc(f.fatherCell || '')}"></label><label class="fld">어머니 셀<input class="in" id="e_mc" value="${esc(f.motherCell || '')}"></label></div>
@@ -427,7 +428,7 @@ ${admin ? `<div class="two"><label class="fld">반<select class="in" id="e_cls">
 }
 async function saveKid() {
   const k = findKid(S.arg), name = val('e_name'); if (!name) return toast('이름을 적어 주세요');
-  const flags = (k.flags || []).filter(x => x !== '장기결석'); if ($('#e_long').checked) flags.push('장기결석');
+  const flags = (k.flags || []).filter(x => !TAG_AUTO.includes(x));
   const patch = { name, birth: val('e_birth'), remark: val('e_remark'), flags, gender: val('e_gender') };
   const admin = S.me.role === 'admin'; const oldClass = k.classId;
   if (admin) { patch.classId = val('e_cls') || k.classId; patch.status = val('e_status') || 'active'; }
@@ -731,9 +732,10 @@ async function dutyDel() {
 }
 
 /* ---------- 교사실 (공지 · 캘린더 · 업무 분담 · 조직도 · 통계) ---------- */
-const APP_VERSION = 'v14';
+const APP_VERSION = 'v15';
 const APP_DATE = '2026-11-11';
 const CHANGELOG = [
+  { v: 'v15', date: '11월 11일', items: ['아이 표시(선교사 가정 · VIP · 새친구 · 돌봄 필요 등) 누구나 고치기 — 아이 카드 → 표시 고치기', '결석 표시는 출석부로 자동: 2~3주 결석 · 4~7주 장기 결석 · 8주 넘으면 오래 못 봄 (주마다 바뀌어요)', '폰에서 교사실 메뉴를 그림 타일 서랍으로', '폰에서 순서표 분류 아이콘을 4칸 두 줄로 한눈에', '순서표 주일 카드가 상자 밖으로 나가던 것 정리'] },
   { v: 'v14', date: '11월 11일', items: ['순서표에서 "기타" 빼기 (찬양팀이 맡아요)', '출석 카드: 사진을 크게, 이름과 가운데 정렬', '남자 · 여자 표시: 아이 카드에서 한 번 누르거나, 친구들 → "아직 모르는 친구 정하기"로 한꺼번에', '아이 카드 사진이 잘리지 않게 원본 비율로, 누르면 크게 보기'] },
   { v: 'v13', date: '11월 11일', items: ['"지금 새로고침"이 눌리지 않던 것 고침 (새 파일을 확실히 받아서 다시 열어요)', '모든 선생님이 모든 반 아이를 보고, 누구나 어느 반이든 출석 체크', '주일 자료 링크: 설교 슬라이드 · OX 퀴즈 · 활동지 · BGM · 영상 (파일은 공용 구글 드라이브, 앱에는 링크만)', '업무 분담을 구역별 역할 카드 보드로 · 역할에서 빼면 메모와 교사 카드의 맡은 일에서도 빠져요', '교사 카드 빼기 → "그만두신 선생님" 보관함 (디렉터 · 관리자만, 되돌리기 가능)', '조직도에 모든 선생님 (헬퍼 선생님은 따로 풀로)', '예배 · 교사실 화면 폭과 위쪽 탭을 모두 같게, 캘린더 "다가오는 3주" 목록 정리'] },
   { v: 'v12', date: '11월 11일', items: ['자료 내려받기: 아이 명단 · 출석부 · 생일 달력 · 교사 명단 · 업무 분담 · 순서표 · 일정 · 주일 인원 · 찬양을 PDF나 엑셀로', '전체 자료를 엑셀 한 파일로 (관리자)', '연간 일정 한 번에 넣기: 엑셀 양식 내려받기 → 채워서 올리기 → 바뀌는 것 확인 → 적용', '홈 위쪽에 앱 버전 (누르면 업데이트 기록)', '일정에 "내용" 칸 (제목 바로 아래, 캘린더 목록에도 첫 줄이 보여요)'] },
@@ -751,7 +753,7 @@ const CHANGELOG = [
 ];
 const R = { tab: 'notice', notices: null, events: null, month: null, day: null, editNotice: null, editEvent: null, editPreset: null, dutyView: 'table', open: {} };
 const ROOM_TABS = [['notice', '공지'], ['cal', '캘린더'], ['turns', '순서표'], ['duty', '업무 분담'], ['org', '조직도'], ['stats', '통계']];
-const roomTabs = active => `<div class="seg">${ROOM_TABS.map(([k, l]) => `<button class="${active === k ? 'on' : ''}" data-act="rtab" data-id="${k}">${l}</button>`).join('')}</div>`;
+const roomTabs = active => `<div class="seg roomseg">${ROOM_TABS.map(([k, l]) => `<button class="${active === k ? 'on' : ''}" data-act="rtab" data-id="${k}">${l}</button>`).join('')}</div>${roomPick(active)}`;
 const NOTE_KINDS = ['통화', '문자', '심방', '기도제목', '특이사항'];
 
 async function loadDuties() {
@@ -3346,4 +3348,52 @@ Object.assign(ACT, {
   gBulk: () => { GB.done = new Set(); gBulkSheet(); },
   gsel: d => { $('#e_gender').value = d.id; document.querySelectorAll('.gseg button').forEach(b => b.classList.toggle('on', b.dataset.id === d.id)); },
   kidZoom: d => kidZoom(d.slot)
+});
+
+/* ================= v15 · 아이 표시 · 결석 단계 · 교사실 서랍 ================= */
+const TAG_AUTO = ['장기결석', '장기 결석'];
+const TAG_PRESET = [['선교사 가정', 'mis'], ['VIP', 'vip'], ['새친구', 'new'], ['돌봄 필요', 'care'], ['알레르기', 'alg'], ['형제 함께', 'sib'], ['다문화 가정', 'mul'], ['특별한 도움', 'help']];
+const tagCls = t => (TAG_PRESET.find(x => x[0] === t) || [0, 'etc'])[1];
+const kidTags = k => (k.flags || []).filter(f => !TAG_AUTO.includes(f)).map(f => `<span class="ktag ${tagCls(f)}">${esc(f)}</span>`).join('');
+// 출석부에서 계산 — 주일이 지나 출석을 기록할 때마다 자동으로 바뀌어요
+function absTag(n, long) {
+  if (n < 2) return '';
+  const [cls, txt] = n >= 8 ? ['abs3', long ? `${n}주째 못 봤어요 · 연락해 볼까요?` : `${n}주 못 봄`] : n >= 4 ? ['abs2', long ? `장기 결석 · ${n}주째` : `장기 ${n}주`] : ['abs1', `${n}주째 결석`];
+  return `<span class="atag ${cls}" title="출석부로 자동 계산">${txt}</span>`;
+}
+function tagSheet() {
+  const k = findKid(S.arg); if (!k) return;
+  TS.sel = new Set((k.flags || []).filter(f => !TAG_AUTO.includes(f)));
+  const draw = () => {
+    const custom = [...TS.sel].filter(t => !TAG_PRESET.some(p => p[0] === t));
+    $('#tagbox').innerHTML = TAG_PRESET.map(([t, c]) => `<button type="button" class="ktag pick ${c} ${TS.sel.has(t) ? 'on' : ''}" data-act="tagTog" data-id="${esc(t)}">${TS.sel.has(t) ? '✓ ' : ''}${esc(t)}</button>`).join('') + custom.map(t => `<button type="button" class="ktag pick etc on" data-act="tagTog" data-id="${esc(t)}">✓ ${esc(t)} ×</button>`).join('');
+  };
+  TS.draw = draw;
+  sheet(`<div class="ttl" style="font-size:24px">${esc(k.name)} · 표시</div>
+<div class="sub">누르면 켜지고 다시 누르면 꺼져요. 결석 표시는 출석부로 자동 계산돼서 여기서 고치지 않아요.</div>
+<div class="tagpick" id="tagbox"></div>
+<div class="addtag"><input class="in" id="tag_new" placeholder="새 표시 (예: 우유 알레르기)" maxlength="16"><button class="sec sm" data-act="tagAdd">더하기</button></div>
+<label class="fld">메모 <span class="s2">(표시로 쓰기 긴 이야기)</span><input class="in" id="tag_remark" value="${esc(TAG_AUTO.includes(k.remark || '') ? '' : (k.remark || ''))}"></label>
+<div class="btns"><button class="pri" data-act="tagSave">저장</button><button class="sec" data-act="sheetClose">취소</button></div>`);
+  draw();
+}
+const TS = { sel: new Set(), draw: null };
+async function tagSave() {
+  const k = findKid(S.arg); if (!k) return;
+  const flags = [...TS.sel], remark = val('tag_remark');
+  try { await updateDoc(doc(db, 'children', k.id), { flags, remark }); k.flags = flags; k.remark = remark; closeSheet(); toast('저장했어요'); paint(); }
+  catch (e) { toast('저장하지 못했어요: ' + errMsg(e)); }
+}
+const ROOM_INFO = { notice: ['공지', '디렉터 공지 · 링크 · 사진', '<path d="M4 10v4h3l6 4V6L7 10H4z"/><path d="M17 9a4 4 0 0 1 0 6"/>', '#C62828'], cal: ['캘린더', '행사 · 공휴일 · 생일', '<rect x="3" y="4" width="18" height="17" rx="3"/><path d="M3 9h18M8 2v4M16 2v4"/>', '#E08A00'], turns: ['순서표', '주일 설교 · 기도 · 챈트 · 율동', '<path d="M8 6h12M8 12h12M8 18h12"/><circle cx="4" cy="6" r="1.4"/><circle cx="4" cy="12" r="1.4"/><circle cx="4" cy="18" r="1.4"/>', '#2E9D8F'], duty: ['업무 분담', '누가 무엇을 맡는지', '<circle cx="9" cy="8" r="3.2"/><path d="M3 20a6 6 0 0 1 12 0"/><path d="M16 11l2 2 4-4"/>', '#3A6EA5'], org: ['조직도', '반 · 담임 · 보조 선생님', '<rect x="9" y="3" width="6" height="5" rx="1.5"/><rect x="3" y="16" width="6" height="5" rx="1.5"/><rect x="15" y="16" width="6" height="5" rx="1.5"/><path d="M12 8v4M6 16v-2h12v2"/>', '#7B4FB8'], stats: ['통계', '주일 인원 · 출석', ICON.stats, '#6B5646'] };
+const roomPick = active => { const r = ROOM_INFO[active] || ROOM_INFO.notice; return `<button class="roompick" data-act="roomMenu"><span class="rpic" style="background:${r[3]}">${svg(r[2], 22, 1.9)}</span><span class="grow"><b>${r[0]}</b><small>${r[1]}</small></span><span class="rpmore">다른 방 ${svg('<path d="M6 9l6 6 6-6"/>', 16, 2.2)}</span></button>`; };
+function roomMenu() {
+  sheet(`<div class="ttl" style="font-size:24px">교사실</div><div class="roomtiles">${ROOM_TABS.map(([k]) => { const r = ROOM_INFO[k]; return `<button class="rtile ${R.tab === k ? 'on' : ''}" data-act="rtabGo" data-id="${k}" style="--c:${r[3]}"><span class="rpic" style="background:${r[3]}">${svg(r[2], 26, 1.9)}</span><b>${r[0]}</b><small>${r[1]}</small></button>`; }).join('')}</div>`);
+}
+Object.assign(ACT, {
+  tagSheet: () => tagSheet(),
+  tagTog: d => { if (TS.sel.has(d.id)) TS.sel.delete(d.id); else TS.sel.add(d.id); TS.draw && TS.draw(); },
+  tagAdd: () => { const v = val('tag_new').replace(/\s+/g, ' '); if (!v) return; if (TAG_AUTO.includes(v)) return toast('결석 표시는 출석부로 자동 계산돼요'); TS.sel.add(v); $('#tag_new').value = ''; TS.draw && TS.draw(); },
+  tagSave: () => tagSave(),
+  roomMenu: () => roomMenu(),
+  rtabGo: d => { closeSheet(); ACT.rtab(d); }
 });

@@ -9,7 +9,7 @@
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="favicon-64.png" type="image/png">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
-<link rel="modulepreload" href="app.js?v=v14">
+<link rel="modulepreload" href="app.js?v=v15">
 <link rel="modulepreload" href="firebase-config.js">
 <link rel="modulepreload" href="https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js" crossorigin>
 <link rel="modulepreload" href="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js" crossorigin>
@@ -763,10 +763,51 @@ input[type=date].in::-webkit-date-and-time-value,input[type=time].in::-webkit-da
 .lbox{position:fixed;inset:0;z-index:80;background:rgba(20,12,6,.92);display:flex;align-items:center;justify-content:center;padding:16px;cursor:zoom-out}
 .lbox img{max-width:100%;max-height:100%;object-fit:contain;border-radius:12px}
 .lbx{position:absolute;top:14px;right:14px;width:44px;height:44px;border-radius:50%;border:0;background:rgba(255,255,255,.15);color:#fff;font-size:28px;line-height:44px;cursor:pointer}
+
+/* ===== v15 ===== */
+.atag{display:inline-flex;align-items:center;font-size:13px;line-height:1;padding:6px 10px;border-radius:12px;white-space:nowrap}
+.atag.abs1{background:#FFF1DC;color:#A85F00}
+.atag.abs2{background:#FDE3E1;color:#B3261E}
+.atag.abs3{background:#8E1B1B;color:#fff}
+.ktag{display:inline-flex;align-items:center;font-size:13px;line-height:1;padding:6px 10px;border-radius:12px;white-space:nowrap;background:#F3EBDD;color:#6B5646;border:0;font-family:inherit}
+.ktag.mis{background:#DDF1E3;color:#1E6B3E}.ktag.vip{background:#FFF0B8;color:#8A5A00}.ktag.new{background:#E3EFFB;color:#2F6DB0}.ktag.care{background:#FCE4EC;color:#C2185B}.ktag.alg{background:#FFE6D5;color:#B4501C}.ktag.sib{background:#EDE4F7;color:#6A3EA1}.ktag.mul{background:#E0F4F1;color:#1F7A6E}.ktag.help{background:#E8EEF5;color:#3A5A80}
+.tagbox{display:flex;flex-wrap:wrap;justify-content:flex-end;gap:4px;max-width:46%}
+.tagedit{display:inline-flex;align-items:center;gap:4px;min-height:32px;padding:0 12px;border-radius:16px;border:1px dashed #D9B98A;background:#fff;color:#8A5A2B;font-family:inherit;font-size:13px;cursor:pointer}
+.note.sm{font-size:14px}
+.tagpick{display:flex;flex-wrap:wrap;gap:8px;margin:6px 0 4px}
+.ktag.pick{min-height:40px;padding:0 14px;font-size:15px;cursor:pointer;border:2px solid transparent;opacity:.55}
+.ktag.pick.on{opacity:1;border-color:currentColor}
+.addtag{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;align-items:center}
+.roompick{display:none}
+.roomtiles{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.rtile{display:flex;flex-direction:column;align-items:flex-start;gap:6px;text-align:left;padding:14px;border-radius:22px;border:2px solid #EBD9B8;background:#fff;font-family:inherit;color:inherit;cursor:pointer;min-height:132px}
+.rtile b{font-size:19px;font-weight:400}.rtile small{font-size:12px;color:#6B5646;line-height:1.4}
+.rtile.on{border-color:var(--c);box-shadow:0 0 0 2px var(--c) inset;background:#FFFBF3}
+.rpic{width:46px;height:46px;border-radius:15px;color:#fff;display:flex;align-items:center;justify-content:center;flex:none;box-shadow:0 6px 14px -8px rgba(0,0,0,.4)}
+@media (max-width:719px){
+  .seg.roomseg{display:none!important}
+  .roompick{display:flex;align-items:center;gap:12px;width:100%;padding:10px 12px;border-radius:22px;border:1px solid #F0E2C8;background:#fff;font-family:inherit;color:inherit;text-align:left;cursor:pointer;box-shadow:0 10px 24px -22px rgba(80,50,20,.4)}
+  .roompick .rpic{width:42px;height:42px;border-radius:14px}
+  .roompick .grow{flex:1;display:flex;flex-direction:column;min-width:0}.roompick b{font-size:19px;font-weight:400}.roompick small{font-size:12px;color:#6B5646;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .rpmore{display:inline-flex;align-items:center;gap:2px;font-size:13px;color:#C62828;background:#FDE3E1;border-radius:14px;padding:6px 10px;flex:none}
+  .catbar{grid-auto-flow:row;grid-template-columns:repeat(4,minmax(0,1fr));grid-auto-columns:auto;overflow:visible;gap:6px}
+  .cat{padding:7px 2px 6px;font-size:12px;border-radius:14px;gap:3px;min-width:0}
+  .cat svg{width:18px;height:18px}
+  .cat span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+  .drawer{padding:4px 10px}
+  .drawer .sunday{padding:12px 10px;border-radius:18px}
+  .rrow{grid-template-columns:92px minmax(0,1fr)!important}
+  .tagbox{max-width:40%}
+}
+.scroll>*,.drawer>*,.sunday>*,.sunday,.drawer{min-width:0;max-width:100%}
+.sunday .evchips,.sunday .evchip{max-width:100%;min-width:0}
+.sunday .evchip{white-space:normal;height:auto;line-height:1.4;padding-top:6px;padding-bottom:6px}
+.rrow>*{min-width:0}
+.rrow .chips,.rrow .who{flex-wrap:wrap}
 </style>
 </head>
 <body>
 <div id="app"></div>
-<script type="module" src="app.js?v=v14"></script>
+<script type="module" src="app.js?v=v15"></script>
 </body>
 </html>
