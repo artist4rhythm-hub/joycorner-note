@@ -9,7 +9,16 @@
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="favicon-64.png" type="image/png">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
-<link rel="modulepreload" href="app.js?v=v15">
+<link rel="apple-touch-icon" sizes="120x120" href="apple-touch-icon-120.png">
+<link rel="apple-touch-icon" sizes="152x152" href="apple-touch-icon-152.png">
+<link rel="apple-touch-icon" sizes="167x167" href="apple-touch-icon-167.png">
+<link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon-180.png">
+<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="조이코너">
+<meta name="application-name" content="조이코너">
+<link rel="modulepreload" href="app.js?v=v16">
 <link rel="modulepreload" href="firebase-config.js">
 <link rel="modulepreload" href="https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js" crossorigin>
 <link rel="modulepreload" href="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js" crossorigin>
@@ -804,10 +813,29 @@ input[type=date].in::-webkit-date-and-time-value,input[type=time].in::-webkit-da
 .sunday .evchip{white-space:normal;height:auto;line-height:1.4;padding-top:6px;padding-bottom:6px}
 .rrow>*{min-width:0}
 .rrow .chips,.rrow .who{flex-wrap:wrap}
+
+/* ===== v16 ===== */
+.rdock{display:none}
+.homedock .rdock{display:grid}
+.rdock{grid-template-columns:repeat(6,minmax(0,1fr));gap:4px}
+.rdk{display:flex;flex-direction:column;align-items:center;gap:5px;padding:6px 0 4px;border:0;background:none;font-family:inherit;color:#6B5646;font-size:12px;cursor:pointer;border-radius:16px;min-width:0}
+.rdk .rpic{width:44px;height:44px;border-radius:15px;transition:transform .15s}
+.rdk span{white-space:nowrap;line-height:1}
+.rdk.on{color:#2B2018;background:#fff;box-shadow:0 8px 18px -14px rgba(80,50,20,.5)}
+.rdk.on .rpic{transform:translateY(-1px) scale(1.06);box-shadow:0 0 0 3px #fff,0 0 0 5px var(--c)}
+.rdk:not(.on) .rpic{opacity:.92}
+.homedock{gap:10px}
+.homedock .rdk{background:#FFFBF3}
+@media (max-width:719px){
+  .roompick{display:none!important}
+  .scroll>.rdock{display:grid;position:sticky;top:0;z-index:5;margin:0 -16px;padding:8px 12px 10px;background:linear-gradient(#FFF6E5 85%,rgba(255,246,229,0))}
+  .rdk .rpic{width:42px;height:42px}
+}
+@media (max-width:360px){.rdk .rpic{width:38px;height:38px;border-radius:13px}.rdk{font-size:11px}}
 </style>
 </head>
 <body>
 <div id="app"></div>
-<script type="module" src="app.js?v=v15"></script>
+<script type="module" src="app.js?v=v16"></script>
 </body>
 </html>

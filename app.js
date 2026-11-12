@@ -171,7 +171,7 @@ ${(() => { const me = S.me.name || ''; if (!me || !nextS) return ''; const L = {
 <section class="card"><div class="lbl"><span>돌봄이 필요해요</span></div>${care.length ? `<div class="carerow">${care.map(x => `<button class="carekid" data-act="kid" data-id="${x.k.id}">${avatar(x.k, 56)}<b>${esc(x.k.name)}</b>${absTag(x.n)}</button>`).join('')}</div>` : `<div class="sub">지금은 걱정되는 친구가 없어요. 감사해요!</div>`}</section>
 <section class="card"><div class="lbl"><span>곧 생일이에요</span></div>${bdays.length ? bdays.map(x => `<div class="bday"><span class="d">${x.label}</span><span>${esc(x.k.name)}${x.days === 0 ? ' · 오늘!' : ''}</span></div>`).join('') : `<div class="sub">45일 안에 생일인 친구가 없어요.</div>`}</section>
 
-${homeNoticeCard()}${homeEventsCard()}${versionCard()}
+${homeNoticeCard()}${homeEventsCard()}<section class="card homedock"><div class="lbl"><span>교사실 바로 가기</span></div>${roomDock('')}</section>${versionCard()}
 </div>${nav('home')}`;
 }
 
@@ -732,9 +732,10 @@ async function dutyDel() {
 }
 
 /* ---------- 교사실 (공지 · 캘린더 · 업무 분담 · 조직도 · 통계) ---------- */
-const APP_VERSION = 'v15';
-const APP_DATE = '2026-11-11';
+const APP_VERSION = 'v16';
+const APP_DATE = '2026-11-12';
 const CHANGELOG = [
+  { v: 'v16', date: '11월 12일', items: ['폰 교사실: 공지 · 캘린더 · 순서표 · 업무 · 조직도 · 통계를 색깔 아이콘 6칸으로 늘 위에 (내려도 따라와요)', '홈에 "교사실 바로 가기" 6칸', '패드 · 아이폰 홈 화면 아이콘이 "조" 글자로 나오던 것 고침 (크기별 아이콘 · 이름 설정)'] },
   { v: 'v15', date: '11월 11일', items: ['아이 표시(선교사 가정 · VIP · 새친구 · 돌봄 필요 등) 누구나 고치기 — 아이 카드 → 표시 고치기', '결석 표시는 출석부로 자동: 2~3주 결석 · 4~7주 장기 결석 · 8주 넘으면 오래 못 봄 (주마다 바뀌어요)', '폰에서 교사실 메뉴를 그림 타일 서랍으로', '폰에서 순서표 분류 아이콘을 4칸 두 줄로 한눈에', '순서표 주일 카드가 상자 밖으로 나가던 것 정리'] },
   { v: 'v14', date: '11월 11일', items: ['순서표에서 "기타" 빼기 (찬양팀이 맡아요)', '출석 카드: 사진을 크게, 이름과 가운데 정렬', '남자 · 여자 표시: 아이 카드에서 한 번 누르거나, 친구들 → "아직 모르는 친구 정하기"로 한꺼번에', '아이 카드 사진이 잘리지 않게 원본 비율로, 누르면 크게 보기'] },
   { v: 'v13', date: '11월 11일', items: ['"지금 새로고침"이 눌리지 않던 것 고침 (새 파일을 확실히 받아서 다시 열어요)', '모든 선생님이 모든 반 아이를 보고, 누구나 어느 반이든 출석 체크', '주일 자료 링크: 설교 슬라이드 · OX 퀴즈 · 활동지 · BGM · 영상 (파일은 공용 구글 드라이브, 앱에는 링크만)', '업무 분담을 구역별 역할 카드 보드로 · 역할에서 빼면 메모와 교사 카드의 맡은 일에서도 빠져요', '교사 카드 빼기 → "그만두신 선생님" 보관함 (디렉터 · 관리자만, 되돌리기 가능)', '조직도에 모든 선생님 (헬퍼 선생님은 따로 풀로)', '예배 · 교사실 화면 폭과 위쪽 탭을 모두 같게, 캘린더 "다가오는 3주" 목록 정리'] },
@@ -753,7 +754,7 @@ const CHANGELOG = [
 ];
 const R = { tab: 'notice', notices: null, events: null, month: null, day: null, editNotice: null, editEvent: null, editPreset: null, dutyView: 'table', open: {} };
 const ROOM_TABS = [['notice', '공지'], ['cal', '캘린더'], ['turns', '순서표'], ['duty', '업무 분담'], ['org', '조직도'], ['stats', '통계']];
-const roomTabs = active => `<div class="seg roomseg">${ROOM_TABS.map(([k, l]) => `<button class="${active === k ? 'on' : ''}" data-act="rtab" data-id="${k}">${l}</button>`).join('')}</div>${roomPick(active)}`;
+const roomTabs = active => `<div class="seg roomseg">${ROOM_TABS.map(([k, l]) => `<button class="${active === k ? 'on' : ''}" data-act="rtab" data-id="${k}">${l}</button>`).join('')}</div>${roomDock(active)}`;
 const NOTE_KINDS = ['통화', '문자', '심방', '기도제목', '특이사항'];
 
 async function loadDuties() {
@@ -3397,3 +3398,7 @@ Object.assign(ACT, {
   roomMenu: () => roomMenu(),
   rtabGo: d => { closeSheet(); ACT.rtab(d); }
 });
+
+/* ================= v16 · 교사실 아이콘 6칸 ================= */
+const ROOM_SHORT = { notice: '공지', cal: '캘린더', turns: '순서표', duty: '업무', org: '조직도', stats: '통계' };
+const roomDock = active => `<nav class="rdock" aria-label="교사실">${ROOM_TABS.map(([k]) => { const r = ROOM_INFO[k]; return `<button class="rdk ${active === k ? 'on' : ''}" data-act="rtab" data-id="${k}" style="--c:${r[3]}" aria-label="${r[0]}"><span class="rpic" style="background:${r[3]}">${svg(r[2], 22, 1.9)}</span><span>${ROOM_SHORT[k]}</span></button>`; }).join('')}</nav>`;
