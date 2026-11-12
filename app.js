@@ -748,9 +748,10 @@ async function dutyDel() {
 }
 
 /* ---------- 교사실 (공지 · 캘린더 · 업무 분담 · 조직도 · 통계) ---------- */
-const APP_VERSION = 'v22';
+const APP_VERSION = 'v23';
 const APP_DATE = '2026-11-12';
 const CHANGELOG = [
+  { v: 'v23', date: '11월 13일', items: ['아이패드 · 아이폰 홈 화면 아이콘 파일 이름을 새로 바꿔서, 예전에 실패한 아이콘 기억을 피해 가게', '아이패드 크롬(데스크톱 모드)도 알아보고 "사파리에서 추가해 주세요" 안내를 띄워요'] },
   { v: 'v22', date: '11월 12일', items: ['홈에 [전체 한눈에 / 반별 보기] — 전체 홈에서 모든 반의 친구 수 · 출석 · 돌봄 · 생일을 한 화면에, 반 카드를 누르면 그 반으로', '교사실에 [선생님] 탭 — 모든 선생님 카드(전화 · 생일 · 소속 진/셀 · 주소)를 한눈에, 반별 · 헬퍼 고르기와 찾기', '선생님 카드에 진 · 셀 · 주소 칸 (주소는 디렉터 · 관리자와 본인만 봐요)'] },
   { v: 'v21', date: '11월 12일', items: ['조직도: 반 상자를 고른 폭으로, "반 없이 함께 섬기는 선생님"을 이름표 카드로 정돈', '설정의 구글 캘린더 연결 설정: 무엇인지 · 설정됨 여부를 한눈에, 순서 안내'] },
   { v: 'v20', date: '11월 12일', items: ['글을 끌어 고르다 창 밖에서 손을 떼도 창이 닫히지 않아요 · 쓰던 내용이 있으면 바깥을 눌러도 안 닫혀요', '공지 임시 저장: 나만 보이는 임시 저장 · 쓰는 동안 기기에도 저절로 보관', '공지 양식: 행사 안내 · 주일 공지 · 기도 제목 + 직접 만든 양식', '넓은 화면 교사실 탭에도 색깔 아이콘'] },
@@ -3449,16 +3450,16 @@ document.addEventListener('scroll', e => { const sc = e.target; if (!sc.classLis
 
 /* ================= v18 · 아이폰 · 아이패드 다른 브라우저 안내 ================= */
 const isIOS = () => /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
-const iosOther = () => { const u = navigator.userAgent; return isIOS() && /CriOS|FxiOS|EdgiOS|KAKAOTALK|NAVER|Whale|Instagram|FBAN|Line\//i.test(u); };
+const iosOther = () => { const u = navigator.userAgent; return isIOS() && (/CriOS|FxiOS|EdgiOS|KAKAOTALK|NAVER|Whale|Instagram|FBAN|Line\//i.test(u) || !!window.__gCrWeb || !!window.__firefox__); };
 function iosOtherNote(force) {
   if (!iosOther() || isStandalone()) return '';
-  if (!force && lsGet('jc_iosnote') === '1') return '';
-  const app = /KAKAOTALK/i.test(navigator.userAgent) ? '카카오톡' : /CriOS/.test(navigator.userAgent) ? '크롬' : '이 브라우저';
+  if (!force && lsGet('jc_iosnote2') === '1') return '';
+  const app = /KAKAOTALK/i.test(navigator.userAgent) ? '카카오톡' : (/CriOS/.test(navigator.userAgent) || window.__gCrWeb) ? '크롬' : '이 브라우저';
   return `<div class="iosnote full">${svg('<circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16.5v.5"/>', 20, 2)}<span class="grow"><b>${app}에서 홈 화면에 추가하면 아이콘이 '조' 글자로 나와요.</b><br>아이폰 · 아이패드는 <b>사파리</b>에서 추가해야 조이코너 아이콘이 제대로 들어가요. 주소를 복사해서 사파리에 붙여넣은 뒤 공유 ⬆ → 홈 화면에 추가를 눌러 주세요.<span class="btns2"><button class="pri sm" data-act="copyUrl">주소 복사</button>${force ? '' : '<button class="ghost sm" data-act="iosNoteOff">다음에</button>'}</span></span></div>`;
 }
 Object.assign(ACT, {
   copyUrl: async () => { const u = location.origin + location.pathname; try { await navigator.clipboard.writeText(u); toast('주소를 복사했어요 · 사파리 주소창에 붙여넣어 주세요'); } catch { prompt('이 주소를 복사해 사파리에 붙여넣어 주세요', u); } },
-  iosNoteOff: () => { lsSet('jc_iosnote', '1'); paint(); }
+  iosNoteOff: () => { lsSet('jc_iosnote2', '1'); paint(); }
 });
 
 /* ================= v19 · 출석 마감 · 수정 기록 ================= */
