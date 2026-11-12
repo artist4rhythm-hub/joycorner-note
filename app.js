@@ -148,7 +148,7 @@ function classChips() {
 function nav(active) { S.navActive = active; return ''; }
 function navHtml(active) {
   const t = (k, ic, label) => `<button class="tab ${active === k ? 'on' : ''}" data-act="go" data-to="${k}">${svg(ICON[ic])}<span>${label}</span></button>`;
-  return `<nav class="nav" aria-label="메뉴"><div class="brand"><img src="icon-192.png" alt="조이코너" width="52" height="52"><small class="railv">${APP_VERSION}</small></div>${t('home', 'home', '홈')}${t('attend', 'att', '출석')}${t('friends', 'kids', '친구들')}${t('worship', 'music', '예배')}${t('room', 'room', '교사실')}<button class="tab deskonly ${active === 'help' ? 'on' : ''}" data-act="go" data-to="help">${svg('<circle cx="12" cy="12" r="9"/><path d="M9.6 9.4a2.5 2.5 0 0 1 4.8.9c0 1.7-2.4 2.1-2.4 3.7M12 16.9v.1"/>')}<span>도우미</span></button></nav>`;
+  return `<nav class="nav" aria-label="메뉴"><div class="brand"><img src="icons/icon-192.png" alt="조이코너" width="52" height="52"><small class="railv">${APP_VERSION}</small></div>${t('home', 'home', '홈')}${t('attend', 'att', '출석')}${t('friends', 'kids', '친구들')}${t('worship', 'music', '예배')}${t('room', 'room', '교사실')}<button class="tab deskonly ${active === 'help' ? 'on' : ''}" data-act="go" data-to="help">${svg('<circle cx="12" cy="12" r="9"/><path d="M9.6 9.4a2.5 2.5 0 0 1 4.8.9c0 1.7-2.4 2.1-2.4 3.7M12 16.9v.1"/>')}<span>도우미</span></button></nav>`;
 }
 const noClass = () => `<div class="center"><div class="big">아직 반이 없어요</div><div class="sub">${S.me.role === 'admin' ? '설정에서 시트 데이터를 가져오거나 교사를 등록해 주세요.' : '관리자에게 맡을 반을 정해 달라고 말해 주세요.'}</div>${S.me.role === 'admin' ? `<button class="cta" style="max-width:280px" data-act="go" data-to="settings">설정 열기</button>` : ''}</div>`;
 
@@ -748,9 +748,10 @@ async function dutyDel() {
 }
 
 /* ---------- 교사실 (공지 · 캘린더 · 업무 분담 · 조직도 · 통계) ---------- */
-const APP_VERSION = 'v23';
+const APP_VERSION = 'v24';
 const APP_DATE = '2026-11-12';
 const CHANGELOG = [
+  { v: 'v24', date: '11월 13일', items: ['홈 화면 아이콘이 "조" 글자로 나오던 문제 — 잘 되는 다른 앱(말씀선포)과 같은 구조로 맞춤: 앱 보관 도우미(서비스 워커) · icons 폴더 · 아이콘 연결 한 줄 · 화면 꾸밈 파일(app.css) 분리'] },
   { v: 'v23', date: '11월 13일', items: ['아이패드 · 아이폰 홈 화면 아이콘 파일 이름을 새로 바꿔서, 예전에 실패한 아이콘 기억을 피해 가게', '아이패드 크롬(데스크톱 모드)도 알아보고 "사파리에서 추가해 주세요" 안내를 띄워요'] },
   { v: 'v22', date: '11월 12일', items: ['홈에 [전체 한눈에 / 반별 보기] — 전체 홈에서 모든 반의 친구 수 · 출석 · 돌봄 · 생일을 한 화면에, 반 카드를 누르면 그 반으로', '교사실에 [선생님] 탭 — 모든 선생님 카드(전화 · 생일 · 소속 진/셀 · 주소)를 한눈에, 반별 · 헬퍼 고르기와 찾기', '선생님 카드에 진 · 셀 · 주소 칸 (주소는 디렉터 · 관리자와 본인만 봐요)'] },
   { v: 'v21', date: '11월 12일', items: ['조직도: 반 상자를 고른 폭으로, "반 없이 함께 섬기는 선생님"을 이름표 카드로 정돈', '설정의 구글 캘린더 연결 설정: 무엇인지 · 설정됨 여부를 한눈에, 순서 안내'] },
@@ -1437,13 +1438,13 @@ function helpInstall() {
 ${S.bip && !isStandalone() ? '<button class="cta" data-act="installNow">지금 설치</button>' : ''}
 <div class="seg">${tabs.map(([k, l]) => `<button class="${dev === k ? 'on' : ''}" data-act="helpDev" data-id="${k}">${l}</button>`).join('')}</div>
 <div class="installwrap"><ol class="steps">${steps.map(([a, b], i) => `<li><span class="sn">${i + 1}</span><div><b>${esc(a)}</b><p>${esc(b)}</p></div></li>`).join('')}</ol>
-<div class="phone ${dev}"><div class="pscreen">${Array.from({ length: 11 }, (_, i) => `<i style="background:${['#A8D0F0', '#FFD66B', '#B9DDB0', '#F4A9A0', '#D9BFF2', '#F6C28B'][i % 6]}"></i>`).join('')}<img src="icon-192.png" alt="조이코너 아이콘" class="pnew"><span class="plabel">조이코너</span></div></div></div>`;
+<div class="phone ${dev}"><div class="pscreen">${Array.from({ length: 11 }, (_, i) => `<i style="background:${['#A8D0F0', '#FFD66B', '#B9DDB0', '#F4A9A0', '#D9BFF2', '#F6C28B'][i % 6]}"></i>`).join('')}<img src="icons/icon-192.png" alt="조이코너 아이콘" class="pnew"><span class="plabel">조이코너</span></div></div></div>`;
 }
 function welcomeLine() {
   let off = false; try { off = localStorage.getItem('jc_welcome_off') === '1'; } catch { /* 없음 */ }
   if (off) return '';
   const sa = isStandalone();
-  return `<div class="welcome full"><img src="icon-192.png" alt="" width="40" height="40"><span class="t"><b>처음이세요?</b><span>${sa ? '도우미에서 기능을 차근차근 볼 수 있어요.' : '홈 화면에 바로가기를 만들면 앱처럼 열려요.'}</span></span>${sa ? '' : '<button class="ghost sm2" data-act="helpGo" data-id="install">바로가기</button>'}<button class="ghost sm2" data-act="go" data-to="help">도우미</button><button class="x" data-act="welcomeOff" aria-label="닫기">×</button></div>`;
+  return `<div class="welcome full"><img src="icons/icon-192.png" alt="" width="40" height="40"><span class="t"><b>처음이세요?</b><span>${sa ? '도우미에서 기능을 차근차근 볼 수 있어요.' : '홈 화면에 바로가기를 만들면 앱처럼 열려요.'}</span></span>${sa ? '' : '<button class="ghost sm2" data-act="helpGo" data-id="install">바로가기</button>'}<button class="ghost sm2" data-act="go" data-to="help">도우미</button><button class="x" data-act="welcomeOff" aria-label="닫기">×</button></div>`;
 }
 
 /* ---------- 새 버전 알림 ---------- */
@@ -3020,7 +3021,7 @@ footer{font-size:8px;color:#9A8676;margin-top:6px}
   const tbl = t => !t.rows.length ? `<h2>${esc(t.title)}</h2><div class="empty">기록이 없어요.</div>` : `<h2>${esc(t.title)}</h2><table class="${t.dense ? 'dense' : ''} ${t.foot ? 'foot' : ''}"><thead><tr>${t.cols.map(c => `<th>${esc(c[0])}</th>`).join('')}</tr></thead><tbody>${t.rows.map(r => `<tr>${r.map(v => `<td class="${v === 'O' ? 'o' : ''}">${esc(v)}</td>`).join('')}</tr>`).join('')}</tbody></table>`;
   return `<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><base href="${esc(location.href.split('#')[0])}"><title>${esc(title)}</title><style>${css}</style></head><body>
 <div class="bar"><span>인쇄 창에서 <b>대상: PDF로 저장</b>을 고르면 PDF 파일이 돼요. (A4 ${orient === 'landscape' ? '가로' : '세로'} · 여백 10mm)</span><button onclick="print()">PDF로 저장 · 인쇄</button></div>
-<div class="page"><header><img src="icon-192.png" alt=""><h1>${esc(title)}</h1><span>${esc(sub)}</span></header>${tables.map(tbl).join('')}<footer>조이코너 노트 ${APP_VERSION} · ${todayDot()} 내려받음 · ${esc(myName())} · 아이들 정보가 들어 있어요. 보관에 주의해 주세요.</footer></div>
+<div class="page"><header><img src="icons/icon-192.png" alt=""><h1>${esc(title)}</h1><span>${esc(sub)}</span></header>${tables.map(tbl).join('')}<footer>조이코너 노트 ${APP_VERSION} · ${todayDot()} 내려받음 · ${esc(myName())} · 아이들 정보가 들어 있어요. 보관에 주의해 주세요.</footer></div>
 <script>window.addEventListener('load',()=>setTimeout(()=>{try{print()}catch(e){}},500))<\/script></body></html>`;
 }
 async function exRun(k, fmt) {
@@ -3234,7 +3235,7 @@ VIEWS.export = vExport;
 /* ---------- 새 버전: 캐시까지 새로 받아서 다시 열기 ---------- */
 async function hardReload(v) {
   const b = document.querySelector('#newver button'); if (b) { b.disabled = true; b.textContent = '받는 중…'; }
-  try { await Promise.all(['index.html', 'app.js?v=' + (v || Date.now()), 'app.js', 'version.json'].map(u => fetch(u, { cache: 'reload' }).catch(() => { }))); } catch { /* 괜찮아요 */ }
+  try { await Promise.all(['index.html', 'app.js?v=' + (v || Date.now()), 'app.js', 'app.css?v=' + (v || Date.now()), 'app.css', 'version.json'].map(u => fetch(u, { cache: 'reload' }).catch(() => { }))); } catch { /* 괜찮아요 */ }
   try { if (window.caches) { const ks = await caches.keys(); await Promise.all(ks.map(k => caches.delete(k))); } } catch { /* 없음 */ }
   location.replace(location.pathname + '?r=' + Date.now() + location.hash);
 }
@@ -3767,3 +3768,8 @@ Object.assign(ACT, {
   homeMode: d => { HM.mode = d.id; lsSet('jc_homemode', d.id); S.lastKey = ''; if (d.id === 'all') S.myClasses.forEach(c => ensureAtt(c)); paint(); },
   homeCls: d => { S.cur = d.id; lsSet('jc_cur', d.id); HM.mode = 'class'; lsSet('jc_homemode', 'class'); S.lastKey = ''; route(); }
 });
+
+/* v24 — 앱 보관 도우미(서비스 워커): 홈 화면 앱 아이콘 · 빠른 열기 */
+if ('serviceWorker' in navigator && location.protocol === 'https:') {
+  window.addEventListener('load', () => { navigator.serviceWorker.register('sw.js').catch(() => { }); });
+}
