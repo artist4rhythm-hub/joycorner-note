@@ -732,9 +732,10 @@ async function dutyDel() {
 }
 
 /* ---------- 교사실 (공지 · 캘린더 · 업무 분담 · 조직도 · 통계) ---------- */
-const APP_VERSION = 'v16';
+const APP_VERSION = 'v17';
 const APP_DATE = '2026-11-12';
 const CHANGELOG = [
+  { v: 'v17', date: '11월 12일', items: ['폰 교사실 아이콘 6칸: 화면 폭에 맞춰 간격 · 크기가 저절로 맞춰져요', '아래로 내릴 때 아이콘 줄이 화면 맨 위에 딱 붙고, 뒤 글이 비치지 않게'] },
   { v: 'v16', date: '11월 12일', items: ['폰 교사실: 공지 · 캘린더 · 순서표 · 업무 · 조직도 · 통계를 색깔 아이콘 6칸으로 늘 위에 (내려도 따라와요)', '홈에 "교사실 바로 가기" 6칸', '패드 · 아이폰 홈 화면 아이콘이 "조" 글자로 나오던 것 고침 (크기별 아이콘 · 이름 설정)'] },
   { v: 'v15', date: '11월 11일', items: ['아이 표시(선교사 가정 · VIP · 새친구 · 돌봄 필요 등) 누구나 고치기 — 아이 카드 → 표시 고치기', '결석 표시는 출석부로 자동: 2~3주 결석 · 4~7주 장기 결석 · 8주 넘으면 오래 못 봄 (주마다 바뀌어요)', '폰에서 교사실 메뉴를 그림 타일 서랍으로', '폰에서 순서표 분류 아이콘을 4칸 두 줄로 한눈에', '순서표 주일 카드가 상자 밖으로 나가던 것 정리'] },
   { v: 'v14', date: '11월 11일', items: ['순서표에서 "기타" 빼기 (찬양팀이 맡아요)', '출석 카드: 사진을 크게, 이름과 가운데 정렬', '남자 · 여자 표시: 아이 카드에서 한 번 누르거나, 친구들 → "아직 모르는 친구 정하기"로 한꺼번에', '아이 카드 사진이 잘리지 않게 원본 비율로, 누르면 크게 보기'] },
@@ -3402,3 +3403,6 @@ Object.assign(ACT, {
 /* ================= v16 · 교사실 아이콘 6칸 ================= */
 const ROOM_SHORT = { notice: '공지', cal: '캘린더', turns: '순서표', duty: '업무', org: '조직도', stats: '통계' };
 const roomDock = active => `<nav class="rdock" aria-label="교사실">${ROOM_TABS.map(([k]) => { const r = ROOM_INFO[k]; return `<button class="rdk ${active === k ? 'on' : ''}" data-act="rtab" data-id="${k}" style="--c:${r[3]}" aria-label="${r[0]}"><span class="rpic" style="background:${r[3]}">${svg(r[2], 22, 1.9)}</span><span>${ROOM_SHORT[k]}</span></button>`; }).join('')}</nav>`;
+
+/* v17 — 아이콘 줄이 위에 붙으면 아래 선을 보여 줘요 */
+document.addEventListener('scroll', e => { const sc = e.target; if (!sc.classList || !sc.classList.contains('scroll')) return; const d = sc.querySelector(':scope>.rdock'); if (d) d.classList.toggle('stuck', sc.scrollTop > 40); }, true);

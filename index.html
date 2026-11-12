@@ -18,7 +18,7 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="조이코너">
 <meta name="application-name" content="조이코너">
-<link rel="modulepreload" href="app.js?v=v16">
+<link rel="modulepreload" href="app.js?v=v17">
 <link rel="modulepreload" href="firebase-config.js">
 <link rel="modulepreload" href="https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js" crossorigin>
 <link rel="modulepreload" href="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js" crossorigin>
@@ -828,7 +828,15 @@ input[type=date].in::-webkit-date-and-time-value,input[type=time].in::-webkit-da
 .homedock .rdk{background:#FFFBF3}
 @media (max-width:719px){
   .roompick{display:none!important}
-  .scroll>.rdock{display:grid;position:sticky;top:0;z-index:5;margin:0 -16px;padding:8px 12px 10px;background:linear-gradient(#FFF6E5 85%,rgba(255,246,229,0))}
+  .scroll>.rdock{display:grid;position:sticky;top:-18px;z-index:6;margin:-6px -16px 0;width:calc(100% + 32px);max-width:none;box-sizing:border-box;padding:10px max(10px,env(safe-area-inset-left)) 10px max(10px,env(safe-area-inset-right));background:#FFF6E5;border-bottom:1px solid transparent;transition:border-color .2s,box-shadow .2s}
+  .scroll>.rdock.stuck{border-bottom-color:#EBD9B8;box-shadow:0 10px 18px -16px rgba(80,50,20,.45)}
+  .scroll>.rdock .rdk{padding:4px 0 2px}
+  .scroll>.rdock .rdk.on{background:none;box-shadow:none}
+  .scroll>.rdock .rdk .rpic{width:clamp(36px,11.5vw,46px);height:clamp(36px,11.5vw,46px);border-radius:clamp(12px,3.6vw,15px)}
+  .scroll>.rdock .rdk .rpic svg{width:clamp(18px,5.6vw,22px);height:clamp(18px,5.6vw,22px)}
+  .scroll>.rdock .rdk span{font-size:clamp(11px,3.2vw,13px)}
+  .scroll>.rdock .rdk.on span{color:#2B2018;font-weight:700}
+  .scroll>.rdock .rdk.on .rpic{transform:none;box-shadow:0 0 0 2px #FFF6E5,0 0 0 4px var(--c)}
   .rdk .rpic{width:42px;height:42px}
 }
 @media (max-width:360px){.rdk .rpic{width:38px;height:38px;border-radius:13px}.rdk{font-size:11px}}
@@ -836,6 +844,6 @@ input[type=date].in::-webkit-date-and-time-value,input[type=time].in::-webkit-da
 </head>
 <body>
 <div id="app"></div>
-<script type="module" src="app.js?v=v16"></script>
+<script type="module" src="app.js?v=v17"></script>
 </body>
 </html>
