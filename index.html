@@ -7,18 +7,19 @@
 <meta name="robots" content="noindex,nofollow">
 <title>조이코너 노트</title>
 <link rel="manifest" href="manifest.webmanifest">
-<link rel="icon" href="favicon-64.png" type="image/png">
+<link rel="icon" href="favicon-64.png" type="image/png" sizes="64x64">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <link rel="apple-touch-icon" sizes="120x120" href="apple-touch-icon-120.png">
 <link rel="apple-touch-icon" sizes="152x152" href="apple-touch-icon-152.png">
 <link rel="apple-touch-icon" sizes="167x167" href="apple-touch-icon-167.png">
 <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon-180.png">
 <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
+<link rel="icon" type="image/png" sizes="512x512" href="icon-512.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="조이코너">
 <meta name="application-name" content="조이코너">
-<link rel="modulepreload" href="app.js?v=v17">
+<link rel="modulepreload" href="app.js?v=v18">
 <link rel="modulepreload" href="firebase-config.js">
 <link rel="modulepreload" href="https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js" crossorigin>
 <link rel="modulepreload" href="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js" crossorigin>
@@ -840,10 +841,15 @@ input[type=date].in::-webkit-date-and-time-value,input[type=time].in::-webkit-da
   .rdk .rpic{width:42px;height:42px}
 }
 @media (max-width:360px){.rdk .rpic{width:38px;height:38px;border-radius:13px}.rdk{font-size:11px}}
+
+/* ===== v18 ===== */
+.iosnote{display:flex;gap:10px;align-items:flex-start;background:#FFF4F3;border:1px solid #E8A39C;border-radius:20px;padding:12px 14px;font-size:14px;line-height:1.55;color:#5A3A2A}
+.iosnote>svg{color:#C62828;flex:none;margin-top:2px}.iosnote .grow{flex:1;min-width:0}.iosnote b{color:#8E1B1B;font-weight:400}
+.iosnote .btns2{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
 </style>
 </head>
 <body>
 <div id="app"></div>
-<script type="module" src="app.js?v=v17"></script>
+<script type="module" src="app.js?v=v18"></script>
 </body>
 </html>

@@ -162,7 +162,7 @@ function vHome() {
   const nextS = S.schedule.find(x => x.date >= todayStr && !x.noService) || S.schedule[S.schedule.length - 1];
   const diff = nextS ? Math.round((parseD(nextS.date) - parseD(todayStr)) / 86400000) : 99;
   const care = careList(c).slice(0, 6), bdays = upcomingBirthdays(c).slice(0, 4);
-  return `<div class="scroll cols">${header}${holBanner()}${gcalBanner()}${classChips()}
+  return `<div class="scroll cols">${header}${iosOtherNote()}${holBanner()}${gcalBanner()}${classChips()}
 <section class="card"><div class="rowtop"><div style="display:flex;padding-left:10px">${faces.map(k => `<span style="margin-left:-10px;border:3px solid #fff;border-radius:50%;display:block;line-height:0">${avatar(k, 46)}</span>`).join('')}</div><div><div class="big">${esc(cl.name)}</div><div class="sub">친구 ${kids.length}명</div></div></div>
 <div class="chips">${(() => { const cs = classStaff(c); const h = cs.homeroom.map(n => `<span class="chip">담임 ${esc(n)}</span>`).join('') + cs.assistants.map(n => `<span class="chip">${esc(n)}</span>`).join(''); return h || (S.me.role === 'admin' ? `<button class="chip dashed" data-act="go" data-to="settings">+ 교사 명단에서 정해 주세요</button>` : '<span class="chip">담임 미정</span>'); })()}</div>
 <button class="cta" data-act="go" data-to="attend">${svg(ICON.checkc, 28, 2.4)}출석 시작하기</button></section>
@@ -732,9 +732,10 @@ async function dutyDel() {
 }
 
 /* ---------- 교사실 (공지 · 캘린더 · 업무 분담 · 조직도 · 통계) ---------- */
-const APP_VERSION = 'v17';
+const APP_VERSION = 'v18';
 const APP_DATE = '2026-11-12';
 const CHANGELOG = [
+  { v: 'v18', date: '11월 12일', items: ['아이폰 · 아이패드에서 크롬 · 카톡 브라우저로 열면 "사파리로 열어 홈 화면에 추가하세요" 안내 (아이콘이 "조" 글자로 나오지 않게)', '크롬이 큰 아이콘을 고르도록 아이콘 크기 표시'] },
   { v: 'v17', date: '11월 12일', items: ['폰 교사실 아이콘 6칸: 화면 폭에 맞춰 간격 · 크기가 저절로 맞춰져요', '아래로 내릴 때 아이콘 줄이 화면 맨 위에 딱 붙고, 뒤 글이 비치지 않게'] },
   { v: 'v16', date: '11월 12일', items: ['폰 교사실: 공지 · 캘린더 · 순서표 · 업무 · 조직도 · 통계를 색깔 아이콘 6칸으로 늘 위에 (내려도 따라와요)', '홈에 "교사실 바로 가기" 6칸', '패드 · 아이폰 홈 화면 아이콘이 "조" 글자로 나오던 것 고침 (크기별 아이콘 · 이름 설정)'] },
   { v: 'v15', date: '11월 11일', items: ['아이 표시(선교사 가정 · VIP · 새친구 · 돌봄 필요 등) 누구나 고치기 — 아이 카드 → 표시 고치기', '결석 표시는 출석부로 자동: 2~3주 결석 · 4~7주 장기 결석 · 8주 넘으면 오래 못 봄 (주마다 바뀌어요)', '폰에서 교사실 메뉴를 그림 타일 서랍으로', '폰에서 순서표 분류 아이콘을 4칸 두 줄로 한눈에', '순서표 주일 카드가 상자 밖으로 나가던 것 정리'] },
@@ -1398,7 +1399,7 @@ function helpInstall() {
     android: [['크롬으로 열기', '카카오톡 안이라면 ⋮ → [다른 브라우저로 열기].'], ['⋮ 메뉴 누르기', '오른쪽 위 점 세 개예요.'], ['[앱 설치] 또는 [홈 화면에 추가]', '[설치]를 누르면 홈 화면에 조이코너 아이콘이 생겨요.']],
     pc: [['크롬 · 엣지로 열기', '주소창 오른쪽 끝을 봐요.'], ['설치 아이콘 누르기', '모니터 모양에 화살표가 있는 아이콘이에요.'], ['[설치]', '바탕화면과 작업표시줄에 앱처럼 생겨요.']]
   }[dev];
-  return `${isStandalone() ? '<div class="note">지금 홈 화면 앱으로 열려 있어요. 따로 할 일이 없어요!</div>' : ''}
+  return `${iosOtherNote(true)}${isStandalone() ? '<div class="note">지금 홈 화면 앱으로 열려 있어요. 따로 할 일이 없어요!</div>' : ''}
 ${S.bip && !isStandalone() ? '<button class="cta" data-act="installNow">지금 설치</button>' : ''}
 <div class="seg">${tabs.map(([k, l]) => `<button class="${dev === k ? 'on' : ''}" data-act="helpDev" data-id="${k}">${l}</button>`).join('')}</div>
 <div class="installwrap"><ol class="steps">${steps.map(([a, b], i) => `<li><span class="sn">${i + 1}</span><div><b>${esc(a)}</b><p>${esc(b)}</p></div></li>`).join('')}</ol>
@@ -3406,3 +3407,17 @@ const roomDock = active => `<nav class="rdock" aria-label="교사실">${ROOM_TAB
 
 /* v17 — 아이콘 줄이 위에 붙으면 아래 선을 보여 줘요 */
 document.addEventListener('scroll', e => { const sc = e.target; if (!sc.classList || !sc.classList.contains('scroll')) return; const d = sc.querySelector(':scope>.rdock'); if (d) d.classList.toggle('stuck', sc.scrollTop > 40); }, true);
+
+/* ================= v18 · 아이폰 · 아이패드 다른 브라우저 안내 ================= */
+const isIOS = () => /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+const iosOther = () => { const u = navigator.userAgent; return isIOS() && /CriOS|FxiOS|EdgiOS|KAKAOTALK|NAVER|Whale|Instagram|FBAN|Line\//i.test(u); };
+function iosOtherNote(force) {
+  if (!iosOther() || isStandalone()) return '';
+  if (!force && lsGet('jc_iosnote') === '1') return '';
+  const app = /KAKAOTALK/i.test(navigator.userAgent) ? '카카오톡' : /CriOS/.test(navigator.userAgent) ? '크롬' : '이 브라우저';
+  return `<div class="iosnote full">${svg('<circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16.5v.5"/>', 20, 2)}<span class="grow"><b>${app}에서 홈 화면에 추가하면 아이콘이 '조' 글자로 나와요.</b><br>아이폰 · 아이패드는 <b>사파리</b>에서 추가해야 조이코너 아이콘이 제대로 들어가요. 주소를 복사해서 사파리에 붙여넣은 뒤 공유 ⬆ → 홈 화면에 추가를 눌러 주세요.<span class="btns2"><button class="pri sm" data-act="copyUrl">주소 복사</button>${force ? '' : '<button class="ghost sm" data-act="iosNoteOff">다음에</button>'}</span></span></div>`;
+}
+Object.assign(ACT, {
+  copyUrl: async () => { const u = location.origin + location.pathname; try { await navigator.clipboard.writeText(u); toast('주소를 복사했어요 · 사파리 주소창에 붙여넣어 주세요'); } catch { prompt('이 주소를 복사해 사파리에 붙여넣어 주세요', u); } },
+  iosNoteOff: () => { lsSet('jc_iosnote', '1'); paint(); }
+});
