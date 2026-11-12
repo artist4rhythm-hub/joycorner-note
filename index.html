@@ -19,7 +19,7 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="조이코너">
 <meta name="application-name" content="조이코너">
-<link rel="modulepreload" href="app.js?v=v18">
+<link rel="modulepreload" href="app.js?v=v19">
 <link rel="modulepreload" href="firebase-config.js">
 <link rel="modulepreload" href="https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js" crossorigin>
 <link rel="modulepreload" href="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js" crossorigin>
@@ -846,10 +846,28 @@ input[type=date].in::-webkit-date-and-time-value,input[type=time].in::-webkit-da
 .iosnote{display:flex;gap:10px;align-items:flex-start;background:#FFF4F3;border:1px solid #E8A39C;border-radius:20px;padding:12px 14px;font-size:14px;line-height:1.55;color:#5A3A2A}
 .iosnote>svg{color:#C62828;flex:none;margin-top:2px}.iosnote .grow{flex:1;min-width:0}.iosnote b{color:#8E1B1B;font-weight:400}
 .iosnote .btns2{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
+
+/* ===== v19 ===== */
+.lockbar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;background:#fff;border:1px solid #F0E2C8;border-radius:20px;padding:10px 12px}
+.lockbar .grow{flex:1 1 200px;display:flex;flex-direction:column;gap:2px;min-width:0}.lockbar b{font-weight:400;font-size:15px}.lockbar small{font-size:12px;color:#6B5646}
+.lockbar.on{background:#F4EEE6;border-color:#D9C7A8}.lockbar.on>svg{color:#6B5646;flex:none}
+.lockbar .sm{min-height:38px;font-size:14px;display:inline-flex;align-items:center;gap:4px}
+.lockpill{display:inline-flex;align-items:center;gap:5px;min-height:44px;padding:0 14px;border-radius:22px;border:0;background:#5A4636;color:#fff;font-family:inherit;font-size:15px;cursor:pointer;flex:none}
+.grid.locked .kid{cursor:not-allowed}.grid.locked .kid:not(.on){opacity:.6}
+.grid.locked .kid.on{border-color:#7C9C86;background:#EEF5F0}
+.loglist{display:flex;flex-direction:column;border:1px solid #F0E2C8;border-radius:16px;background:#fff;max-height:60vh;overflow-y:auto}
+.logrow{display:grid;grid-template-columns:76px 84px minmax(0,1fr) auto;gap:8px;align-items:center;padding:9px 12px;border-bottom:1px solid #F5EBD8;font-size:14px}
+.logrow:last-child{border-bottom:0}.logrow .lt{color:#8A5A2B;font-size:12px}.logrow .lw{color:#6B5646;font-size:13px}.logrow b{font-weight:400}
+.logrow .lk{font-size:13px;border-radius:10px;padding:3px 8px;background:#F3EBDD;justify-self:start}
+.logrow.on .lk{background:#DDF1E3;color:#1E6B3E}.logrow.off .lk,.logrow.clear .lk{background:#FDE3E1;color:#B3261E}.logrow.lock .lk{background:#5A4636;color:#fff}.logrow.unlock .lk{background:#FFF1DC;color:#A85F00}
+@media (max-width:420px){.logrow{grid-template-columns:62px 74px minmax(0,1fr);}.logrow .lw{grid-column:3;font-size:12px}}
+.undobar{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(92px + env(safe-area-inset-bottom));z-index:90;display:flex;align-items:center;gap:12px;background:#2B2018;color:#fff;border-radius:22px;padding:10px 10px 10px 16px;font-size:15px;box-shadow:0 12px 30px -12px rgba(0,0,0,.5);max-width:calc(100% - 32px)}
+.undobar button{border:0;background:#FFD66B;color:#2B2018;font-family:inherit;font-size:15px;border-radius:16px;padding:8px 14px;cursor:pointer;flex:none}
+@media (min-width:720px){.undobar{bottom:28px}}
 </style>
 </head>
 <body>
 <div id="app"></div>
-<script type="module" src="app.js?v=v18"></script>
+<script type="module" src="app.js?v=v19"></script>
 </body>
 </html>

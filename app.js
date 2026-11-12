@@ -184,11 +184,11 @@ function vAttend() {
   const dd = parseD(d);
   return `<div class="ahead"><div class="top"><div class="ttl" style="font-size:22px">${esc(S.classes[c].name)} <span class="cnt">${n}<small>/${kids.length}</small></span></div>
 <div class="date"><button data-act="week" data-n="-7" aria-label="지난 주">◀</button><span>${dd.getMonth() + 1}/${dd.getDate()} 주일</span><button data-act="week" data-n="7" aria-label="다음 주" ${d >= maxD ? 'disabled' : ''}>▶</button></div></div>
-<div class="row2"><div class="bar"><div class="fill" style="width:${pct}%"></div></div><span class="save ${S.pending ? 'wait' : ''}">${S.pending ? '대기 중' : '저장됨'}</span><button class="pri sm" data-act="allIn">${svg(ICON.checkc, 20, 2.4)}전원 출석</button></div></div>
+<div class="row2"><div class="bar"><div class="fill" style="width:${pct}%"></div></div><span class="save ${S.pending ? 'wait' : ''}">${S.pending ? '대기 중' : '저장됨'}</span>${attLocked() ? `<button class="lockpill" data-act="attLockInfo">${svg(LOCK_IC, 18, 2.2)}마감됨</button>` : `<button class="pri sm" data-act="allIn">${svg(ICON.checkc, 20, 2.4)}전원 출석</button>`}</div></div>
 <div class="scroll" style="padding-top:8px">${classChips()}
 <div class="story">${sch ? (sch.noService ? '이 주일은 조이코너 예배가 없어요' : '오늘의 이야기 · ' + esc(sch.story || '')) : ''}${S.pending ? ' · 인터넷이 연결되면 저절로 올라가요' : ''}</div>
-<div style="display:flex;align-items:center;justify-content:space-between;gap:8px"><p class="hint">한 번 누르면 출석, 다시 누르면 취소</p><button class="ghost" style="min-height:40px;padding:0 14px;font-size:13px;flex:none" data-act="clearAsk">다시 하기</button></div>
-<div class="grid">${kids.map(k => { const on = marks[k.id] === 'p'; return `<button class="kid ${on ? 'on' : ''} ${k.gender ? 'g-' + k.gender : ''}" data-act="toggle" data-id="${k.id}" aria-pressed="${on}"><span class="stamp">${svg(ICON.check, 18, 3)}</span><span class="kav">${avatar(k, 84)}</span><b class="nm">${esc(k.name)}${genderMark(k)}</b><span class="st">${on ? '왔어요' : '아직'}</span></button>`; }).join('')}</div>
+${attLockBar(n, kids.length)}
+<div class="grid ${attLocked() ? 'locked' : ''}">${kids.map(k => { const on = marks[k.id] === 'p'; return `<button class="kid ${on ? 'on' : ''} ${k.gender ? 'g-' + k.gender : ''}" data-act="toggle" data-id="${k.id}" aria-pressed="${on}"><span class="stamp">${svg(ICON.check, 18, 3)}</span><span class="kav">${avatar(k, 84)}</span><b class="nm">${esc(k.name)}${genderMark(k)}</b><span class="st">${on ? '왔어요' : '아직'}</span></button>`; }).join('')}</div>
 <button class="addkid" data-act="addKid">+ 새로 온 친구 등록</button><button class="ghost" data-act="go" data-to="stats">출석 통계 보기</button></div>${nav('attend')}`;
 }
 function ensureAttWatch() {
@@ -199,7 +199,8 @@ function ensureAttWatch() {
   if (!want) return;
   const c = S.cur, d = S.attDate;
   S.unsubAtt = onSnapshot(doc(db, 'attendance', want), { includeMetadataChanges: true }, snap => {
-    if (snap.exists()) { (S.att[c] ||= {})[d] = snap.data().marks || {}; }
+    if (snap.exists()) { const x = snap.data(); (S.att[c] ||= {})[d] = x.marks || {}; ATTL.meta[want] = { locked: x.locked, lockedBy: x.lockedBy || '', lockedByName: x.lockedByName || '', lockedAt: x.lockedAt || '' }; }
+    else ATTL.meta[want] = {};
     S.pending = snap.metadata.hasPendingWrites;
     if (S.route === 'attend' && S.watchKey === want) paint();
   }, () => { /* 권한 없음 등은 조용히 */ });
@@ -210,9 +211,12 @@ function writeMarks(marksPatch) {
     .catch(e => toast('저장하지 못했어요: ' + (e.code === 'permission-denied' ? '권한이 없어요' : e.message)));
 }
 function toggleKid(id) {
+  if (attLocked()) return attLockedToast();
   const c = S.cur, d = S.attDate; const marks = ((S.att[c] ||= {})[d] ||= {});
   const on = marks[id] === 'p'; if (on) delete marks[id]; else marks[id] = 'p';
   paint(); writeMarks({ [id]: on ? deleteField() : 'p' });
+  const k = findKid(id); attLog(on ? 'off' : 'on', { kid: id, kidName: k ? k.name : '' });
+  if (on) undoBar(`${k ? k.name : ''} 출석을 취소했어요`, () => { if (attLocked()) return; marks[id] = 'p'; paint(); writeMarks({ [id]: 'p' }); attLog('on', { kid: id, kidName: k ? k.name : '', undo: true }); });
 }
 
 /* ---------- 친구들 ---------- */
@@ -732,9 +736,10 @@ async function dutyDel() {
 }
 
 /* ---------- 교사실 (공지 · 캘린더 · 업무 분담 · 조직도 · 통계) ---------- */
-const APP_VERSION = 'v18';
+const APP_VERSION = 'v19';
 const APP_DATE = '2026-11-12';
 const CHANGELOG = [
+  { v: 'v19', date: '11월 12일', items: ['출석 마감: 다 체크하면 [출석 마감]으로 잠가요 — 잠긴 출석부는 누구도 실수로 바꿀 수 없어요', '지난 주일 출석은 수요일부터 저절로 잠겨요 (디렉터 · 관리자는 풀 수 있어요)', '출석 기록: 누가 언제 누구를 체크 · 취소 · 마감했는지 모두 남아요', '체크를 취소하면 5초 동안 [되돌리기]'] },
   { v: 'v18', date: '11월 12일', items: ['아이폰 · 아이패드에서 크롬 · 카톡 브라우저로 열면 "사파리로 열어 홈 화면에 추가하세요" 안내 (아이콘이 "조" 글자로 나오지 않게)', '크롬이 큰 아이콘을 고르도록 아이콘 크기 표시'] },
   { v: 'v17', date: '11월 12일', items: ['폰 교사실 아이콘 6칸: 화면 폭에 맞춰 간격 · 크기가 저절로 맞춰져요', '아래로 내릴 때 아이콘 줄이 화면 맨 위에 딱 붙고, 뒤 글이 비치지 않게'] },
   { v: 'v16', date: '11월 12일', items: ['폰 교사실: 공지 · 캘린더 · 순서표 · 업무 · 조직도 · 통계를 색깔 아이콘 6칸으로 늘 위에 (내려도 따라와요)', '홈에 "교사실 바로 가기" 6칸', '패드 · 아이폰 홈 화면 아이콘이 "조" 글자로 나오던 것 고침 (크기별 아이콘 · 이름 설정)'] },
@@ -2013,9 +2018,9 @@ const ACT = {
   back: () => { if (S.route === 'kid') go('friends'); else go('home'); },
   cls: d => { S.cur = d.id; lsSet('jc_cur', d.id); route(); },
   toggle: d => toggleKid(d.id),
-  allIn: () => { const c = S.cur, d = S.attDate; const m = ((S.att[c] ||= {})[d] ||= {}); const patch = {}; activeKids(c).forEach(k => { m[k.id] = 'p'; patch[k.id] = 'p'; }); paint(); writeMarks(patch); },
-  clearAsk: () => sheet(`<div class="ttl" style="font-size:22px">출석을 모두 지울까요?</div><div class="sub">이 주일의 체크가 전부 사라져요.</div><div class="btns"><button class="pri" data-act="clearYes">네, 지울게요</button><button class="sec" data-act="sheetClose">아니요</button></div>`),
-  clearYes: () => { const c = S.cur, d = S.attDate; const m = (S.att[c] ||= {}); const patch = {}; Object.keys(m[d] || {}).forEach(id => { patch[id] = deleteField(); }); m[d] = {}; closeSheet(); paint(); if (Object.keys(patch).length) writeMarks(patch); },
+  allIn: () => { if (attLocked()) return attLockedToast(); const c = S.cur, d = S.attDate; const m = ((S.att[c] ||= {})[d] ||= {}); const patch = {}; activeKids(c).forEach(k => { if (m[k.id] !== 'p') { m[k.id] = 'p'; patch[k.id] = 'p'; } }); paint(); if (Object.keys(patch).length) { writeMarks(patch); attLog('all', { n: Object.keys(patch).length }); } },
+  clearAsk: () => sheet(`<div class="ttl" style="font-size:22px">출석을 모두 지울까요?</div><div class="sub">이 주일의 체크가 전부 사라져요. 누가 언제 지웠는지 기록에 남아요.</div><div class="btns"><button class="pri" data-act="clearYes">네, 지울게요</button><button class="sec" data-act="sheetClose">아니요</button></div>`),
+  clearYes: () => { if (attLocked()) { closeSheet(); return attLockedToast(); } const c = S.cur, d = S.attDate; const m = (S.att[c] ||= {}); const patch = {}; const before = Object.keys(m[d] || {}).length; Object.keys(m[d] || {}).forEach(id => { patch[id] = deleteField(); }); m[d] = {}; closeSheet(); paint(); if (Object.keys(patch).length) { writeMarks(patch); attLog('clear', { n: before }); } },
   week: d => { const nd = addDays(S.attDate, Number(d.n)); if (nd > ymd(sundayOnOrBefore(new Date()))) return; S.attDate = nd; route(); },
   kid: d => go('kid/' + d.id),
   editKid: editKidSheet, saveKid,
@@ -3420,4 +3425,64 @@ function iosOtherNote(force) {
 Object.assign(ACT, {
   copyUrl: async () => { const u = location.origin + location.pathname; try { await navigator.clipboard.writeText(u); toast('주소를 복사했어요 · 사파리 주소창에 붙여넣어 주세요'); } catch { prompt('이 주소를 복사해 사파리에 붙여넣어 주세요', u); } },
   iosNoteOff: () => { lsSet('jc_iosnote', '1'); paint(); }
+});
+
+/* ================= v19 · 출석 마감 · 수정 기록 ================= */
+const LOCK_IC = '<rect x="5" y="11" width="14" height="10" rx="2.5"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/>';
+const UNLOCK_IC = '<rect x="5" y="11" width="14" height="10" rx="2.5"/><path d="M8 11V8a4 4 0 0 1 7.5-2"/>';
+const ATTL = { meta: {}, log: {} };
+const attKey = () => `${S.cur}_${S.attDate}`;
+// 지난 주일은 화요일이 지나면(수요일부터) 저절로 잠겨요 — 일부러 푼 경우(locked:false)만 빼고
+const attAuto = d => addDays(d, 3) <= ymd(new Date());
+function attLocked() {
+  const m = ATTL.meta[attKey()] || {};
+  if (m.locked === true) return true;
+  if (m.locked === false) return false;
+  return attAuto(S.attDate);
+}
+function attLockedToast() { toast(isAdminMe() ? '마감된 출석부예요 · 고치려면 [잠금 풀기]를 눌러 주세요' : '마감된 출석부예요 · 고칠 게 있으면 디렉터 · 관리자에게 말씀해 주세요'); }
+function attLockBar(n, total) {
+  const m = ATTL.meta[attKey()] || {}, locked = attLocked(), auto = locked && m.locked !== true;
+  const canUnlock = isAdminMe() || (m.locked === true && m.lockedBy === S.me.email && !attAuto(S.attDate));
+  if (locked) return `<div class="lockbar on">${svg(LOCK_IC, 22, 2)}<span class="grow"><b>마감된 출석부 · ${n}명 출석</b><small>${auto ? '지난 주일이라 저절로 잠겼어요' : `${esc(m.lockedByName || '')} 선생님이 ${m.lockedAt ? (t => `${t.getMonth() + 1}/${t.getDate()} ${pad(t.getHours())}:${pad(t.getMinutes())}`)(new Date(m.lockedAt)) : ''} 마감`}</small></span><button class="ghost sm" data-act="attLog">기록</button>${canUnlock ? `<button class="ghost sm" data-act="attUnlockAsk">${svg(UNLOCK_IC, 15, 2)}잠금 풀기</button>` : ''}</div>`;
+  return `<div class="lockbar"><span class="grow"><b>한 번 누르면 출석, 다시 누르면 취소</b><small>다 체크했으면 [출석 마감]을 눌러 잠가 주세요 · 수요일엔 저절로 잠겨요</small></span><button class="ghost sm" data-act="attLog">기록</button><button class="ghost sm" data-act="clearAsk">다시 하기</button><button class="pri sm" data-act="attLockAsk" ${total ? '' : 'disabled'}>${svg(LOCK_IC, 16, 2.2)}출석 마감</button></div>`;
+}
+function attLog(kind, extra = {}) {
+  const c = S.cur, d = S.attDate;
+  const row = { key: `${c}_${d}`, classId: c, date: d, kind, at: new Date().toISOString(), by: S.me.email, name: myName(), ...extra };
+  const r = doc(collection(db, 'attlog')); (ATTL.log[row.key] ||= null);
+  setDoc(r, row).catch(() => { });
+  if (Array.isArray(ATTL.log[row.key])) ATTL.log[row.key].unshift({ id: r.id, ...row });
+}
+async function attLockSet(lock) {
+  const c = S.cur, d = S.attDate, key = `${c}_${d}`;
+  const data = lock ? { classId: c, date: d, locked: true, lockedBy: S.me.email, lockedByName: myName(), lockedAt: new Date().toISOString() } : { classId: c, date: d, locked: false, lockedBy: '', lockedByName: '', lockedAt: '', unlockedBy: S.me.email, unlockedAt: new Date().toISOString() };
+  try { await setDoc(doc(db, 'attendance', key), data, { merge: true }); ATTL.meta[key] = { ...(ATTL.meta[key] || {}), ...data }; attLog(lock ? 'lock' : 'unlock', { n: Object.keys((S.att[c] || {})[d] || {}).length }); closeSheet(); toast(lock ? '출석을 마감했어요 · 이제 실수로 바뀌지 않아요' : '잠금을 풀었어요 · 다 고치면 다시 [출석 마감]을 눌러 주세요'); paint(); }
+  catch (e) { toast((lock ? '마감' : '잠금 풀기') + '하지 못했어요: ' + errMsg(e)); }
+}
+const LOG_TXT = { on: '출석 체크', off: '출석 취소', all: '전원 출석', clear: '모두 지움', lock: '출석 마감', unlock: '잠금 풀기' };
+async function attLogSheet() {
+  const key = attKey();
+  sheet(`<div class="ttl" style="font-size:24px">출석 기록 · ${esc(clsName(S.cur))} ${fmtShort(S.attDate)}</div><div class="sub">불러오는 중…</div>`);
+  if (!Array.isArray(ATTL.log[key])) { try { const sn = await getDocs(query(collection(db, 'attlog'), where('key', '==', key))); ATTL.log[key] = sn.docs.map(x => ({ id: x.id, ...x.data() })).sort((a, b) => ko(b.at, a.at)); } catch { ATTL.log[key] = []; } }
+  const l = ATTL.log[key];
+  sheet(`<div class="ttl" style="font-size:24px">출석 기록 · ${esc(clsName(S.cur))} ${fmtShort(S.attDate)}</div>
+<div class="sub">누가 언제 무엇을 바꿨는지 남아요. 기록은 지울 수 없어요.</div>
+<div class="loglist">${l.length ? l.map(x => { const t = new Date(x.at); return `<div class="logrow ${x.kind}"><span class="lt">${t.getMonth() + 1}/${t.getDate()} ${pad(t.getHours())}:${pad(t.getMinutes())}</span><span class="lk">${LOG_TXT[x.kind] || x.kind}${x.undo ? ' (되돌리기)' : ''}</span><span class="grow">${x.kidName ? `<b>${esc(x.kidName)}</b>` : x.n ? `${x.n}명` : ''}</span><span class="lw">${esc(x.name || '')}</span></div>`; }).join('') : '<div class="sub" style="padding:12px">아직 기록이 없어요. (v19부터 기록돼요)</div>'}</div>
+<div class="btns"><button class="pri" data-act="sheetClose">닫기</button></div>`);
+}
+let undoT = null;
+function undoBar(msg, fn) {
+  const old = document.querySelector('.undobar'); if (old) old.remove(); clearTimeout(undoT);
+  const el = document.createElement('div'); el.className = 'undobar'; el.innerHTML = `<span>${esc(msg)}</span><button>되돌리기</button>`;
+  el.querySelector('button').onclick = () => { el.remove(); clearTimeout(undoT); fn(); };
+  document.body.appendChild(el); undoT = setTimeout(() => el.remove(), 5000);
+}
+Object.assign(ACT, {
+  attLockAsk: () => { const c = S.cur, d = S.attDate, n = activeKids(c).filter(k => ((S.att[c] || {})[d] || {})[k.id] === 'p').length; sheet(`<div class="ttl" style="font-size:22px">${esc(clsName(c))} ${fmtShort(d)} 출석을 마감할까요?</div><div class="sub">${n}명 출석 · ${activeKids(c).length - n}명 결석으로 잠가요. 잠근 뒤에는 누구도 실수로 바꿀 수 없어요. 고칠 게 생기면 마감한 선생님이나 디렉터 · 관리자가 풀 수 있어요.</div><div class="btns"><button class="pri" data-act="attLock">${svg(LOCK_IC, 18, 2.2)} 마감하기</button><button class="sec" data-act="sheetClose">아직이요</button></div>`); },
+  attLock: () => attLockSet(true),
+  attUnlockAsk: () => sheet(`<div class="ttl" style="font-size:22px">잠금을 풀까요?</div><div class="sub">다른 선생님들도 다시 체크를 바꿀 수 있게 돼요. 누가 풀었는지 기록에 남아요. 다 고치면 다시 [출석 마감]을 눌러 주세요.</div><div class="btns"><button class="pri" data-act="attUnlock">잠금 풀기</button><button class="sec" data-act="sheetClose">취소</button></div>`),
+  attUnlock: () => attLockSet(false),
+  attLockInfo: () => attLockedToast(),
+  attLog: () => attLogSheet()
 });
