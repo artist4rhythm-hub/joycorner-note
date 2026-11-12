@@ -127,7 +127,14 @@ function sheet(html) {
   closeSheet();
   const bg = document.createElement('div'); bg.className = 'sbg'; bg.id = 'sheet';
   bg.innerHTML = `<div class="sheet" role="dialog" aria-modal="true">${html}</div>`;
-  bg.addEventListener('click', e => { if (e.target === bg) closeSheet(); });
+  let downOnBg = false;
+  bg.addEventListener('pointerdown', e => { downOnBg = e.target === bg; });
+  bg.addEventListener('input', () => { bg.dataset.dirty = '1'; });
+  bg.addEventListener('click', e => {
+    if (e.target !== bg || !downOnBg) return;            // 글을 끌어 고르다 밖에서 손을 뗀 경우는 닫지 않아요
+    if (bg.dataset.dirty) { const sh = bg.querySelector('.sheet'); sh.classList.remove('nudge'); void sh.offsetWidth; sh.classList.add('nudge'); toast('쓰던 내용이 있어요 · 닫으려면 [취소]를 눌러 주세요'); return; }
+    closeSheet();
+  });
   appEl.appendChild(bg);
   return bg;
 }
@@ -736,9 +743,10 @@ async function dutyDel() {
 }
 
 /* ---------- 교사실 (공지 · 캘린더 · 업무 분담 · 조직도 · 통계) ---------- */
-const APP_VERSION = 'v19';
+const APP_VERSION = 'v20';
 const APP_DATE = '2026-11-12';
 const CHANGELOG = [
+  { v: 'v20', date: '11월 12일', items: ['글을 끌어 고르다 창 밖에서 손을 떼도 창이 닫히지 않아요 · 쓰던 내용이 있으면 바깥을 눌러도 안 닫혀요', '공지 임시 저장: 나만 보이는 임시 저장 · 쓰는 동안 기기에도 저절로 보관', '공지 양식: 행사 안내 · 주일 공지 · 기도 제목 + 직접 만든 양식', '넓은 화면 교사실 탭에도 색깔 아이콘'] },
   { v: 'v19', date: '11월 12일', items: ['출석 마감: 다 체크하면 [출석 마감]으로 잠가요 — 잠긴 출석부는 누구도 실수로 바꿀 수 없어요', '지난 주일 출석은 수요일부터 저절로 잠겨요 (디렉터 · 관리자는 풀 수 있어요)', '출석 기록: 누가 언제 누구를 체크 · 취소 · 마감했는지 모두 남아요', '체크를 취소하면 5초 동안 [되돌리기]'] },
   { v: 'v18', date: '11월 12일', items: ['아이폰 · 아이패드에서 크롬 · 카톡 브라우저로 열면 "사파리로 열어 홈 화면에 추가하세요" 안내 (아이콘이 "조" 글자로 나오지 않게)', '크롬이 큰 아이콘을 고르도록 아이콘 크기 표시'] },
   { v: 'v17', date: '11월 12일', items: ['폰 교사실 아이콘 6칸: 화면 폭에 맞춰 간격 · 크기가 저절로 맞춰져요', '아래로 내릴 때 아이콘 줄이 화면 맨 위에 딱 붙고, 뒤 글이 비치지 않게'] },
@@ -761,7 +769,7 @@ const CHANGELOG = [
 ];
 const R = { tab: 'notice', notices: null, events: null, month: null, day: null, editNotice: null, editEvent: null, editPreset: null, dutyView: 'table', open: {} };
 const ROOM_TABS = [['notice', '공지'], ['cal', '캘린더'], ['turns', '순서표'], ['duty', '업무 분담'], ['org', '조직도'], ['stats', '통계']];
-const roomTabs = active => `<div class="seg roomseg">${ROOM_TABS.map(([k, l]) => `<button class="${active === k ? 'on' : ''}" data-act="rtab" data-id="${k}">${l}</button>`).join('')}</div>${roomDock(active)}`;
+const roomTabs = active => `<div class="seg roomseg">${ROOM_TABS.map(([k, l]) => `<button class="${active === k ? 'on' : ''}" data-act="rtab" data-id="${k}" style="--c:${(ROOM_INFO[k] || [])[3] || '#C62828'}"><span class="rti">${svg((ROOM_INFO[k] || [])[2] || '', 17, 2)}</span><span>${l}</span></button>`).join('')}</div>${roomDock(active)}`;
 const NOTE_KINDS = ['통화', '문자', '심방', '기도제목', '특이사항'];
 
 async function loadDuties() {
@@ -788,7 +796,8 @@ function vRoom() {
 /* 공지 */
 function rNotices() {
   const list = sortedNotices(), admin = isAdminMe();
-  return `${admin ? '<button class="cta full" data-act="noticeNew">+ 공지 올리기</button>' : ''}
+  if (admin && DR.list === null) loadDrafts();
+  return `${admin ? '<button class="cta full" data-act="noticeNew">+ 공지 올리기</button>' : ''}${admin ? draftList() : ''}
 ${list.length ? list.map(n => `<button class="card tapcard ncard" data-act="noticeOpen" data-id="${n.id}">${n.thumb ? `<img class="nthumb" src="${n.thumb}" alt="">` : ''}<div class="lbl"><span>${n.pinned ? '📌 ' : ''}${esc(n.category || '공지')}${n.eventDate ? ' · ' + fmtMD(n.eventDate) : ''}</span><span class="s2">${esc((n.at || '').slice(5, 10).replace('-', '/'))}</span></div><div class="big" style="font-size:21px">${esc(n.title)}</div><div class="clamp">${esc(n.body || '')}</div><div class="s2">${esc(n.authorName || '')}${n.imgCount ? ` · 사진 ${n.imgCount}장` : ''}${n.links ? ' · 링크' : ''}</div></button>`).join('') : '<div class="sub full">아직 공지가 없어요.</div>'}`;
 }
 function commentBlock(postId, type) {
@@ -1134,12 +1143,16 @@ ${n.links ? `<div class="links">${n.links.split('\n').filter(Boolean).map(l => `
 </article>
 ${commentBlock(n.id, 'notice')}</div>${nav('room')}`;
 }
-async function noticeSheet(id) {
-  const n = id ? R.notices.find(x => x.id === id) : { category: '공지', title: '', body: '', links: '', eventDate: '', eventTime: '', pinned: false, imgCount: 0 };
-  if (!n) return;
-  R.editNotice = id || null;
+async function noticeSheet(id, fromDraft) {
+  const base = id ? R.notices.find(x => x.id === id) : { category: '공지', title: '', body: '', links: '', eventDate: '', eventTime: '', pinned: false, imgCount: 0 };
+  if (!base) return;
+  const n = fromDraft ? { ...base, ...fromDraft } : base;
+  R.editNotice = id || null; R.draftId = fromDraft ? fromDraft.id || null : null;
   pkInit('notice', id ? await loadImgs('noticeImages', id, n.imgCount) : [], 'photo');
-  sheet(`<div class="ttl" style="font-size:24px">${id ? '공지 고치기' : '공지 올리기'}</div>
+  loadTpls();
+  sheet(`<div class="ttl" style="font-size:24px">${id ? '공지 고치기' : '공지 올리기'}${R.draftId ? ' <span class="tag g">임시 저장한 글</span>' : ''}</div>
+${localDraftNote(id)}
+<div class="tplbar" id="tplbar">${tplBar()}</div>
 <div class="two"><label class="fld">종류<select class="in" id="n_cat">${['공지', '행사', '자료', '기도'].map(c => `<option ${n.category === c ? 'selected' : ''}>${c}</option>`).join('')}</select></label><label class="chk" style="align-self:end"><input type="checkbox" id="n_pin" ${n.pinned ? 'checked' : ''}>맨 위에 고정</label></div>
 <label class="fld">제목<input class="in" id="n_title" value="${esc(n.title)}"></label>
 <label class="fld">내용<textarea id="n_body" style="min-height:180px">${esc(n.body || '')}</textarea></label>
@@ -1147,8 +1160,10 @@ async function noticeSheet(id) {
 <div class="two"><label class="fld">행사 날짜 (있으면)<input class="in" type="date" id="n_date" value="${esc(n.eventDate || '')}"></label><label class="fld">시간<input class="in" id="n_time" value="${esc(n.eventTime || '')}" placeholder="예: 13:30"></label></div>
 <div class="fld">사진 (최대 10장)</div>${pkHtml('notice')}
 <div class="sub" id="n_msg"></div>
-<div class="btns"><button class="pri" data-act="noticeSave">저장</button><button class="sec" data-act="sheetClose">취소</button></div>
+<div class="btns"><button class="pri" data-act="noticeSave">${id ? '고친 내용 게시' : '게시하기'}</button><button class="sec" data-act="draftSave">임시 저장</button><button class="sec" data-act="noticeCancel">취소</button></div>
+<div class="s2">임시 저장한 글은 나만 보여요 (사진은 게시할 때 넣어 주세요) · 쓰는 동안 이 기기에도 저절로 보관돼요 · <button class="linkbtn" data-act="tplSaveAsk">이 글을 양식으로 저장</button></div>
 ${id ? '<button class="ghost danger" data-act="noticeDel">공지 지우기</button>' : ''}`);
+  const box = $('#sheet'); box.addEventListener('input', () => { clearTimeout(R.adT); R.adT = setTimeout(() => autoDraft(id), 800); });
 }
 async function noticeSave() {
   if (PK.notice && PK.notice.busy) return toast('사진을 준비하고 있어요. 잠시만요');
@@ -1163,7 +1178,8 @@ async function noticeSave() {
     data.thumb = data.imgCount ? await thumbFrom(PK.notice.items[0].url, 480) : '';
     await setDoc(ref, data);
     if (old) Object.assign(old, data); else R.notices.push({ id: ref.id, ...data });
-    closeSheet(); toast('저장했어요'); if (S.route === 'notice' && S.arg === ref.id) paint(); else go('notice/' + ref.id);
+    if (R.draftId) { deleteDoc(doc(db, 'drafts', R.draftId)).catch(() => { }); DR.list = (DR.list || []).filter(x => x.id !== R.draftId); R.draftId = null; }
+    lsDel(adKey(id)); closeSheet(); toast('게시했어요'); if (S.route === 'notice' && S.arg === ref.id) paint(); else go('notice/' + ref.id);
   } catch (e) { msg.textContent = ''; toast('저장하지 못했어요: ' + errMsg(e)); }
 }
 async function noticeDel() {
@@ -3485,4 +3501,90 @@ Object.assign(ACT, {
   attUnlock: () => attLockSet(false),
   attLockInfo: () => attLockedToast(),
   attLog: () => attLogSheet()
+});
+
+/* ================= v20 · 임시 저장 · 양식 ================= */
+const lsDel = k => { try { localStorage.removeItem(k); } catch { /* 괜찮아요 */ } };
+const adKey = id => `jc_ad_${S.me.email}_${id || 'new'}`;
+const noticeFields = () => ({ category: val('n_cat'), title: val('n_title'), body: ($('#n_body') || {}).value || '', links: (($('#n_links') || {}).value || '').trim(), eventDate: val('n_date'), eventTime: val('n_time'), pinned: !!($('#n_pin') || {}).checked });
+function autoDraft(id) { if (!$('#n_title')) return; const f = noticeFields(); if (!f.title && !f.body) return; lsSet(adKey(id), JSON.stringify({ ...f, savedAt: new Date().toISOString() })); }
+function localDraftNote(id) {
+  let d = null; try { d = JSON.parse(lsGet(adKey(id)) || 'null'); } catch { d = null; }
+  if (!d || R.draftId) return '';
+  const t = new Date(d.savedAt);
+  return `<div class="adnote">${svg('<path d="M12 8v4l3 2"/><circle cx="12" cy="12" r="9"/>', 18, 2)}<span class="grow">쓰다 만 글이 있어요 · ${t.getMonth() + 1}/${t.getDate()} ${pad(t.getHours())}:${pad(t.getMinutes())} <b>${esc(d.title || '(제목 없음)')}</b></span><button class="ghost sm" data-act="adUse">이어 쓰기</button><button class="ghost sm" data-act="adDrop">버리기</button></div>`;
+}
+function fillNotice(f) {
+  if (f.category !== undefined && $('#n_cat')) $('#n_cat').value = f.category || '공지';
+  if (f.title !== undefined) $('#n_title').value = f.title || '';
+  if (f.body !== undefined) $('#n_body').value = f.body || '';
+  if (f.links !== undefined) $('#n_links').value = f.links || '';
+  if (f.eventDate !== undefined) $('#n_date').value = f.eventDate || '';
+  if (f.eventTime !== undefined) $('#n_time').value = f.eventTime || '';
+  if (f.pinned !== undefined) $('#n_pin').checked = !!f.pinned;
+  const bg = $('#sheet'); if (bg) bg.dataset.dirty = '1';
+}
+/* 임시 저장 (나만 보여요) */
+const DR = { list: null };
+async function loadDrafts() {
+  DR.list = [];
+  try { const sn = await getDocs(query(collection(db, 'drafts'), where('owner', '==', S.me.email))); DR.list = sn.docs.map(x => ({ id: x.id, ...x.data() })).sort((a, b) => ko(b.savedAt || '', a.savedAt || '')); } catch { DR.list = []; }
+  softPaint();
+}
+function draftList() {
+  const l = DR.list || []; if (!l.length) return '';
+  return `<section class="card full drafts"><div class="lbl"><span>내 임시 저장 ${l.length}개</span><span class="s2">나만 보여요</span></div>${l.map(d => { const t = new Date(d.savedAt); return `<div class="drow"><button class="grow" data-act="draftOpen" data-id="${d.id}"><b>${esc(d.title || '(제목 없음)')}</b><small>${d.noticeId ? '게시한 공지 고치는 중 · ' : ''}${t.getMonth() + 1}/${t.getDate()} ${pad(t.getHours())}:${pad(t.getMinutes())} 저장 · ${esc((d.body || '').split('\\n')[0].slice(0, 40))}</small></button><button class="editbtn" data-act="draftDel" data-id="${d.id}" aria-label="지우기">${svg('<path d="M5 7h14M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/>', 15, 1.8)}</button></div>`; }).join('')}</section>`;
+}
+async function draftSave() {
+  const f = noticeFields(); if (!f.title && !f.body) return toast('제목이나 내용을 조금이라도 적어 주세요');
+  const data = { ...f, owner: S.me.email, kind: 'notice', noticeId: R.editNotice || '', savedAt: new Date().toISOString() };
+  try {
+    const ref = R.draftId ? doc(db, 'drafts', R.draftId) : doc(collection(db, 'drafts'));
+    await setDoc(ref, data); R.draftId = ref.id;
+    DR.list = [{ id: ref.id, ...data }, ...(DR.list || []).filter(x => x.id !== ref.id)];
+    lsDel(adKey(R.editNotice)); const bg = $('#sheet'); if (bg) delete bg.dataset.dirty;
+    toast('임시 저장했어요 · 교사실 → 공지의 "내 임시 저장"에서 이어 쓸 수 있어요');
+  } catch (e) { toast('임시 저장하지 못했어요: ' + errMsg(e)); }
+}
+/* 양식 */
+const TPL_BUILTIN = [
+  { id: 'b1', name: '행사 안내', builtin: true, category: '행사', title: '[행사] ', body: '■ 일시: \n■ 장소: \n■ 대상: \n■ 준비물: \n■ 담당: \n■ 참고: ' },
+  { id: 'b2', name: '주일 공지', builtin: true, category: '공지', title: '이번 주일 조이코너 안내', body: '■ 이번 주 이야기: \n■ 설교 · 기도: \n■ 준비할 것: \n■ 함께 기도해요: ' },
+  { id: 'b3', name: '기도 제목', builtin: true, category: '기도', title: '함께 기도해요', body: '1. \n2. \n3. ' },
+  { id: 'b4', name: '자료 공유', builtin: true, category: '자료', title: '[자료] ', body: '무엇: \n어디에 쓰나요: \n', links: 'https://' }
+];
+const TPL = { list: null };
+async function loadTpls() {
+  if (TPL.list) return;
+  TPL.list = [];
+  try { const sn = await getDocs(query(collection(db, 'templates'), where('kind', '==', 'notice'))); TPL.list = sn.docs.map(x => ({ id: x.id, ...x.data() })).sort((a, b) => ko(a.name || '', b.name || '')); } catch { TPL.list = []; }
+  const bar = $('#tplbar'); if (bar) bar.innerHTML = tplBar();
+}
+function tplBar() {
+  const all = [...TPL_BUILTIN, ...(TPL.list || [])];
+  return `<span class="tpll">${svg('<rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h5"/>', 16, 2)}양식</span>${all.map(t => `<span class="tplchip ${t.builtin ? '' : 'mine'}"><button data-act="tplUse" data-id="${t.id}">${esc(t.name)}</button>${!t.builtin && (t.by === S.me.email || isAdminMe()) ? `<button class="x" data-act="tplDel" data-id="${t.id}" aria-label="${esc(t.name)} 양식 지우기">×</button>` : ''}</span>`).join('')}`;
+}
+function tplUse(id) {
+  const t = [...TPL_BUILTIN, ...(TPL.list || [])].find(x => x.id === id); if (!t) return;
+  const f = noticeFields();
+  const apply = () => { fillNotice({ category: t.category || '공지', title: t.title || '', body: t.body || '', links: t.links || '' }); toast(`"${t.name}" 양식을 넣었어요`); };
+  if ((f.title && f.title !== t.title) || f.body) { const ok = confirm(`지금 쓴 제목 · 내용을 "${t.name}" 양식으로 바꿀까요?`); if (!ok) return; }
+  apply();
+}
+async function tplSave(name) {
+  const f = noticeFields();
+  const data = { kind: 'notice', name, category: f.category, title: f.title, body: f.body, links: f.links, by: S.me.email, byName: myName(), at: new Date().toISOString() };
+  try { const r = doc(collection(db, 'templates')); await setDoc(r, data); (TPL.list ||= []).push({ id: r.id, ...data }); const bar = $('#tplbar'); if (bar) bar.innerHTML = tplBar(); toast(`"${name}" 양식을 만들었어요 · 다음에 공지를 쓸 때 위쪽에서 골라요`); }
+  catch (e) { toast('양식을 저장하지 못했어요: ' + errMsg(e)); }
+}
+Object.assign(ACT, {
+  draftSave: () => draftSave(),
+  draftOpen: d => { const x = (DR.list || []).find(y => y.id === d.id); if (x) noticeSheet(x.noticeId || null, x); },
+  draftDel: async d => { if (!confirm('이 임시 저장 글을 지울까요?')) return; try { await deleteDoc(doc(db, 'drafts', d.id)); DR.list = DR.list.filter(x => x.id !== d.id); paint(); toast('지웠어요'); } catch (e) { toast('지우지 못했어요: ' + errMsg(e)); } },
+  noticeCancel: () => { const bg = $('#sheet'); if (bg && bg.dataset.dirty) { autoDraft(R.editNotice); toast('쓰던 내용은 이 기기에 보관했어요 · 다시 열면 이어 쓸 수 있어요'); } closeSheet(); paint(); },
+  adUse: () => { let d = null; try { d = JSON.parse(lsGet(adKey(R.editNotice)) || 'null'); } catch { d = null; } if (d) fillNotice(d); const el = document.querySelector('.adnote'); if (el) el.remove(); },
+  adDrop: () => { lsDel(adKey(R.editNotice)); const el = document.querySelector('.adnote'); if (el) el.remove(); },
+  tplUse: d => tplUse(d.id),
+  tplDel: async d => { const t = (TPL.list || []).find(x => x.id === d.id); if (!t || !confirm(`"${t.name}" 양식을 지울까요?`)) return; try { await deleteDoc(doc(db, 'templates', d.id)); TPL.list = TPL.list.filter(x => x.id !== d.id); const bar = $('#tplbar'); if (bar) bar.innerHTML = tplBar(); } catch (e) { toast('지우지 못했어요: ' + errMsg(e)); } },
+  tplSaveAsk: () => { const f = noticeFields(); if (!f.title && !f.body) return toast('양식으로 만들 제목이나 내용을 먼저 적어 주세요'); const name = (prompt('양식 이름을 정해 주세요 (예: 월례 회의 안내)', f.title.replace(/^\[.*?\]\s*/, '').slice(0, 14)) || '').trim(); if (name) tplSave(name.slice(0, 20)); }
 });

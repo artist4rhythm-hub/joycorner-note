@@ -19,7 +19,7 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="조이코너">
 <meta name="application-name" content="조이코너">
-<link rel="modulepreload" href="app.js?v=v19">
+<link rel="modulepreload" href="app.js?v=v20">
 <link rel="modulepreload" href="firebase-config.js">
 <link rel="modulepreload" href="https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js" crossorigin>
 <link rel="modulepreload" href="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js" crossorigin>
@@ -864,10 +864,27 @@ input[type=date].in::-webkit-date-and-time-value,input[type=time].in::-webkit-da
 .undobar{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(92px + env(safe-area-inset-bottom));z-index:90;display:flex;align-items:center;gap:12px;background:#2B2018;color:#fff;border-radius:22px;padding:10px 10px 10px 16px;font-size:15px;box-shadow:0 12px 30px -12px rgba(0,0,0,.5);max-width:calc(100% - 32px)}
 .undobar button{border:0;background:#FFD66B;color:#2B2018;font-family:inherit;font-size:15px;border-radius:16px;padding:8px 14px;cursor:pointer;flex:none}
 @media (min-width:720px){.undobar{bottom:28px}}
+
+/* ===== v20 ===== */
+.sheet.nudge{animation:nudge .35s ease}
+@keyframes nudge{0%,100%{transform:translateX(0)}25%{transform:translateX(-8px)}75%{transform:translateX(8px)}}
+.tplbar{display:flex;flex-wrap:wrap;align-items:center;gap:6px}
+.tpll{display:inline-flex;align-items:center;gap:4px;font-size:13px;color:#8A5A2B;margin-right:2px}.tpll svg{color:#C62828}
+.tplchip{display:inline-flex;align-items:center;border-radius:16px;background:#fff;border:1px solid #EBD9B8;overflow:hidden}
+.tplchip button{border:0;background:none;font-family:inherit;font-size:14px;color:#5A3A2A;padding:7px 12px;cursor:pointer}
+.tplchip.mine{border-color:#C62828;background:#FFF4F3}.tplchip .x{padding:7px 9px 7px 2px;color:#B3261E}
+.adnote{display:flex;align-items:center;gap:8px;flex-wrap:wrap;background:#FFF1DC;border:1px solid #F0D3A5;border-radius:16px;padding:8px 10px;font-size:14px}
+.adnote>svg{color:#A85F00;flex:none}.adnote .grow{flex:1 1 180px}.adnote b{font-weight:400;color:#8E1B1B}
+.drafts .drow{display:flex;align-items:center;gap:6px;border-top:1px solid #F5EBD8;padding-top:6px}
+.drafts .drow .grow{flex:1;display:flex;flex-direction:column;align-items:flex-start;text-align:left;border:0;background:none;font-family:inherit;color:inherit;cursor:pointer;padding:4px 2px;min-width:0}
+.drafts .drow b{font-weight:400;font-size:16px}.drafts .drow small{font-size:12px;color:#6B5646;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+.roomseg button{display:inline-flex;align-items:center;justify-content:center;gap:8px}
+.roomseg .rti{width:28px;height:28px;border-radius:10px;background:var(--c);color:#fff;display:inline-flex;align-items:center;justify-content:center;flex:none;box-shadow:0 4px 10px -6px rgba(0,0,0,.45)}
+.roomseg button.on .rti{box-shadow:0 0 0 2px #fff}
 </style>
 </head>
 <body>
 <div id="app"></div>
-<script type="module" src="app.js?v=v19"></script>
+<script type="module" src="app.js?v=v20"></script>
 </body>
 </html>
