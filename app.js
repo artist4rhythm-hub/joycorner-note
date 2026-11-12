@@ -743,9 +743,10 @@ async function dutyDel() {
 }
 
 /* ---------- 교사실 (공지 · 캘린더 · 업무 분담 · 조직도 · 통계) ---------- */
-const APP_VERSION = 'v20';
+const APP_VERSION = 'v21';
 const APP_DATE = '2026-11-12';
 const CHANGELOG = [
+  { v: 'v21', date: '11월 12일', items: ['조직도: 반 상자를 고른 폭으로, "반 없이 함께 섬기는 선생님"을 이름표 카드로 정돈', '설정의 구글 캘린더 연결 설정: 무엇인지 · 설정됨 여부를 한눈에, 순서 안내'] },
   { v: 'v20', date: '11월 12일', items: ['글을 끌어 고르다 창 밖에서 손을 떼도 창이 닫히지 않아요 · 쓰던 내용이 있으면 바깥을 눌러도 안 닫혀요', '공지 임시 저장: 나만 보이는 임시 저장 · 쓰는 동안 기기에도 저절로 보관', '공지 양식: 행사 안내 · 주일 공지 · 기도 제목 + 직접 만든 양식', '넓은 화면 교사실 탭에도 색깔 아이콘'] },
   { v: 'v19', date: '11월 12일', items: ['출석 마감: 다 체크하면 [출석 마감]으로 잠가요 — 잠긴 출석부는 누구도 실수로 바꿀 수 없어요', '지난 주일 출석은 수요일부터 저절로 잠겨요 (디렉터 · 관리자는 풀 수 있어요)', '출석 기록: 누가 언제 누구를 체크 · 취소 · 마감했는지 모두 남아요', '체크를 취소하면 5초 동안 [되돌리기]'] },
   { v: 'v18', date: '11월 12일', items: ['아이폰 · 아이패드에서 크롬 · 카톡 브라우저로 열면 "사파리로 열어 홈 화면에 추가하세요" 안내 (아이콘이 "조" 글자로 나오지 않게)', '크롬이 큰 아이콘을 고르도록 아이콘 크기 표시'] },
@@ -1356,8 +1357,8 @@ function rOrg() {
   return `<section class="card full org"><div class="otop"><div class="obox root"><img src="logo-white.png" alt="조이코너" class="ologo"><span>교사 ${S.staff.filter(x => x.kind !== 'helper').length}명 · 아이 ${allKids().filter(k => (k.status || 'active') === 'active').length}명</span></div></div>
 <div class="oline"></div><div class="otop"><div class="obox dir"><div class="ohead"><b>디렉터</b></div>${chips(dirs.map(x => x.name))}</div></div>
 ${admins.length ? `<div class="oline"></div><div class="otop"><div class="obox adm"><div class="ohead"><b>관리자</b></div>${chips(admins.map(x => x.name))}</div></div>` : ''}
-<div class="oline"></div><div class="orow">${classBoxes}</div>
-${(() => { const shown = new Set([...dirs, ...admins].map(x => x.name)); cls.forEach(c => { const cs = classStaff(c.id); [...cs.homeroom, ...cs.assistants].forEach(n => shown.add(n)); }); const rest = S.staff.filter(x => x.kind !== 'helper' && !shown.has(x.name)); return rest.length ? `<div class="orow"><div class="obox wide"><div class="ohead"><b>함께 섬기는 선생님</b><span class="s2">반 없음 · ${rest.length}명</span></div>${chips(rest.map(x => x.name))}</div></div>` : ''; })()}</section>
+<div class="oline"></div><div class="orow ogrid">${classBoxes}</div>
+${orgRest(dirs, admins, cls)}</section>
 <section class="card full"><div class="lbl"><span>반별 한눈에</span></div><div class="tablewrap"><table class="dtable"><thead><tr><th>반</th><th>담임</th><th>보조</th><th>아이</th><th>4주 출석</th></tr></thead><tbody>${rows}</tbody></table></div></section>
 <section class="card full"><div class="lbl"><span>사역팀</span><span class="s2">업무 분담 기준</span></div><div class="orow teams">${teamBoxes || '<div class="sub">업무 분담을 가져오면 사역팀이 보여요.</div>'}</div></section>`;
 }
@@ -2703,7 +2704,13 @@ ${on ? `<div class="sub">구글 캘린더의 <b>조이코너</b> 캘린더에 ${
 }
 function gcalSettingsCard() {
   if (!isAdminMe()) return '';
-  return `<section class="card"><div class="lbl"><span>구글 연결 설정</span><span class="s2">관리자</span></div><div class="sub">선생님들이 "내 구글 캘린더"를 연결하고, 관리자가 "구글 캘린더에서 바로 가져오기"를 쓰려면 한 번 넣어 주세요. 만드는 방법은 안내 파일에 있어요. 이 값은 공개돼도 괜찮아요.</div><label class="fld">OAuth 클라이언트 ID<input class="in" id="cfg_cid" value="${esc(CFG.gcalClientId || '')}" placeholder="0000-xxxx.apps.googleusercontent.com"></label><button class="sec" data-act="cfgSave">저장</button></section>`;
+  const set = !!CFG.gcalClientId;
+  return `<section class="card gset"><div class="lbl"><span>구글 캘린더 연결 설정</span><span class="s2">관리자 · 처음 한 번</span></div>
+<div class="gstate ${set ? 'ok' : ''}">${svg(set ? '<path d="M5 12l5 5 9-10"/>' : '<circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16.5v.5"/>', 20, 2.2)}<span class="grow"><b>${set ? '설정됨 · 구글 캘린더 기능이 켜져 있어요' : '아직 설정 전이에요'}</b><small>${set ? '선생님들이 "내 구글 캘린더 연결"을, 관리자가 "구글 캘린더에서 바로 가져오기"를 쓸 수 있어요.' : '이걸 넣어야 ① 선생님마다 "내 구글 캘린더에 조이코너 일정 넣기"와 ② 관리자의 "구글 캘린더에서 바로 가져오기"가 켜져요. 쓰지 않으면 비워 둬도 앱은 그대로 잘 돼요.'}</small></span></div>
+<details class="drawer gsetd" ${set ? '' : 'open'}><summary><b>${set ? '클라이언트 ID 바꾸기' : '클라이언트 ID 넣기'}</b><span class="s2">구글 클라우드에서 만든 값 · 공개돼도 괜찮아요</span></summary>
+<ol class="gsteps"><li>구글 클라우드(joycorner-note) → Calendar API [사용] <span class="s2">— 해 두셨어요</span></li><li>OAuth 동의 화면 → 범위 두 줄 추가 → 앱 게시</li><li>사용자 인증 정보 → 웹 OAuth 클라이언트 → 원본 https://artist4rhythm-hub.github.io</li><li>나온 클라이언트 ID를 아래에 붙여넣고 저장</li></ol>
+<label class="fld">OAuth 클라이언트 ID<input class="in" id="cfg_cid" value="${esc(CFG.gcalClientId || '')}" placeholder="940459044878-xxxx.apps.googleusercontent.com"></label><button class="sec" data-act="cfgSave">저장</button>
+<div class="s2">자세한 순서: 압축 파일 3_참고/구글캘린더-설정-안내.txt (프로젝트 문서에도 있어요)</div></details></section>`;
 }
 
 /* ---------- 버튼 ---------- */
@@ -3588,3 +3595,15 @@ Object.assign(ACT, {
   tplDel: async d => { const t = (TPL.list || []).find(x => x.id === d.id); if (!t || !confirm(`"${t.name}" 양식을 지울까요?`)) return; try { await deleteDoc(doc(db, 'templates', d.id)); TPL.list = TPL.list.filter(x => x.id !== d.id); const bar = $('#tplbar'); if (bar) bar.innerHTML = tplBar(); } catch (e) { toast('지우지 못했어요: ' + errMsg(e)); } },
   tplSaveAsk: () => { const f = noticeFields(); if (!f.title && !f.body) return toast('양식으로 만들 제목이나 내용을 먼저 적어 주세요'); const name = (prompt('양식 이름을 정해 주세요 (예: 월례 회의 안내)', f.title.replace(/^\[.*?\]\s*/, '').slice(0, 14)) || '').trim(); if (name) tplSave(name.slice(0, 20)); }
 });
+
+/* ================= v21 · 조직도 '함께 섬기는 선생님' ================= */
+function orgRest(dirs, admins, cls) {
+  const shown = new Set([...dirs, ...admins].map(x => x.name));
+  cls.forEach(c => { const cs = classStaff(c.id); [...cs.homeroom, ...cs.assistants].forEach(n => shown.add(n)); });
+  const rest = S.staff.filter(x => x.kind !== 'helper' && !shown.has(x.name));
+  const helpers = S.staff.filter(x => x.kind === 'helper');
+  if (!rest.length && !helpers.length) return '';
+  const card = st => `<button class="ocard" data-act="staffOpen" data-id="${st.id}">${staffAv(st, 44)}<b>${esc(st.name)}</b><small>${esc(dutiesOf(st.name).map(x => x.role).slice(0, 2).join(' · ') || (st.since ? fmtShort(st.since) + ' 함께' : '반 배정 전'))}</small></button>`;
+  return `<div class="orest">${rest.length ? `<div class="orhead"><span class="orpill">${svg('<circle cx="9" cy="8" r="3.2"/><path d="M3 20a6 6 0 0 1 12 0"/><circle cx="17" cy="9" r="2.5"/><path d="M15.5 14.5A5 5 0 0 1 21 19"/>', 16, 2)}함께 섬기는 선생님</span><span class="s2">반 없이 섬기거나 반 배정 전 · ${rest.length}명</span></div><div class="ocards">${rest.map(card).join('')}</div>` : ''}
+${helpers.length ? `<div class="orhelp">${svg('<path d="M12 21s-7-4.5-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 11c0 5.5-7 10-7 10z"/>', 15, 2)}헬퍼 선생님 ${helpers.length}명은 조직도에 넣지 않고 설정 → 교사 명단의 '헬퍼 선생님 풀'에 있어요</div>` : ''}</div>`;
+}
