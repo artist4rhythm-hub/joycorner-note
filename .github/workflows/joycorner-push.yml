@@ -1,0 +1,68 @@
+# 조이코너 노트 — 알림 보내기 도우미
+# 5분마다 깨어나서, 관리자가 [알림 보내기]로 올린 공지가 있으면 선생님들 기기에 알림을 보내요.
+# 비밀 열쇠(FIREBASE_SA)는 깃허브 Settings → Secrets 에만 넣어요. 이 파일에는 아무 비밀도 없어요.
+name: 조이코너 알림 보내기
+on:
+  schedule:
+    - cron: '*/5 * * * *'
+  workflow_dispatch:
+concurrency:
+  group: joycorner-push
+  cancel-in-progress: false
+permissions:
+  contents: read
+jobs:
+  send:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: 도우미 준비
+        run: |
+          mkdir -p helper && cd helper
+          npm init -y > /dev/null
+          npm install --no-audit --no-fund --silent firebase-admin@12
+      - name: 알림 보내기
+        working-directory: helper
+        env:
+          FIREBASE_SA: ${{ secrets.FIREBASE_SA }}
+        run: |
+          cat > send.mjs <<'JS'
+          import admin from 'firebase-admin';
+          let sa = {};
+          try { sa = JSON.parse(process.env.FIREBASE_SA || '{}'); } catch { console.log('FIREBASE_SA 내용이 올바른 JSON이 아니에요'); process.exit(1); }
+          if (!sa.project_id) { console.log('FIREBASE_SA 비밀값이 아직 없어요 — 설정 순서 3번을 해 주세요'); process.exit(0); }
+          admin.initializeApp({ credential: admin.credential.cert(sa) });
+          const db = admin.firestore(), fcm = admin.messaging(), now = new Date().toISOString();
+          const jobs = await db.collection('pushQueue').where('status', '==', 'wait').limit(20).get();
+          let sent = 0, fail = 0, removed = 0, done = 0;
+          if (!jobs.empty) {
+            const toks = (await db.collection('pushTokens').get()).docs;
+            for (const job of jobs.docs) {
+              const j = job.data();
+              if (Date.now() - new Date(j.at || 0).getTime() > 2 * 864e5) { await job.ref.update({ status: 'skip', doneAt: now }); continue; }
+              const targets = toks.filter(t => (t.data().email || '') !== (j.by || ''));
+              let ok = 0;
+              for (let i = 0; i < targets.length; i += 500) {
+                const part = targets.slice(i, i + 500);
+                const r = await fcm.sendEachForMulticast({
+                  tokens: part.map(t => t.data().token),
+                  data: { title: String(j.title || '조이코너 노트'), body: String(j.body || ''), url: String(j.url || './'), tag: String(j.tag || 'joy') },
+                  webpush: { headers: { Urgency: 'high', TTL: '86400' } }
+                });
+                ok += r.successCount; fail += r.failureCount;
+                for (let k = 0; k < r.responses.length; k++) {
+                  const res = r.responses[k];
+                  if (!res.success && /not-registered|invalid-registration-token|invalid-argument/.test((res.error && res.error.code) || '')) { await part[k].ref.delete().catch(() => {}); removed++; }
+                }
+              }
+              sent += ok; done++;
+              await job.ref.update({ status: 'sent', doneAt: now, devices: targets.length, ok });
+            }
+          }
+          await db.doc('config/push').set({ lastRun: now, lastJobs: done, lastSent: sent, lastFail: fail, total: admin.firestore.FieldValue.increment(sent) }, { merge: true });
+          console.log(`확인 완료 · 보낸 공지 ${done} · 성공 ${sent} · 실패 ${fail} · 정리한 기기 ${removed}`);
+          JS
+          node send.mjs
