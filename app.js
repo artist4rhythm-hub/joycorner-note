@@ -162,7 +162,7 @@ const vPending = () => `<div class="center"><div class="big">아직 등록되지
 /* ---------- 홈 ---------- */
 function homeHeader() {
   const name = S.me.name || S.user.displayName || '';
-  return `<header class="hd"><div><div class="hello">안녕하세요, ${esc(name)} 선생님!</div><div class="sub">${new Date().getMonth() + 1}월 ${new Date().getDate()}일 ${DOW[new Date().getDay()]}요일 <button class="vpill" data-act="changelog" aria-label="업데이트 기록">${APP_VERSION}</button></div></div><div class="btns"><button class="iconbtn" data-act="go" data-to="help" aria-label="도우미">${svg('<circle cx="12" cy="12" r="9"/><path d="M9.6 9.4a2.5 2.5 0 0 1 4.8.9c0 1.7-2.4 2.1-2.4 3.7M12 16.9v.1"/>')}</button><button class="iconbtn" data-act="go" data-to="settings" aria-label="설정">${svg(ICON.gear)}</button></div></header>${welcomeLine()}`;
+  return `<header class="hd"><div><div class="hello">안녕하세요, ${esc(name)} 선생님!</div><div class="sub">${new Date().getMonth() + 1}월 ${new Date().getDate()}일 ${DOW[new Date().getDay()]}요일 <button class="vpill" data-act="changelog" aria-label="업데이트 기록">${APP_VERSION}</button></div></div><div class="btns"><button class="iconbtn" data-act="go" data-to="help" aria-label="도우미">${svg('<circle cx="12" cy="12" r="9"/><path d="M9.6 9.4a2.5 2.5 0 0 1 4.8.9c0 1.7-2.4 2.1-2.4 3.7M12 16.9v.1"/>')}</button><button class="iconbtn" data-act="go" data-to="settings" aria-label="설정">${svg(ICON.gear)}</button></div></header>${welcomeLine()}${notifyNudge()}`;
 }
 function vHomeClass() {
   const c = S.cur;
@@ -750,9 +750,10 @@ async function dutyDel() {
 }
 
 /* ---------- 교사실 (공지 · 캘린더 · 업무 분담 · 조직도 · 통계) ---------- */
-const APP_VERSION = 'v28';
+const APP_VERSION = 'v29';
 const APP_DATE = '2026-11-12';
 const CHANGELOG = [
+  { v: 'v29', date: '11월 13일', items: ['도우미에 [알림 켜기] 안내 — 아이폰·아이패드 / 안드로이드 / 컴퓨터별 순서와 알림 미리보기 그림, 막혔을 때 고치는 법', '홈에 "새 공지를 알림으로 받아 보세요" — 알림이 꺼진 기기에서 한 번 권해요 (닫으면 다시 안 떠요)', '설정 알림 카드에 [켜는 법 ›]'] },
   { v: 'v28', date: '11월 13일', items: ['공지 알림 — 설정 → 알림 · 이 기기 → [이 기기에서 알림 받기]', '앱이 열려 있을 때: 새 공지를 바로 기기 알림으로 (목자의 삶과 같은 방식)', '앱이 닫혀 있어도: 관리자가 \'알림 보내기 도우미\'를 켜면 보통 5~15분 안에', '공지 쓰기에 [선생님들 기기에 알림 보내기] · 알림을 누르면 그 공지로 · 앱 아이콘에 새 공지 표시'] },
   { v: 'v27', date: '11월 13일', items: ['캘린더 화면의 달력이 작은 상자로 줄어들던 문제 고침 (v26 홈의 날짜 칸 이름이 달력과 겹쳤어요)'] },
   { v: 'v26', date: '11월 13일', items: ['홈 [전체 한눈에]를 그림으로 — 출석률 링 · 최근 8주 반별 막대 · 파스텔 숫자 칸 · 반 카드 링과 흐름선 · 돌봄 결석 막대 · 생일 달력', '교사실 [통계]도 그림으로 — 평균 출석 링 · 흐름선 · 돌봄 게이지 · 친구별 출석 링 · 반별 비교 링', '고치기는 한 단계 더 — 연필 · 순서 버튼은 [고치기]를 눌러야 보여요 · 주일 인원 막대는 먼저 자세히 보기 · 예배 업무 카드 · 교사 사진 · 아이 성별도 바로 바뀌지 않게', '지우기는 두 번 눌러야 지워져요 (4초 안에 한 번 더)'] },
@@ -1424,12 +1425,13 @@ function vHelp() {
   if (!topic) {
     return `<div class="scroll narrow">${back}<div class="eyebrow">도우미</div><h1 class="atitle">무엇을 도와드릴까요?</h1>
 <input class="search" id="hq" type="search" placeholder="찾기 — 예: 악보, 출석, 부재" autocomplete="off">
-<div class="btns" style="flex-wrap:wrap"><button class="ghost sm2" data-act="helpGo" data-id="install">홈 화면에 바로가기</button><button class="ghost sm2" data-act="helpGo" data-id="start">처음 시작</button><button class="ghost sm2" data-act="helpGo" data-id="faq">자주 묻는 질문</button></div>
+<div class="btns" style="flex-wrap:wrap"><button class="ghost sm2" data-act="helpGo" data-id="install">홈 화면에 바로가기</button><button class="ghost sm2" data-act="helpGo" data-id="notify">알림 켜기</button><button class="ghost sm2" data-act="helpGo" data-id="start">처음 시작</button><button class="ghost sm2" data-act="helpGo" data-id="faq">자주 묻는 질문</button></div>
 <div class="htiles" id="htiles">${HELP.map(h => `<button class="htile" data-act="helpGo" data-id="${h.id}" data-k="${esc(h.t + ' ' + (h.steps || []).map(s => s.join(' ')).join(' '))}"><span class="hic" style="background:${h.c}">${svg(HELP_IC[h.ic] || ICON.home, 24, 1.8)}</span><b>${esc(h.t)}</b></button>`).join('')}</div>
 <div class="s2" style="text-align:center">조이코너 노트 ${APP_VERSION}</div></div>${nav('help')}`;
   }
   let body = '';
   if (topic.id === 'install') body = helpInstall();
+  else if (topic.id === 'notify') body = helpNotify();
   else if (topic.id === 'faq') body = FAQ.map(([q, a]) => `<details class="faq"><summary>${esc(q)}</summary><p>${esc(a)}</p></details>`).join('');
   else if (topic.id === 'privacy') body = `<div class="pgrid">${[['맡은 반 선생님', '그 반 아이 카드·사진·가정·출석·돌봄 기록'], ['디렉터', '모든 반, 교사 명단·권한, 공지, 설교 점검, 반 올리기, 교사 돌봄 기록'], ['시스템 관리자', '모든 반 아이·가정 데이터, 가져오기, 일정표·업무 분담, 백업'], ['교사 모두', '공지, 캘린더, 순서표, 업무 분담, 조직도, 설교, 악보'], ['쓴 사람 + 디렉터', '교사 영혼 카드의 돌봄 기록 (시스템 관리자도 못 봐요)'], ['수퍼관리자', '사용 현황 · 디렉터 지정']].map(([a, b]) => `<section class="card"><div class="lbl"><span>${a}</span></div><div>${b}</div></section>`).join('')}</div><div class="note">아이 정보는 깃허브에 올라가지 않고, 로그인한 선생님에게만 보여요.</div>`;
   else body = `<ol class="steps">${topic.steps.map(([a, b], i) => `<li><span class="sn">${i + 1}</span><div><b>${esc(a)}</b><p>${esc(b)}</p></div></li>`).join('')}</ol>${(topic.tips || []).length ? `<div class="chips">${topic.tips.map(t => `<span class="chip sm">💡 ${esc(t)}</span>`).join('')}</div>` : ''}${topic.go ? `<button class="cta" data-act="go" data-to="${topic.go}">${esc(topic.t)} 화면 열기</button>` : ''}`;
@@ -4046,7 +4048,7 @@ function ntCard() {
   }[st];
   const btn = st === 'on' ? `<button class="sec" data-act="ntTest">${svg('<path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.9 1.9 0 0 0 3.4 0"/>', 16, 2)} 시험 알림</button>${push ? `<button class="ghost" data-act="ntReg">다시 등록</button>` : ''}<button class="ghost" data-act="ntOff">끄기</button>`
     : st === 'off' ? `<button class="pri" data-act="ntOn">${svg('<path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.9 1.9 0 0 0 3.4 0"/>', 18, 2)} 이 기기에서 알림 받기</button>` : st === 'denied' ? `<button class="sec" data-act="ntOn">다시 확인</button>` : '';
-  return `<section class="card ntcard"><div class="lbl"><span>알림 · 이 기기</span><span class="s2">${devKind()}${isStandalone() ? ' · 홈 화면 앱' : ''}</span></div>
+  return `<section class="card ntcard"><div class="lbl"><span>알림 · 이 기기</span><button class="linkbtn" data-act="helpGo" data-id="notify">켜는 법 ›</button></div><div class="s2">${devKind()}${isStandalone() ? ' · 홈 화면 앱' : ''}</div>
 <div class="ntst ${head[0]}"><span class="nti">${svg(st === 'on' ? '<path d="M5 12.5l4.5 4.5L19 7"/>' : st === 'off' ? '<path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/>' : '<path d="M12 8v5M12 16.5v.5"/><circle cx="12" cy="12" r="9"/>', 18, 2.2)}</span><span class="grow"><b>${head[1]}</b><small>${head[2]}</small></span></div>
 <div class="ntlv"><span class="${st === 'on' ? 'y' : ''}"><i>1</i>앱이 열려 있을 때 · 바로</span><span class="${st === 'on' && push && reg ? 'y' : ''}"><i>2</i>앱이 닫혀 있어도 · 몇 분 안에${push ? '' : ' (관리자 설정 전)'}</span></div>
 <div class="btns" style="flex-wrap:wrap">${btn}</div></section>`;
@@ -4081,7 +4083,7 @@ async function queuePush(n, id) {
 Object.assign(ACT, {
   ntOn: async () => {
     const st = ntState();
-    if (st === 'ios-browser' || st === 'none') return sheet(`<div class="ttl" style="font-size:22px">알림은 홈 화면 앱에서 켜요</div><div class="sub">${isIOS() ? '사파리에서 공유 ⬆ → [홈 화면에 추가] → 홈 화면의 조이코너 앱을 열고 설정 → 알림 · 이 기기 → [이 기기에서 알림 받기]를 눌러 주세요. (iOS 16.4 이상)' : '크롬이나 엣지에서 열어 주세요.'}</div><div class="btns"><button class="pri" data-act="sheetClose">알겠어요</button></div>`);
+    if (st === 'ios-browser' || st === 'none') return sheet(`<div class="ttl" style="font-size:22px">알림은 홈 화면 앱에서 켜요</div><div class="sub">${isIOS() ? '사파리에서 공유 ⬆ → [홈 화면에 추가] → 홈 화면의 조이코너 앱을 열고 설정 → 알림 · 이 기기 → [이 기기에서 알림 받기]를 눌러 주세요. (iOS 16.4 이상)' : '크롬이나 엣지에서 열어 주세요.'}</div><div class="btns">${isIOS() ? '<button class="pri" data-act="ntInstallGuide">홈 화면에 바로가기 만드는 법</button>' : ''}<button class="${isIOS() ? 'sec' : 'pri'}" data-act="sheetClose">알겠어요</button></div>`);
     let p = 'default'; try { p = await Notification.requestPermission(); } catch { }
     if (p !== 'granted') { toast(p === 'denied' ? '알림이 막혀 있어요 · 기기 설정에서 허용해 주세요' : '알림을 허용하지 않았어요'); return paint(); }
     NT.on = true; lsSet('jc_nt', '1');
@@ -4098,4 +4100,62 @@ Object.assign(ACT, {
     try { await setDoc(doc(db, 'config', 'app'), { vapidKey: v }, { merge: true }); CFG.vapidKey = v; toast(v ? '저장했어요 · 이제 선생님들이 [이 기기에서 알림 받기]를 누르면 등록돼요' : '지웠어요'); if (NT.on) pushRegister(true); paint(); }
     catch (e) { toast('저장하지 못했어요: ' + errMsg(e)); }
   }
+});
+
+/* ================= v29 · 알림 켜기 안내 (홈 화면 바로가기 안내처럼) ================= */
+const BELL = '<path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.9 1.9 0 0 0 3.4 0"/>';
+HELP_IC.bell = BELL; HC.notify = '#E08A00';
+HELP.splice(HELP.findIndex(h => h.id === 'install') + 1, 0, { id: 'notify', t: '알림 켜기', ic: 'bell', c: HC.notify });
+function ntPreview(dev) {
+  const msg = `<img src="icons/joycorner-192.png" alt=""><div class="nb-t"><span class="nb-h"><b>조이코너</b><small>지금</small></span><span class="nb-m"><b>공지 · 이번 주 교사 모임 안내</b><br>토요일 오후 2시 · 2층 교사실에서 모여요</span></div>`;
+  if (dev === 'pc') return `<div class="ndesk"><div class="nd-bar"><i></i><i></i><i></i></div><div class="nd-scr"><div class="nbanner pc">${msg}</div></div><div class="nd-foot"></div></div>`;
+  return `<div class="nphone ${dev}"><div class="nscr"><div class="ntime">9:41</div><div class="ndate">11월 15일 일요일</div><div class="nbanner">${msg}</div></div></div>`;
+}
+function helpNotify() {
+  const dev = S.helpDev || devGuess(), st = ntState();
+  const tabs = [['ios', '아이폰 · 아이패드'], ['android', '안드로이드'], ['pc', '컴퓨터']];
+  const steps = {
+    ios: [['홈 화면 앱으로 열기', '사파리로 [홈 화면에 추가]한 조이코너 아이콘을 눌러 열어요. 사파리 화면 · 크롬 · 카카오톡 안에서는 알림이 안 와요. (iOS 16.4 이상)', 'install'],
+      ['[이 기기에서 알림 받기]', '이 화면 맨 위 버튼, 또는 설정 → 알림 · 이 기기에 있어요.'],
+      ['[허용] 누르기', '"조이코너에서 알림을 보내려고 합니다" 창이 뜨면 [허용]을 눌러요.'],
+      ['[시험 알림]으로 확인', '화면 위에 알림이 내려오면 끝! 잠금 화면에도 와요.']],
+    android: [['크롬 또는 설치한 앱으로 열기', '카카오톡 안이라면 ⋮ → [다른 브라우저로 열기] → 크롬.'],
+      ['[이 기기에서 알림 받기]', '이 화면 맨 위 버튼, 또는 설정 → 알림 · 이 기기에 있어요.'],
+      ['[허용] 누르기', '주소창 아래에 뜨는 "알림 보내기" 창에서 [허용].'],
+      ['[시험 알림]으로 확인', '위에서 알림이 내려오면 끝!']],
+    pc: [['크롬 · 엣지로 열기', '설치한 앱(바탕화면 조이코너)이면 더 좋아요.'],
+      ['[이 기기에서 알림 받기]', '이 화면 맨 위 버튼, 또는 설정 → 알림 · 이 기기에 있어요.'],
+      ['[허용] 누르기', '주소창 아래에 뜨는 창에서 [허용].'],
+      ['[시험 알림]으로 확인', '화면 오른쪽 위(맥) · 오른쪽 아래(윈도우)에 알림이 떠요. 크롬을 켜 둔 동안 와요.']]
+  }[dev];
+  const fix = {
+    ios: ['아이폰 · 아이패드 [설정] → [알림] → [조이코너] → 알림 허용 켜기 · 잠금 화면 · 배너도 켜기', '집중 모드(방해 금지)가 켜져 있으면 알림이 조용히 와요', '그래도 안 되면 홈 화면 앱을 지우고 사파리에서 다시 [홈 화면에 추가] → 다시 켜기'],
+    android: ['주소창 왼쪽 자물쇠(사이트 설정) → 알림 → [허용]', '휴대폰 [설정] → [앱] → 크롬(또는 조이코너) → [알림] 켜기', '절전 모드에서는 알림이 늦게 올 수 있어요'],
+    pc: ['주소창 왼쪽 자물쇠 → 사이트 설정 → 알림 → [허용]', '맥: 시스템 설정 → 알림 → Google Chrome → 알림 허용', '윈도우: 설정 → 시스템 → 알림 → Chrome 켜기 · 방해 금지 끄기']
+  }[dev];
+  const box = {
+    on: `<div class="ntst ok"><span class="nti">${svg('<path d="M5 12.5l4.5 4.5L19 7"/>', 18, 2.2)}</span><span class="grow"><b>이 기기는 알림이 켜져 있어요</b><small>새 공지가 올라오면 알려 드려요</small></span></div><button class="sec" data-act="ntTest">${svg(BELL, 16, 2)} 시험 알림 보내기</button>`,
+    off: `<button class="cta" data-act="ntOn">${svg(BELL, 22, 2)} 이 기기에서 알림 받기</button>`,
+    'ios-browser': `<div class="ntst bad"><span class="nti">1</span><span class="grow"><b>먼저 홈 화면에 바로가기를 만들어요</b><small>아이폰 · 아이패드는 홈 화면 앱에서만 알림이 와요. 만든 뒤 그 앱에서 이 화면을 다시 열어요.</small></span></div><button class="cta" data-act="helpGo" data-id="install">홈 화면에 바로가기 만들기</button>`,
+    denied: `<div class="ntst bad"><span class="nti">!</span><span class="grow"><b>알림이 막혀 있어요</b><small>아래 '막혔을 때'대로 허용한 뒤 [다시 확인]을 눌러요</small></span></div><button class="sec" data-act="ntOn">다시 확인</button>`,
+    none: `<div class="ntst bad"><span class="nti">!</span><span class="grow"><b>이 브라우저는 알림을 지원하지 않아요</b><small>크롬 · 엣지, 또는 사파리 홈 화면 앱에서 열어 주세요</small></span></div>`
+  }[st];
+  return `<div class="ntguide">${box}</div>
+<div class="seg">${tabs.map(([k, l]) => `<button class="${dev === k ? 'on' : ''}" data-act="helpDev" data-id="${k}">${l}</button>`).join('')}</div>
+<div class="installwrap"><ol class="steps">${steps.map(([a, b, link], i) => `<li><span class="sn">${i + 1}</span><div><b>${esc(a)}</b><p>${esc(b)}</p>${link ? `<button class="linkbtn" data-act="helpGo" data-id="${link}">홈 화면에 바로가기 만드는 법 ›</button>` : ''}</div></li>`).join('')}</ol>${ntPreview(dev)}</div>
+<section class="card nwhen"><div class="lbl"><span>알림은 언제 와요?</span></div>
+<div class="nw"><span class="wi now">${svg('<path d="M13 2L4 14h7l-1 8 9-12h-7z"/>', 18, 2)}</span><span class="grow"><b>앱이 열려 있을 때 · 바로</b><small>다른 화면을 보고 있어도 새 공지가 오면 바로 알려요</small></span></div>
+<div class="nw"><span class="wi later">${svg('<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>', 18, 2)}</span><span class="grow"><b>앱이 닫혀 있어도 · 보통 5~15분 안에</b><small>${CFG.vapidKey ? '켜져 있어요 — 휴대폰을 주머니에 넣어 두어도 와요' : '관리자가 설정 → 알림 보내기 도우미를 켜면 돼요'}</small></span></div>
+<div class="s2">공지를 쓴 선생님 본인에게는 보내지 않아요 · 알림을 누르면 그 공지가 열려요</div></section>
+<details class="faq"><summary>막혔을 때 (알림이 안 와요)</summary><ul class="nfix">${fix.map(x => `<li>${esc(x)}</li>`).join('')}</ul></details>
+<details class="faq"><summary>알림을 끄고 싶어요</summary><p>설정 → 알림 · 이 기기 → [끄기]. 이 기기만 꺼지고, 다른 기기는 그대로예요.</p></details>`;
+}
+/* 홈 — 알림이 꺼져 있으면 한 번 권해요 (닫으면 이 기기에서는 다시 안 떠요) */
+function notifyNudge() {
+  if (lsGet('jc_ntnudge_off') === '1' || ntState() !== 'off') return '';
+  return `<div class="ntnudge full"><span class="nn-ic">${svg(BELL, 22, 2)}</span><span class="t"><b>새 공지를 알림으로 받아 보세요</b><span>한 번만 [허용]하면 돼요 · 이 기기에만 적용돼요</span></span><span class="nn-b"><button class="pri sm" data-act="ntOn">알림 켜기</button><button class="ghost sm" data-act="helpGo" data-id="notify">방법 보기</button></span><button class="x" data-act="ntNudgeOff" aria-label="닫기">×</button></div>`;
+}
+Object.assign(ACT, {
+  ntNudgeOff: () => { lsSet('jc_ntnudge_off', '1'); paint(); },
+  ntInstallGuide: () => { closeSheet(); go('help/install'); }
 });
