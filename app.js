@@ -749,9 +749,10 @@ async function dutyDel() {
 }
 
 /* ---------- 교사실 (공지 · 캘린더 · 업무 분담 · 조직도 · 통계) ---------- */
-const APP_VERSION = 'v26';
+const APP_VERSION = 'v27';
 const APP_DATE = '2026-11-12';
 const CHANGELOG = [
+  { v: 'v27', date: '11월 13일', items: ['캘린더 화면의 달력이 작은 상자로 줄어들던 문제 고침 (v26 홈의 날짜 칸 이름이 달력과 겹쳤어요)'] },
   { v: 'v26', date: '11월 13일', items: ['홈 [전체 한눈에]를 그림으로 — 출석률 링 · 최근 8주 반별 막대 · 파스텔 숫자 칸 · 반 카드 링과 흐름선 · 돌봄 결석 막대 · 생일 달력', '교사실 [통계]도 그림으로 — 평균 출석 링 · 흐름선 · 돌봄 게이지 · 친구별 출석 링 · 반별 비교 링', '고치기는 한 단계 더 — 연필 · 순서 버튼은 [고치기]를 눌러야 보여요 · 주일 인원 막대는 먼저 자세히 보기 · 예배 업무 카드 · 교사 사진 · 아이 성별도 바로 바뀌지 않게', '지우기는 두 번 눌러야 지워져요 (4초 안에 한 번 더)'] },
   { v: 'v25', date: '11월 13일', items: ['홈 화면 아이콘: 앱 시작 주소 · 이름표(id) · 아이콘 파일 이름을 새로 — 패드가 예전에 기억한 "조" 글자와 상관없이 처음부터 다시 받게', '아이콘 시험 페이지 3개(icontest-a/b/c.html) — 어디서 막히는지 1분 만에 가려내기'] },
   { v: 'v24', date: '11월 13일', items: ['홈 화면 아이콘이 "조" 글자로 나오던 문제 — 잘 되는 다른 앱(말씀선포)과 같은 구조로 맞춤: 앱 보관 도우미(서비스 워커) · icons 폴더 · 아이콘 연결 한 줄 · 화면 꾸밈 파일(app.css) 분리'] },
@@ -3817,7 +3818,7 @@ function quickActs() {
 }
 function bdayList(n = 6) {
   const bd = bdaysAll().slice(0, n);
-  return bd.length ? `<div class="bdl">${bd.map(x => { const [m, d] = x.label.split('/'); return `<button class="bdr" ${x.act}><span class="cal"><small>${m}월</small><b>${d}</b></span>${x.av}<span class="grow"><b>${esc(x.name)}</b><small>${esc(x.sub)}</small></span>${x.days === 0 ? '<span class="tag">오늘!</span>' : `<span class="dd">D-${x.days}</span>`}</button>`; }).join('')}</div>` : '<div class="sub">한 달 안에 생일인 친구 · 선생님이 없어요.</div>';
+  return bd.length ? `<div class="bdl">${bd.map(x => { const [m, d] = x.label.split('/'); return `<button class="bdr" ${x.act}><span class="dcal"><small>${m}월</small><b>${d}</b></span>${x.av}<span class="grow"><b>${esc(x.name)}</b><small>${esc(x.sub)}</small></span>${x.days === 0 ? '<span class="tag">오늘!</span>' : `<span class="dd">D-${x.days}</span>`}</button>`; }).join('')}</div>` : '<div class="sub">한 달 안에 생일인 친구 · 선생님이 없어요.</div>';
 }
 function careBars(care, n = 7) {
   if (!care.length) return '<div class="sub">지금은 걱정되는 친구가 없어요. 감사해요!</div>';
@@ -3827,7 +3828,7 @@ function careBars(care, n = 7) {
 function sundayMini() {
   const s = nextService(); if (!s) return '';
   const diff = Math.round((parseD(s.date) - parseD(ymd(new Date()))) / 86400000);
-  return `<div class="sunm"><span class="cal big"><small>${parseD(s.date).getMonth() + 1}월</small><b>${parseD(s.date).getDate()}</b></span><span class="grow"><small>${diff <= 7 ? '이번 주일' : '다음 주일'}${diff >= 0 ? ` · D-${diff}` : ''}</small><b>${esc(s.story || (s.noService ? '조이코너 예배 없음' : '이야기 준비 중'))}</b><span class="meta">${s.preacher ? `<span>설교 ${esc(s.preacher)}</span>` : ''}${s.pray ? `<span>중보기도 ${esc(s.pray)}</span>` : ''}</span></span></div>`;
+  return `<div class="sunm"><span class="dcal big"><small>${parseD(s.date).getMonth() + 1}월</small><b>${parseD(s.date).getDate()}</b></span><span class="grow"><small>${diff <= 7 ? '이번 주일' : '다음 주일'}${diff >= 0 ? ` · D-${diff}` : ''}</small><b>${esc(s.story || (s.noService ? '조이코너 예배 없음' : '이야기 준비 중'))}</b><span class="meta">${s.preacher ? `<span>설교 ${esc(s.preacher)}</span>` : ''}${s.pray ? `<span>중보기도 ${esc(s.pray)}</span>` : ''}</span></span></div>`;
 }
 
 /* ---------- A안 · 화사한 대시보드 ---------- */
