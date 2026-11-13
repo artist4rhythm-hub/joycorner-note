@@ -38,9 +38,9 @@ const svg = (p, s = 24, w = 2) => `<svg width="${s}" height="${s}" viewBox="0 0 
 
 /* ---------- 파이어베이스 ---------- */
 const configured = !String(firebaseConfig.apiKey).includes('붙여넣기');
-let auth, db;
+let auth, db, fbApp;
 if (configured) {
-  const fbApp = initializeApp(firebaseConfig);
+  fbApp = initializeApp(firebaseConfig);
   auth = getAuth(fbApp);
   try {
     db = initializeFirestore(fbApp, { localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() }) });
@@ -320,9 +320,9 @@ function vSettings() {
   return `<div class="scroll cols"><div class="hd"><button class="back" data-act="back">← 홈</button></div><div class="ttl">설정</div>
 <section class="card"><div class="lbl"><span>내 정보</span></div><div class="big" style="font-size:22px">${esc(S.me.name || S.user.displayName || '')}</div><div class="sub">${esc(S.user.email)} · ${S.me.owner ? '수퍼관리자' : S.me.director ? '디렉터' : admin ? '시스템 관리자' : '교사'}</div><button class="sec" data-act="logout">로그아웃</button></section>
 <section class="card"><div class="lbl"><span>자료 내려받기</span><span class="s2">PDF · 엑셀</span></div><div class="sub">아이 명단 · 출석부 · 교사 명단 · 업무 분담 · 순서표 · 일정 · 주일 인원 · 찬양을 종류별로 받아요.${S.me.role === 'admin' ? ' 연간 일정 엑셀 일괄 입력도 여기서 해요.' : ''}</div><button class="sec" data-act="go" data-to="export">자료 내려받기 열기</button></section>
-${gcalCard()}
+${ntCard()}${gcalCard()}
 ${admin ? `
-${gcalSettingsCard()}
+${pushAdminCard()}${gcalSettingsCard()}
 ${vStaffList()}
 <section class="card"><div class="lbl"><span>시트 데이터 가져오기</span></div><div class="sub">처음에는 joycorner-import.json(전체). 그 뒤에 더할 때는 extra 파일(아이 정보는 건드리지 않아요).</div><label class="filebtn">${svg('<path d="M12 16V4m-5 5 5-5 5 5"/><path d="M4 16v3a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3"/>', 20, 1.8)}<span id="impName">파일 고르기</span><input type="file" id="impFile" accept="application/json,.json" hidden></label><div class="pbar hide" id="impBar"><i></i></div><div class="sub" id="impMsg"></div><button class="sec" data-act="runImport">가져오기 시작</button></section>
 <section class="card"><div class="lbl"><span>연도별 백업</span></div><div class="sub">한 해의 기록을 파일 하나로 내려받아 보관해요.</div><div class="two"><label class="fld">연도<select class="in" id="bk_year">${[new Date().getFullYear() + 1, new Date().getFullYear(), new Date().getFullYear() - 1].map(y => `<option ${y === new Date().getFullYear() ? 'selected' : ''}>${y}</option>`).join('')}</select></label><span></span></div><div class="btns" style="flex-wrap:wrap"><button class="ghost" data-act="backup" data-id="0">사진 빼고</button><button class="ghost" data-act="backup" data-id="1">사진까지</button></div><div class="s2" id="bk_msg"></div></section>
@@ -368,6 +368,7 @@ function paint() {
   if (sc2 && key === S.lastKey) sc2.scrollTop = top;
   S.lastKey = key;
   emAfter(key);
+  if (S.route === 'notice' || (S.route === 'room' && R.tab === 'notice')) setBadge(0);
 }
 function route() {
   const [, r, a] = (location.hash || '#/home').split('/');
@@ -382,7 +383,7 @@ function route() {
   if (S.route === 'home' && HM.mode === 'all') S.myClasses.forEach(c => ensureAtt(c));
   if (S.route === 'kid') { const k = findKid(S.arg); if (k) ensureAtt(k.classId); }
   if (['room', 'notice', 'home', 'event', 'staff'].includes(S.route)) { const was = Array.isArray(R.events) && Array.isArray(R.notices); loadRoom().then(() => { if (!was && ['room', 'notice', 'home', 'event', 'staff'].includes(S.route)) softPaint(); }); }
-  if (S.route === 'settings' || S.route === 'room') loadCfg().then(c => { if (c.gcalClientId) loadGIS().catch(() => { }); });
+  if (S.route === 'settings' || S.route === 'room') loadCfg().then(c => { if (S.route === 'settings') softPaint(); if (c.gcalClientId) loadGIS().catch(() => { }); });
   if (S.route === 'room' || S.route === 'settings') gcalLoad().then(() => softPaint());
   if (S.route === 'staff' && S.arg && !(S.staffEx[S.arg] && S.staffEx[S.arg].notes)) { S.staffEx[S.arg] = { notes: null }; loadStaffExtra(S.arg); }
   if (S.route === 'kid' && S.kidFor !== S.arg) { S.kidData = null; S.kidFor = S.arg; loadKid(S.arg).catch(() => { }); }
@@ -749,9 +750,10 @@ async function dutyDel() {
 }
 
 /* ---------- 교사실 (공지 · 캘린더 · 업무 분담 · 조직도 · 통계) ---------- */
-const APP_VERSION = 'v27';
+const APP_VERSION = 'v28';
 const APP_DATE = '2026-11-12';
 const CHANGELOG = [
+  { v: 'v28', date: '11월 13일', items: ['공지 알림 — 설정 → 알림 · 이 기기 → [이 기기에서 알림 받기]', '앱이 열려 있을 때: 새 공지를 바로 기기 알림으로 (목자의 삶과 같은 방식)', '앱이 닫혀 있어도: 관리자가 \'알림 보내기 도우미\'를 켜면 보통 5~15분 안에', '공지 쓰기에 [선생님들 기기에 알림 보내기] · 알림을 누르면 그 공지로 · 앱 아이콘에 새 공지 표시'] },
   { v: 'v27', date: '11월 13일', items: ['캘린더 화면의 달력이 작은 상자로 줄어들던 문제 고침 (v26 홈의 날짜 칸 이름이 달력과 겹쳤어요)'] },
   { v: 'v26', date: '11월 13일', items: ['홈 [전체 한눈에]를 그림으로 — 출석률 링 · 최근 8주 반별 막대 · 파스텔 숫자 칸 · 반 카드 링과 흐름선 · 돌봄 결석 막대 · 생일 달력', '교사실 [통계]도 그림으로 — 평균 출석 링 · 흐름선 · 돌봄 게이지 · 친구별 출석 링 · 반별 비교 링', '고치기는 한 단계 더 — 연필 · 순서 버튼은 [고치기]를 눌러야 보여요 · 주일 인원 막대는 먼저 자세히 보기 · 예배 업무 카드 · 교사 사진 · 아이 성별도 바로 바뀌지 않게', '지우기는 두 번 눌러야 지워져요 (4초 안에 한 번 더)'] },
   { v: 'v25', date: '11월 13일', items: ['홈 화면 아이콘: 앱 시작 주소 · 이름표(id) · 아이콘 파일 이름을 새로 — 패드가 예전에 기억한 "조" 글자와 상관없이 처음부터 다시 받게', '아이콘 시험 페이지 3개(icontest-a/b/c.html) — 어디서 막히는지 1분 만에 가려내기'] },
@@ -1167,6 +1169,7 @@ async function noticeSheet(id, fromDraft) {
 ${localDraftNote(id)}
 <div class="tplbar" id="tplbar">${tplBar()}</div>
 <div class="two"><label class="fld">종류<select class="in" id="n_cat">${['공지', '행사', '자료', '기도'].map(c => `<option ${n.category === c ? 'selected' : ''}>${c}</option>`).join('')}</select></label><label class="chk" style="align-self:end"><input type="checkbox" id="n_pin" ${n.pinned ? 'checked' : ''}>맨 위에 고정</label></div>
+<label class="chk ntpush"><input type="checkbox" id="n_push" ${id ? '' : 'checked'}>선생님들 기기에 알림 보내기<small>${CFG.vapidKey ? '앱이 열려 있으면 바로, 닫혀 있으면 보통 5~15분 안에 가요' : '지금은 앱이 열려 있는 선생님께만 가요 (설정 → 알림 보내기 도우미)'}</small></label>
 <label class="fld">제목<input class="in" id="n_title" value="${esc(n.title)}"></label>
 <label class="fld">내용<textarea id="n_body" style="min-height:180px">${esc(n.body || '')}</textarea></label>
 <label class="fld">링크 (한 줄에 하나씩)<textarea id="n_links" style="min-height:60px" placeholder="https://">${esc(n.links || '')}</textarea></label>
@@ -1182,6 +1185,7 @@ async function noticeSave() {
   if (PK.notice && PK.notice.busy) return toast('사진을 준비하고 있어요. 잠시만요');
   const id = R.editNotice, old = id ? R.notices.find(x => x.id === id) : null;
   const title = val('n_title'); if (!title) return toast('제목을 적어 주세요');
+  const wantPush = !!($('#n_push') || {}).checked;
   const ref = id ? doc(db, 'notices', id) : doc(collection(db, 'notices'));
   const data = { category: val('n_cat'), title, body: $('#n_body').value, links: $('#n_links').value.trim(), eventDate: val('n_date'), eventTime: val('n_time'), pinned: $('#n_pin').checked,
     imgCount: 0, thumb: '', authorEmail: old ? old.authorEmail : S.me.email, authorName: old ? old.authorName : myName(), at: old ? old.at : new Date().toISOString() };
@@ -1190,9 +1194,10 @@ async function noticeSave() {
     data.imgCount = await pkSave('notice', 'noticeImages', ref.id, { noticeId: ref.id }, old ? old.imgCount : 0);
     data.thumb = data.imgCount ? await thumbFrom(PK.notice.items[0].url, 480) : '';
     await setDoc(ref, data);
+    if (wantPush) await queuePush(data, ref.id).catch(e => toast('알림 예약은 못 했어요: ' + errMsg(e)));
     if (old) Object.assign(old, data); else R.notices.push({ id: ref.id, ...data });
     if (R.draftId) { deleteDoc(doc(db, 'drafts', R.draftId)).catch(() => { }); DR.list = (DR.list || []).filter(x => x.id !== R.draftId); R.draftId = null; }
-    lsDel(adKey(id)); closeSheet(); toast('게시했어요'); if (S.route === 'notice' && S.arg === ref.id) paint(); else go('notice/' + ref.id);
+    lsDel(adKey(id)); closeSheet(); toast(wantPush ? '게시했어요 · 선생님들께 알림을 보낼게요' : '게시했어요'); if (S.route === 'notice' && S.arg === ref.id) paint(); else go('notice/' + ref.id);
   } catch (e) { msg.textContent = ''; toast('저장하지 못했어요: ' + errMsg(e)); }
 }
 async function noticeDel() {
@@ -2155,7 +2160,7 @@ async function start(user) {
     };
     setMe(snap.data());
     await loadAll();
-    S.phase = 'ready'; route(); setTimeout(checkVersion, 1500);
+    S.phase = 'ready'; route(); setTimeout(checkVersion, 1500); if (!NT.booted) { NT.booted = true; ntBoot(); }
     // 권한이 바뀌었는지 서버에서 한 번 더 확인해요
     if (fromCache) getDoc(doc(db, 'teachers', email)).then(n => {
       if (!n.exists()) { if (email !== OWNER_EMAIL.toLowerCase()) { S.phase = 'pending'; route(); } return; }
@@ -3955,3 +3960,142 @@ ${S.myClasses.length > 1 ? `<section class="card"><div class="lbl"><span>반별 
 ${countsCard()}
 <div class="s2 full">* 비율은 지금 함께하는 친구 수를 기준으로 계산해요.</div></div>${nav('room')}`;
 }
+
+/* ================= v28 · 공지 알림 (이 기기 · 앱이 닫혀 있어도) ================= */
+const NT = { on: lsGet('jc_nt') === '1', unsub: null, boot: new Date().toISOString(), seen: new Set(), st: null, devices: null };
+const MSG_URL = 'https://www.gstatic.com/firebasejs/10.14.1/firebase-messaging.js';
+const myMail = () => (S.me.email || '').toLowerCase();
+const plainTxt = s => String(s || '').replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+function ntState() {
+  if (!('Notification' in window) || !('serviceWorker' in navigator)) return isIOS() && !isStandalone() ? 'ios-browser' : 'none';
+  if (Notification.permission === 'denied') return 'denied';
+  return Notification.permission === 'granted' && NT.on ? 'on' : 'off';
+}
+async function showLocal(title, body, tag, url) {
+  try {
+    const reg = navigator.serviceWorker ? await navigator.serviceWorker.getRegistration() : null;
+    if (reg) return await reg.showNotification(title, { body, tag, icon: 'icons/joycorner-192.png', badge: 'icons/favicon-32.png', data: { url } });
+    new Notification(title, { body, tag });
+  } catch { /* 알림을 띄울 수 없는 기기 */ }
+}
+const setBadge = n => { try { n ? navigator.setAppBadge && navigator.setAppBadge(n) : navigator.clearAppBadge && navigator.clearAppBadge(); } catch { } };
+/* ① 앱이 열려 있을 때 — 새 공지를 바로 알려요 (목자의 삶과 같은 방식) */
+function noticeWatch() {
+  if (NT.unsub || !db) return;
+  try {
+    NT.unsub = onSnapshot(query(collection(db, 'notices'), where('at', '>=', NT.boot)), snap => {
+      (snap.docChanges ? snap.docChanges() : []).forEach(ch => {
+        if (ch.type !== 'added') return;
+        const n = { id: ch.doc.id, ...ch.doc.data() };
+        if (NT.seen.has(n.id)) return; NT.seen.add(n.id);
+        if ((n.authorEmail || '').toLowerCase() === myMail()) return;
+        if (Array.isArray(R.notices) && !R.notices.find(x => x.id === n.id)) R.notices.push(n);
+        const title = `${n.category || '공지'} · ${n.title}`;
+        softPaint(); setTimeout(() => toast(`새 ${title}`), 400); setBadge(1);
+        if (NT.on && document.hidden && ntState() === 'on') showLocal(title, plainTxt(n.body).slice(0, 80) || '눌러서 보기', 'notice-' + n.id, './#/notice/' + n.id);
+      });
+    }, () => { });
+  } catch { /* 오프라인 */ }
+}
+/* ② 앱이 닫혀 있어도 — 이 기기를 '알림 받는 기기'로 등록 (관리자가 보내기 도우미를 켜 두면) */
+async function tokId(t) {
+  try { const h = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(t)); return [...new Uint8Array(h)].slice(0, 20).map(b => b.toString(16).padStart(2, '0')).join(''); }
+  catch { return t.replace(/[^A-Za-z0-9_-]/g, '_').slice(-120); }
+}
+async function pushRegister(silent) {
+  await loadCfg(); if (!CFG.vapidKey) return 'novapid';
+  if (!fbApp) return 'err';
+  try {
+    const m = await import(MSG_URL);
+    if (!(await m.isSupported())) return 'unsupported';
+    const reg = (await navigator.serviceWorker.getRegistration()) || (await navigator.serviceWorker.register('sw.js'));
+    await navigator.serviceWorker.ready;
+    const token = await m.getToken(m.getMessaging(fbApp), { vapidKey: CFG.vapidKey, serviceWorkerRegistration: reg });
+    if (!token) return 'notoken';
+    const old = lsGet('jc_push_tok');
+    if (old && old !== token) deleteDoc(doc(db, 'pushTokens', await tokId(old))).catch(() => { });
+    await setDoc(doc(db, 'pushTokens', await tokId(token)), { token, email: myMail(), name: myName(), device: devKind(), at: new Date().toISOString() });
+    lsSet('jc_push_tok', token); lsSet('jc_push_day', ymd(new Date()));
+    return 'ok';
+  } catch (e) { if (!silent) toast('알림 등록이 안 됐어요: ' + errMsg(e)); return 'err'; }
+}
+async function pushUnregister() {
+  const t = lsGet('jc_push_tok'); if (!t) return;
+  try { await deleteDoc(doc(db, 'pushTokens', await tokId(t))); } catch { }
+  try { const m = await import(MSG_URL); await m.deleteToken(m.getMessaging(fbApp)); } catch { }
+  lsDel('jc_push_tok');
+}
+function ntBoot() {
+  noticeWatch();
+  if (navigator.serviceWorker) navigator.serviceWorker.addEventListener('message', ev => {
+    const u = ev.data && ev.data.type === 'open' && ev.data.url; if (!u) return;
+    try { const h = new URL(u, location.href).hash; if (h && h !== location.hash) location.hash = h; } catch { }
+  });
+  /* 하루에 한 번 조용히 등록을 새로 고쳐요 (토큰이 바뀌는 기기 대비) */
+  if (ntState() === 'on' && lsGet('jc_push_day') !== ymd(new Date())) setTimeout(() => pushRegister(true), 5000);
+}
+/* 설정 — 이 기기 알림 카드 */
+function ntCard() {
+  const st = ntState(), push = !!CFG.vapidKey, reg = !!lsGet('jc_push_tok');
+  const head = {
+    on: ['ok', '이 기기에서 알림을 받아요', push ? (reg ? '앱이 닫혀 있어도 새 공지가 와요 (보통 몇 분 안에)' : '앱이 열려 있을 때 바로 와요 · 닫혀 있을 때 받기는 [다시 등록]') : '앱이 열려 있을 때 바로 와요 · 닫혀 있을 때 받기는 관리자가 켜면 저절로'],
+    off: ['', '이 기기 알림이 꺼져 있어요', '켜면 새 공지가 올라올 때 이 기기에 알림이 와요'],
+    denied: ['bad', '알림이 막혀 있어요', isIOS() ? '아이폰 · 아이패드 설정 → 알림 → 조이코너 → 알림 허용을 켜 주세요' : '주소창 왼쪽 자물쇠(또는 사이트 설정) → 알림 → 허용으로 바꿔 주세요'],
+    'ios-browser': ['bad', '홈 화면 앱에서만 알림이 와요', '아이폰 · 아이패드는 사파리 공유 → 홈 화면에 추가한 조이코너 앱을 열고 여기서 켜 주세요'],
+    none: ['bad', '이 브라우저는 알림을 지원하지 않아요', '크롬 · 사파리(홈 화면 앱)에서 열어 주세요']
+  }[st];
+  const btn = st === 'on' ? `<button class="sec" data-act="ntTest">${svg('<path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.9 1.9 0 0 0 3.4 0"/>', 16, 2)} 시험 알림</button>${push ? `<button class="ghost" data-act="ntReg">다시 등록</button>` : ''}<button class="ghost" data-act="ntOff">끄기</button>`
+    : st === 'off' ? `<button class="pri" data-act="ntOn">${svg('<path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.9 1.9 0 0 0 3.4 0"/>', 18, 2)} 이 기기에서 알림 받기</button>` : st === 'denied' ? `<button class="sec" data-act="ntOn">다시 확인</button>` : '';
+  return `<section class="card ntcard"><div class="lbl"><span>알림 · 이 기기</span><span class="s2">${devKind()}${isStandalone() ? ' · 홈 화면 앱' : ''}</span></div>
+<div class="ntst ${head[0]}"><span class="nti">${svg(st === 'on' ? '<path d="M5 12.5l4.5 4.5L19 7"/>' : st === 'off' ? '<path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/>' : '<path d="M12 8v5M12 16.5v.5"/><circle cx="12" cy="12" r="9"/>', 18, 2.2)}</span><span class="grow"><b>${head[1]}</b><small>${head[2]}</small></span></div>
+<div class="ntlv"><span class="${st === 'on' ? 'y' : ''}"><i>1</i>앱이 열려 있을 때 · 바로</span><span class="${st === 'on' && push && reg ? 'y' : ''}"><i>2</i>앱이 닫혀 있어도 · 몇 분 안에${push ? '' : ' (관리자 설정 전)'}</span></div>
+<div class="btns" style="flex-wrap:wrap">${btn}</div></section>`;
+}
+/* 설정 — 관리자: 보내기 도우미 */
+async function loadPushStatus() {
+  try { const s = await getDoc(doc(db, 'config', 'push')); NT.st = s.exists() ? s.data() : {}; } catch { NT.st = {}; }
+  try { const q = await getDocs(collection(db, 'pushTokens')); const a = q.docs.map(d => d.data()); NT.devices = { n: a.length, people: new Set(a.map(x => x.email)).size }; } catch { NT.devices = { n: 0, people: 0 }; }
+  softPaint();
+}
+function pushAdminCard() {
+  if (NT.st === null) { NT.st = undefined; loadPushStatus(); }
+  const st = NT.st || {}, dv = NT.devices, key = !!CFG.vapidKey;
+  const ago = st.lastRun ? Math.round((Date.now() - new Date(st.lastRun).getTime()) / 60000) : null;
+  const alive = ago !== null && ago <= 30;
+  const run = st.lastRun ? (ago < 1 ? '방금' : ago < 60 ? `${ago}분 전` : ago < 1440 ? `${Math.round(ago / 60)}시간 전` : `${Math.round(ago / 1440)}일 전`) : '';
+  const ready = key && alive;
+  return `<section class="card pushadm"><div class="lbl"><span>알림 보내기 도우미 · 앱이 닫혀 있어도</span><span class="s2">관리자</span></div>
+<div class="gstate ${ready ? 'ok' : ''}"><span class="gi">${svg(ready ? '<path d="M5 12.5l4.5 4.5L19 7"/>' : '<path d="M12 8v5M12 16.5v.5"/><circle cx="12" cy="12" r="9"/>', 20, 2.2)}</span><span class="grow"><b>${ready ? '켜져 있어요' : !key ? '아직 설정 전이에요' : st.lastRun ? '도우미가 잠시 쉬고 있어요' : '도우미 연결을 기다려요'}</b><small>${ready ? `공지를 [알림 보내기]로 올리면 보통 5~15분 안에 선생님들 기기에 알림이 가요` : '설정하면 공지를 올릴 때 앱을 닫아 둔 선생님 기기에도 알림이 가요'}</small></span></div>
+<div class="pstat"><div><b>${dv ? dv.n : '…'}</b><small>알림 받는 기기</small></div><div><b>${dv ? dv.people : '…'}</b><small>선생님</small></div><div><b>${run || '—'}</b><small>도우미 마지막 확인</small></div><div><b>${st.total ?? 0}</b><small>지금까지 보낸 알림</small></div></div>
+<details class="drawer gsetd" ${key ? '' : 'open'}><summary><b>${key ? '설정 순서 · 키 바꾸기' : '설정 순서'}</b><span class="s2">파이어베이스 2곳 · 깃허브 2곳 (처음 한 번)</span></summary>
+<ol class="gsteps"><li>파이어베이스 → 프로젝트 설정 → <b>클라우드 메시징</b> → 웹 푸시 인증서 → [키 쌍 생성] → 나온 키를 아래에 붙여넣고 저장</li>
+<li>파이어베이스 → 프로젝트 설정 → <b>서비스 계정</b> → [새 비공개 키 생성] → 받은 파일을 텍스트 편집기로 열어 전체 복사</li>
+<li>깃허브 joycorner-note → Settings → Secrets and variables → Actions → [New repository secret] → 이름 <b>FIREBASE_SA</b> · 내용에 붙여넣기 → 받은 파일은 지우기</li>
+<li>깃허브 → Add file → Create new file → 이름 <b>.github/workflows/joycorner-push.yml</b> → 압축 파일의 내용을 붙여넣고 Commit</li></ol>
+<label class="fld">웹 푸시 인증서 (공개 키)<input class="in" id="cfg_vapid" value="${esc(CFG.vapidKey || '')}" placeholder="B로 시작하는 긴 글자" autocomplete="off"></label>
+<button class="sec" data-act="vapidSave">저장</button><div class="s2">자세한 순서: 압축 파일 3_참고/알림-보내기-도우미-설정-안내.txt (프로젝트 문서에도 있어요)</div></details></section>`;
+}
+async function queuePush(n, id) {
+  await setDoc(doc(collection(db, 'pushQueue')), { kind: 'notice', ref: id, title: `${n.category || '공지'} · ${n.title}`.slice(0, 80), body: plainTxt(n.body).slice(0, 90) || '눌러서 자세히 보기', url: './#/notice/' + id, tag: 'notice-' + id, by: myMail(), byName: myName(), at: new Date().toISOString(), status: 'wait' });
+}
+Object.assign(ACT, {
+  ntOn: async () => {
+    const st = ntState();
+    if (st === 'ios-browser' || st === 'none') return sheet(`<div class="ttl" style="font-size:22px">알림은 홈 화면 앱에서 켜요</div><div class="sub">${isIOS() ? '사파리에서 공유 ⬆ → [홈 화면에 추가] → 홈 화면의 조이코너 앱을 열고 설정 → 알림 · 이 기기 → [이 기기에서 알림 받기]를 눌러 주세요. (iOS 16.4 이상)' : '크롬이나 엣지에서 열어 주세요.'}</div><div class="btns"><button class="pri" data-act="sheetClose">알겠어요</button></div>`);
+    let p = 'default'; try { p = await Notification.requestPermission(); } catch { }
+    if (p !== 'granted') { toast(p === 'denied' ? '알림이 막혀 있어요 · 기기 설정에서 허용해 주세요' : '알림을 허용하지 않았어요'); return paint(); }
+    NT.on = true; lsSet('jc_nt', '1');
+    const r = await pushRegister();
+    toast(r === 'ok' ? '켰어요 · 앱이 닫혀 있어도 새 공지가 와요' : r === 'novapid' ? '켰어요 · 앱이 열려 있을 때 새 공지가 와요' : '켰어요 · 앱이 열려 있을 때 새 공지가 와요 (닫혀 있을 때는 이 기기가 지원하지 않아요)');
+    paint();
+  },
+  ntOff: async () => { NT.on = false; lsSet('jc_nt', '0'); await pushUnregister(); toast('이 기기 알림을 껐어요'); paint(); },
+  ntReg: async () => { const r = await pushRegister(); toast(r === 'ok' ? '다시 등록했어요' : r === 'unsupported' ? '이 기기는 앱이 닫혀 있을 때 알림을 지원하지 않아요' : '등록하지 못했어요'); paint(); },
+  ntTest: () => { showLocal('조이코너 노트 · 시험 알림', '새 공지가 올라오면 이렇게 알려 드려요', 'joy-test', './#/home'); toast('시험 알림을 보냈어요 · 안 보이면 기기 알림 설정을 확인해 주세요'); },
+  vapidSave: async () => {
+    const v = val('cfg_vapid').replace(/\s/g, '');
+    if (v && !/^B[A-Za-z0-9_-]{60,}$/.test(v)) return toast('키 모양이 달라요 · B로 시작하는 긴 공개 키를 붙여넣어 주세요');
+    try { await setDoc(doc(db, 'config', 'app'), { vapidKey: v }, { merge: true }); CFG.vapidKey = v; toast(v ? '저장했어요 · 이제 선생님들이 [이 기기에서 알림 받기]를 누르면 등록돼요' : '지웠어요'); if (NT.on) pushRegister(true); paint(); }
+    catch (e) { toast('저장하지 못했어요: ' + errMsg(e)); }
+  }
+});
