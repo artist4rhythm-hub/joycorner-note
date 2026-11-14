@@ -241,6 +241,7 @@ function vFriends() {
   const noG = activeKids(c).filter(k => !k.gender).length;
   return `<div class="scroll"><div class="ttl">친구들</div>${classChips()}${noG ? `<button class="gnote" data-act="gBulk">${svg('<circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/>', 18, 1.9)}<span>남자 · 여자 아직 모르는 친구 <b>${noG}명</b></span><span class="chev">정하기 ›</span></button>` : ''}
 <input class="search" id="q" type="search" placeholder="이름으로 찾기" autocomplete="off">
+<button class="infobtn" data-act="infoKids">${svg('<rect x="3" y="4" width="18" height="16" rx="2.5"/><path d="M3 9.5h18M9 9.5V20"/>', 18, 2)}<span>사진 · 생일 · 성별 · 가정 정보 입력 현황 표</span><span class="chev">보기 ›</span></button>
 <div class="list klist" id="klist">${kids.map(row).join('')}</div>
 ${arch.length ? (S.showArchived ? `<div class="lbl">함께하지 않는 친구</div><div class="list">${arch.map(row).join('')}</div>` : `<button class="ghost" data-act="showArch">함께하지 않는 친구 ${arch.length}명 보기</button>`) : ''}
 <button class="addkid" data-act="addKid">+ 새로 온 친구 등록</button></div>${nav('friends')}`;
@@ -750,9 +751,10 @@ async function dutyDel() {
 }
 
 /* ---------- 교사실 (공지 · 캘린더 · 업무 분담 · 조직도 · 통계) ---------- */
-const APP_VERSION = 'v29';
+const APP_VERSION = 'v30';
 const APP_DATE = '2026-11-12';
 const CHANGELOG = [
+  { v: 'v30', date: '11월 14일', items: ['선생님 카드에 구글 메일 (누르면 메일 쓰기) · 메일로도 찾기', '교사실 선생님 탭 [입력 현황 표] — 선생님 · 친구들 정보가 채워졌는지 ✓ 로 한눈에, 채움 % 링 · 빈칸 많은 칸 · 빈칸 많은 순 정렬 · 엑셀로 받기', '친구들 화면에서 [입력 현황 표] 바로 가기'] },
   { v: 'v29', date: '11월 13일', items: ['도우미에 [알림 켜기] 안내 — 아이폰·아이패드 / 안드로이드 / 컴퓨터별 순서와 알림 미리보기 그림, 막혔을 때 고치는 법', '홈에 "새 공지를 알림으로 받아 보세요" — 알림이 꺼진 기기에서 한 번 권해요 (닫으면 다시 안 떠요)', '설정 알림 카드에 [켜는 법 ›]'] },
   { v: 'v28', date: '11월 13일', items: ['공지 알림 — 설정 → 알림 · 이 기기 → [이 기기에서 알림 받기]', '앱이 열려 있을 때: 새 공지를 바로 기기 알림으로 (목자의 삶과 같은 방식)', '앱이 닫혀 있어도: 관리자가 \'알림 보내기 도우미\'를 켜면 보통 5~15분 안에', '공지 쓰기에 [선생님들 기기에 알림 보내기] · 알림을 누르면 그 공지로 · 앱 아이콘에 새 공지 표시'] },
   { v: 'v27', date: '11월 13일', items: ['캘린더 화면의 달력이 작은 상자로 줄어들던 문제 고침 (v26 홈의 날짜 칸 이름이 달력과 겹쳤어요)'] },
@@ -3682,27 +3684,28 @@ function tchCard(st) {
   const tag = st.role === 'director' || st.role === 'admin' ? `<span class="tag">${roleLabel(st)}</span>` : '';
   const showAddr = canSeeAddr(st), addr = showAddr ? (TP.addr ? TP.addr[st.id] || '' : '…') : '';
   const row = (ic, label, v) => `<div class="ti"><span class="tic">${svg(ic, 15, 2)}</span><span class="tl">${label}</span><span class="tv ${v ? '' : 'empty'}">${v || '—'}</span></div>`;
-  const q = [st.name, st.jin, st.cell, st.phone].join(' ').toLowerCase();
+  const q = [st.name, st.jin, st.cell, st.phone, st.email].join(' ').toLowerCase();
   const hide = TF.q && !q.includes(TF.q);
   return `<article class="tcard ${mine ? 'me' : ''}" data-q="${esc(q)}" ${hide ? 'hidden' : ''}>
 <button class="phead" data-act="staffOpen" data-id="${st.id}">${staffAv(st, 56)}<span class="tt"><b>${esc(st.name)}</b><span>${esc(cls)}</span></span>${tag}</button>
-<div class="tinfo">${row(TICO.phone, '전화', st.phone ? `<a href="tel:${esc(st.phone)}">${esc(st.phone)}</a>` : '')}${row(TICO.cake, '생일', bdayKo(st.birth))}${row(TICO.church, '소속', esc(orgOf(st)))}${showAddr ? row(TICO.home, '주소', esc(addr)) : ''}</div>
+<div class="tinfo">${row(TICO.phone, '전화', st.phone ? `<a href="tel:${esc(st.phone)}">${esc(st.phone)}</a>` : '')}${row(TICO.mail, '메일', st.email ? `<a href="mailto:${esc(st.email)}">${esc(st.email)}</a>` : '')}${row(TICO.cake, '생일', bdayKo(st.birth))}${row(TICO.church, '소속', esc(orgOf(st)))}${showAddr ? row(TICO.home, '주소', esc(addr)) : ''}</div>
 ${st.phone || edit ? `<div class="tbtns">${st.phone ? `<a class="tb" href="tel:${esc(st.phone)}">${svg(TICO.phone, 15, 2)}전화</a><a class="tb" href="sms:${esc(st.phone)}">${svg('<path d="M4 5h16v11H9l-5 4z"/>', 15, 2)}문자</a>` : ''}${edit ? `<button class="tb ed" data-act="staffEdit" data-id="${st.id}">${svg('<path d="M4 20h4L19 9l-4-4L4 16z"/>', 15, 2)}고치기</button>` : ''}</div>` : ''}
 </article>`;
 }
 function rTeachers() {
   loadAddr();
+  if (TF.view === 'table') return rInfoTable();
   const cls = Object.keys(S.classes).sort((a, b) => (S.classes[a].age || 0) - (S.classes[b].age || 0));
   const all = S.staff.slice().sort((a, b) => (a.kind === 'helper') - (b.kind === 'helper') || (a.role === 'director' ? -1 : 0) - (b.role === 'director' ? -1 : 0) || (a.order ?? 999) - (b.order ?? 999) || ko(a.name, b.name));
   const cnt = k => { const o = TF.f; TF.f = k; const n = all.filter(tchMatch).length; TF.f = o; return n; };
   const chips = [['all', '전체'], ...cls.map(c => [c, clsName(c)]), ['none', '반 없음'], ['helper', '헬퍼']].map(([k, l]) => [k, l, cnt(k)]).filter(([k, , n]) => k === 'all' || n > 0);
   const l = all.filter(tchMatch), mine = myStaff();
   const noInfo = isAdminMe() ? S.staff.filter(x => x.kind !== 'helper' && !x.phone && !x.birth).length : 0;
-  return `<div class="tchtop full"><input class="search" id="tq" type="search" placeholder="이름 · 진 · 셀 · 번호로 찾기" autocomplete="off" value="${esc(TF.q)}">${mine ? `<button class="pri sm" data-act="staffEdit" data-id="${mine.id}">내 카드 채우기</button>` : ''}
+  return `${tviewSeg()}<div class="tchtop full"><input class="search" id="tq" type="search" placeholder="이름 · 진 · 셀 · 번호 · 메일로 찾기" autocomplete="off" value="${esc(TF.q)}">${mine ? `<button class="pri sm" data-act="staffEdit" data-id="${mine.id}">내 카드 채우기</button>` : ''}
 <div class="chips tchf">${chips.map(([k, lb, n]) => `<button class="chip ${TF.f === k ? 'on' : ''}" data-act="tchF" data-id="${k}">${esc(lb)} <small>${n}</small></button>`).join('')}</div></div>
 ${noInfo ? `<div class="note full soft">전화 · 생일이 비어 있는 선생님 ${noInfo}명 · 본인이 [내 카드 채우기]로 넣거나, 카드의 [고치기]로 넣어 주세요</div>` : ''}
 <div class="tgrid full" id="tgrid">${l.map(tchCard).join('') || '<div class="sub">해당하는 선생님이 없어요.</div>'}</div>
-<div class="s2 full">전화 · 생일 · 소속은 모든 선생님이 함께 보고, 주소는 디렉터 · 관리자와 본인만 봐요.</div>`;
+<div class="s2 full">전화 · 메일 · 생일 · 소속은 모든 선생님이 함께 보고, 주소는 디렉터 · 관리자와 본인만 봐요.</div>`;
 }
 document.addEventListener('input', e => {
   if (e.target.id !== 'tq') return;
@@ -3712,7 +3715,7 @@ document.addEventListener('input', e => {
 function staffMoreLine(st) {
   const org = orgOf(st), show = canSeeAddr(st), addr = show && TP.addr ? TP.addr[st.id] || '' : '';
   if (show) loadAddr();
-  return (org ? `<div class="s2">소속 ${esc(org)}</div>` : '') + (addr ? `<div class="s2">주소 ${esc(addr)} <span class="tag g">디렉터 · 관리자 · 본인만</span></div>` : '');
+  return (st.email ? `<div class="s2">메일 <a href="mailto:${esc(st.email)}">${esc(st.email)}</a></div>` : '') + (org ? `<div class="s2">소속 ${esc(org)}</div>` : '') + (addr ? `<div class="s2">주소 ${esc(addr)} <span class="tag g">디렉터 · 관리자 · 본인만</span></div>` : '');
 }
 
 /* ---------- 홈: 전체 한눈에 / 반별 보기 ---------- */
@@ -4056,7 +4059,7 @@ function ntCard() {
 /* 설정 — 관리자: 보내기 도우미 */
 async function loadPushStatus() {
   try { const s = await getDoc(doc(db, 'config', 'push')); NT.st = s.exists() ? s.data() : {}; } catch { NT.st = {}; }
-  try { const q = await getDocs(collection(db, 'pushTokens')); const a = q.docs.map(d => d.data()); NT.devices = { n: a.length, people: new Set(a.map(x => x.email)).size }; } catch { NT.devices = { n: 0, people: 0 }; }
+  try { const q = await getDocs(collection(db, 'pushTokens')); const a = q.docs.map(d => d.data()); NT.devices = { n: a.length, people: new Set(a.map(x => x.email)).size }; NT.emails = new Set(a.map(x => (x.email || '').toLowerCase())); } catch { NT.devices = { n: 0, people: 0 }; }
   softPaint();
 }
 function pushAdminCard() {
@@ -4158,4 +4161,92 @@ function notifyNudge() {
 Object.assign(ACT, {
   ntNudgeOff: () => { lsSet('jc_ntnudge_off', '1'); paint(); },
   ntInstallGuide: () => { closeSheet(); go('help/install'); }
+});
+
+/* ================= v30 · 선생님 메일 · 입력 현황 표 ================= */
+TICO.mail = '<rect x="3" y="5" width="18" height="14" rx="2.5"/><path d="M3.5 6.5l8.5 6.5 8.5-6.5"/>';
+TF.view = lsGet('jc_tview') === 'table' ? 'table' : 'card'; TF.who = 'staff'; TF.sort = 'gap'; TF.kf = 'all'; TF.fam = false;
+const CHK = '<path d="M5 12.5l4.5 4.5L19 7"/>';
+function tviewSeg() {
+  return `<div class="seg tview full"><button class="${TF.view === 'card' ? 'on' : ''}" data-act="tView" data-id="card">${svg('<rect x="3" y="3" width="7.5" height="7.5" rx="2"/><rect x="13.5" y="3" width="7.5" height="7.5" rx="2"/><rect x="3" y="13.5" width="7.5" height="7.5" rx="2"/><rect x="13.5" y="13.5" width="7.5" height="7.5" rx="2"/>', 17, 2)}카드로 보기</button><button class="${TF.view === 'table' ? 'on' : ''}" data-act="tView" data-id="table">${svg('<rect x="3" y="4" width="18" height="16" rx="2.5"/><path d="M3 9.5h18M9 9.5V20"/>', 17, 2)}입력 현황 표</button></div>`;
+}
+const canAdm = () => isAdminMe() || isDirectorMe();
+function staffCols() {
+  return [
+    ['사진', st => !!(st.thumb || st.photo)],
+    ['전화', st => !!st.phone],
+    ['구글 메일', st => !!st.email],
+    ['생일', st => !!st.birth],
+    ['진', st => !!st.jin],
+    ['셀', st => !!st.cell],
+    ...(canAdm() ? [['주소', st => !!(TP.addr && TP.addr[st.id])], ['알림', st => !!(NT.emails && st.email && NT.emails.has(st.email.toLowerCase()))]] : []),
+    ['소개', st => !!st.intro]
+  ];
+}
+function kidCols() {
+  return [
+    ['사진', k => !!k.thumb],
+    ['생일', k => !!k.birth],
+    ['성별', k => !!k.gender],
+    ['부모 이름', k => { const f = famOf(k); return !!(f.father || f.mother); }],
+    ['부모 셀', k => { const f = famOf(k); return !!(f.fatherCell || f.motherCell); }],
+    ['부모 연락처', k => !!phonesOf(famOf(k))]
+  ];
+}
+/* 표 한 장 — 위에는 채움 링 · 가장 빈 칸, 아래는 사람마다 ✓ */
+function infoTable(list, cols, rowHead, act, emptyMsg) {
+  const n = list.length, fill = cols.map(([, f]) => list.filter(f).length);
+  const rows = list.map(x => { const v = cols.map(([, f]) => f(x)), k = v.filter(Boolean).length; return { x, v, k, p: cols.length ? k / cols.length : 0 }; });
+  if (TF.sort === 'gap') rows.sort((a, b) => a.k - b.k); 
+  const all = n * cols.length, got = fill.reduce((s, v) => s + v, 0), pct = all ? got / all : 0;
+  const gaps = cols.map(([l], i) => ({ l, v: fill[i] })).sort((a, b) => a.v - b.v).slice(0, 3).filter(g => g.v < n);
+  const done = rows.filter(r => r.k === cols.length).length;
+  return `<section class="card full itop">${ringSvg(pct, pct >= .8 ? '#2F7D4F' : pct >= .5 ? '#E08A00' : '#C62828', 104, 12, 'rgba(0,0,0,.06)', `<b>${Math.round(pct * 100)}<small>%</small></b><small>채움</small>`)}
+<div class="it-tx"><b>${n}명 중 <span class="ok">${done}명</span>은 다 채웠어요</b><small>빈칸이 많은 곳</small><div class="it-gaps">${gaps.map(g => `<span class="gp"><i style="width:${n ? Math.round(g.v / n * 100) : 0}%"></i><b>${esc(g.l)}</b> ${g.v}/${n}</span>`).join('') || '<span class="s2">모두 채웠어요. 감사해요!</span>'}</div></div>
+<div class="it-act"><div class="seg isort"><button class="${TF.sort === 'gap' ? 'on' : ''}" data-act="tSort" data-id="gap">빈칸 많은 순</button><button class="${TF.sort === 'name' ? 'on' : ''}" data-act="tSort" data-id="name">원래 순서</button></div><button class="sec sm" data-act="infoXlsx">${svg('<path d="M12 3v12M7 10l5 5 5-5M5 21h14"/>', 16, 2)} 엑셀로 받기</button></div></section>
+<div class="itwrap full"><table class="itable"><thead><tr><th class="nmh">이름</th>${cols.map(([l], i) => `<th><span>${esc(l)}</span><small class="${fill[i] === n ? 'full' : ''}">${fill[i]}/${n}</small></th>`).join('')}<th class="pch">채움</th></tr></thead>
+<tbody>${rows.map(r => `<tr data-act="${act}" data-id="${r.x.id}" tabindex="0">${rowHead(r.x)}${r.v.map((ok, i) => `<td class="${ok ? 'y' : 'n'}" title="${esc(cols[i][0])} ${ok ? '있음' : '비어 있음'}">${ok ? `<i>${svg(CHK, 14, 3)}</i>` : '<i></i>'}</td>`).join('')}<td class="pc"><span class="ipbar"><em style="width:${Math.round(r.p * 100)}%;background:${r.p === 1 ? '#2F7D4F' : r.p >= .5 ? '#E08A00' : '#E07A5F'}"></em></span><b>${Math.round(r.p * 100)}%</b></td></tr>`).join('') || `<tr><td colspan="${cols.length + 2}" class="emp">${emptyMsg}</td></tr>`}</tbody></table></div>
+<div class="s2 full">줄을 누르면 그 카드가 열려요 · 카드의 [고치기]로 빈칸을 채워요${canAdm() ? ' · 주소 · 알림 칸은 디렉터 · 관리자만 봐요' : ''}</div>`;
+}
+function staffInfoTable() {
+  if (canAdm() && NT.devices == null) loadPushStatus();
+  const cls = Object.keys(S.classes).sort((a, b) => (S.classes[a].age || 0) - (S.classes[b].age || 0));
+  const all = S.staff.slice().sort((a, b) => (a.kind === 'helper') - (b.kind === 'helper') || (a.order ?? 999) - (b.order ?? 999) || ko(a.name, b.name));
+  const cnt = k => { const o = TF.f; TF.f = k; const n = all.filter(tchMatch).length; TF.f = o; return n; };
+  const chips = [['all', '전체'], ...cls.map(c => [c, clsName(c)]), ['none', '반 없음'], ['helper', '헬퍼']].map(([k, l]) => [k, l, cnt(k)]).filter(([k, , n]) => k === 'all' || n > 0);
+  const head = st => `<td class="nm"><div class="nmi">${staffAv(st, 30)}<span><b>${esc(st.name)}</b><small>${esc(Object.entries(st.classRole || {}).map(([c, r]) => `${clsName(c)} ${r}`).join(' · ') || (st.kind === 'helper' ? '헬퍼' : roleLabel(st) || '반 배정 전'))}</small></span></div></td>`;
+  return `<div class="chips tchf full">${chips.map(([k, lb, n]) => `<button class="chip ${TF.f === k ? 'on' : ''}" data-act="tchF" data-id="${k}">${esc(lb)} <small>${n}</small></button>`).join('')}</div>${infoTable(all.filter(tchMatch), staffCols(), head, 'staffOpen', '해당하는 선생님이 없어요.')}`;
+}
+function kidsInfoTable() {
+  if (!TF.fam) { TF.fam = 'busy'; loadFamsAll().then(() => { TF.fam = true; softPaint(); }).catch(() => { TF.fam = true; }); }
+  const cls = clsSorted(), list = cls.filter(c => TF.kf === 'all' || TF.kf === c).flatMap(c => activeKids(c).map(k => ({ k, c })));
+  const head = k => `<td class="nm"><div class="nmi">${avatar(k, 30)}<span><b>${esc(k.name)}</b><small style="color:${clsCol(k.classId)}">${esc(clsName(k.classId))}</small></span></div></td>`;
+  const chips = [['all', '전체', cls.reduce((s, c) => s + activeKids(c).length, 0)], ...cls.map(c => [c, clsName(c), activeKids(c).length])];
+  return `<div class="chips tchf full">${chips.map(([k, lb, n]) => `<button class="chip ${TF.kf === k ? 'on' : ''}" data-act="tKf" data-id="${k}">${esc(lb)} <small>${n}</small></button>`).join('')}</div>${TF.fam !== true ? '<div class="note full soft">가정 정보를 불러오는 중이에요…</div>' : ''}${infoTable(list.map(x => x.k), kidCols(), head, 'kid', '해당하는 친구가 없어요.')}`;
+}
+function rInfoTable() {
+  const kn = clsSorted().reduce((s, c) => s + activeKids(c).length, 0);
+  return `${tviewSeg()}<div class="seg twho full"><button class="${TF.who === 'staff' ? 'on' : ''}" data-act="tWho" data-id="staff">선생님 <small>${S.staff.length}</small></button><button class="${TF.who === 'kids' ? 'on' : ''}" data-act="tWho" data-id="kids">친구들 <small>${kn}</small></button></div>${TF.who === 'kids' ? kidsInfoTable() : staffInfoTable()}`;
+}
+async function infoXlsx() {
+  const ox = b => b ? 'O' : '';
+  const sc = staffCols(), staff = S.staff.slice().sort((a, b) => (a.order ?? 999) - (b.order ?? 999));
+  if (TF.fam !== true) { await loadFamsAll().catch(() => { }); TF.fam = true; }
+  const kc = kidCols(), kids = clsSorted().flatMap(c => activeKids(c));
+  const pc = (x, cols) => Math.round(cols.filter(([, f]) => f(x)).length / cols.length * 100) + '%';
+  try {
+    await xlsxDownload(`조이코너_입력현황_${ymd(new Date()).replace(/-/g, '')}.xlsx`, [
+      { name: '선생님', cols: [12, 16, ...sc.map(() => 9), 8], aoa: [['이름', '반 · 역할', ...sc.map(c => c[0]), '채움'], ...staff.map(st => [st.name, Object.entries(st.classRole || {}).map(([c, r]) => `${clsName(c)} ${r}`).join(' · ') || (st.kind === 'helper' ? '헬퍼' : ''), ...sc.map(([, f]) => ox(f(st))), pc(st, sc)])] },
+      { name: '친구들', cols: [12, 10, ...kc.map(() => 10), 8], aoa: [['이름', '반', ...kc.map(c => c[0]), '채움'], ...kids.map(k => [k.name, clsName(k.classId), ...kc.map(([, f]) => ox(f(k))), pc(k, kc)])] }
+    ]);
+    toast('엑셀로 받았어요 · O = 입력됨, 빈칸 = 아직');
+  } catch (e) { toast('받지 못했어요: ' + errMsg(e)); }
+}
+Object.assign(ACT, {
+  tView: d => { TF.view = d.id; lsSet('jc_tview', d.id); S.lastKey = ''; paint(); },
+  tWho: d => { TF.who = d.id; paint(); },
+  tSort: d => { TF.sort = d.id; paint(); },
+  tKf: d => { TF.kf = d.id; paint(); },
+  infoXlsx,
+  infoKids: () => { TF.view = 'table'; TF.who = 'kids'; TF.kf = S.cur || 'all'; lsSet('jc_tview', 'table'); R.tab = 'tch'; go('room'); }
 });
