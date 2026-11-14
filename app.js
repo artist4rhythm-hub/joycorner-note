@@ -349,7 +349,7 @@ function vStaffList() {
 <div class="sub">명단을 먼저 만들어 두고, 구글 계정은 나중에 연결하면 돼요. 연결 전에는 수퍼관리자·디렉터·시스템 관리자가 내용을 고쳐요. 디렉터는 수퍼관리자가, 시스템 관리자는 디렉터가 정해요.</div>
 ${dirs.length ? `<div class="lbl" style="margin-top:6px">디렉터 (조이코너 전체 관리)</div><div class="list">${dirs.map(x => row(x)).join('')}</div>` : ''}${groups}${free.length ? `<div class="lbl" style="margin-top:6px">반 없음</div><div class="list">${free.map(x => row(x)).join('')}</div>` : ''}${helpers.length ? `<div class="lbl" style="margin-top:6px">헬퍼 선생님 풀 · 필요할 때 요청 (일일 · 외부)</div><div class="list">${helpers.map(x => row(x)).join('')}</div>` : ''}
 ${total ? '' : '<div class="sub">아직 명단이 없어요. 시트 데이터를 가져오면 15명이 들어와요.</div>'}
-${leftDrawer()}<button class="sec" data-act="staff">+ 교사 추가</button></section>`;
+${archLink()}<button class="sec" data-act="staff">+ 교사 추가</button></section>`;
 }
 
 /* ---------- 그리기 ---------- */
@@ -513,7 +513,7 @@ function staffSheet(id) {
 <label class="fld">구글 계정 이메일 (나중에 넣어도 돼요)<input class="in" id="s_email" type="email" value="${esc(st.email || '')}" placeholder="example@gmail.com"></label>
 <div class="s2">이메일을 넣으면 그 구글 계정으로 로그인할 수 있어요. 지우면 로그인이 막혀요.</div>
 <div class="btns"><button class="pri" data-act="saveStaff">저장</button><button class="sec" data-act="sheetClose">취소</button></div>
-${id ? '<button class="ghost danger" data-act="staffLeaveAsk">그만두신 선생님으로 옮기기</button>' : ''}`);
+${id ? `<div class="sdanger"><button class="ghost" data-act="staffLeaveAsk">그만두신 선생님으로</button><button class="ghost danger" data-act="staffTrashAsk" data-id="${id}">${svg('<path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/>', 15, 2)}휴지통에 넣기</button></div>` : ''}`);
 }
 async function saveStaff() {
   const id = S.editStaff, old = id ? S.staff.find(x => x.id === id) : {};
@@ -751,9 +751,10 @@ async function dutyDel() {
 }
 
 /* ---------- 교사실 (공지 · 캘린더 · 업무 분담 · 조직도 · 통계) ---------- */
-const APP_VERSION = 'v30';
+const APP_VERSION = 'v31';
 const APP_DATE = '2026-11-12';
 const CHANGELOG = [
+  { v: 'v31', date: '11월 14일', items: ['선생님 카드 휴지통 — 지우면 바로 없어지지 않고 휴지통에 들어가요 · [되돌리기]로 원래 자리로 · [완전히 지우기]는 두 번 확인', '교사실 → 선생님 맨 아래 [보관함] — 그만두신 선생님 · 휴지통을 한곳에서 (디렉터 · 관리자)', '선생님 카드 [고치기]와 명단 고치기 창에 [그만두신 선생님으로] [휴지통에 넣기]', '설정 교사 명단에 보관함 바로 가기'] },
   { v: 'v30', date: '11월 14일', items: ['선생님 카드에 구글 메일 (누르면 메일 쓰기) · 메일로도 찾기', '교사실 선생님 탭 [입력 현황 표] — 선생님 · 친구들 정보가 채워졌는지 ✓ 로 한눈에, 채움 % 링 · 빈칸 많은 칸 · 빈칸 많은 순 정렬 · 엑셀로 받기', '친구들 화면에서 [입력 현황 표] 바로 가기'] },
   { v: 'v29', date: '11월 13일', items: ['도우미에 [알림 켜기] 안내 — 아이폰·아이패드 / 안드로이드 / 컴퓨터별 순서와 알림 미리보기 그림, 막혔을 때 고치는 법', '홈에 "새 공지를 알림으로 받아 보세요" — 알림이 꺼진 기기에서 한 번 권해요 (닫으면 다시 안 떠요)', '설정 알림 카드에 [켜는 법 ›]'] },
   { v: 'v28', date: '11월 13일', items: ['공지 알림 — 설정 → 알림 · 이 기기 → [이 기기에서 알림 받기]', '앱이 열려 있을 때: 새 공지를 바로 기기 알림으로 (목자의 삶과 같은 방식)', '앱이 닫혀 있어도: 관리자가 \'알림 보내기 도우미\'를 켜면 보통 5~15분 안에', '공지 쓰기에 [선생님들 기기에 알림 보내기] · 알림을 누르면 그 공지로 · 앱 아이콘에 새 공지 표시'] },
@@ -1297,7 +1298,7 @@ ${canSeeAddr(st) ? `<label class="fld">주소 <small class="s2">디렉터 · 관
 <label class="fld">한 줄 소개<input class="in" id="sf_intro" value="${esc(st.intro || '')}" placeholder="예: 율동으로 아이들과 함께 찬양해요"></label>
 <div class="sub" id="sf_msg"></div>
 <div class="btns"><button class="pri" data-act="staffEditSave">저장</button><button class="sec" data-act="sheetClose">취소</button></div>
-${isAdminMe() ? `<button class="ghost" data-act="staff" data-id="${st.id}">권한 · 반 · 구글 계정 고치기</button>` : ''}`);
+${isAdminMe() ? `<button class="ghost" data-act="staff" data-id="${st.id}">권한 · 반 · 구글 계정 고치기</button><div class="sdanger"><button class="ghost" data-act="staffLeaveAsk2" data-id="${st.id}">그만두신 선생님으로</button><button class="ghost danger" data-act="staffTrashAsk" data-id="${st.id}">${svg('<path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/>', 15, 2)}휴지통에 넣기</button></div>` : ''}`);
 }
 async function staffEditSave() {
   if (PK.face && PK.face.busy) return toast('사진을 준비하고 있어요');
@@ -2202,7 +2203,7 @@ function applyCore({ cs, ks, sc, st }) {
   if (!S.myClasses.includes(S.cur)) { const saved = lsGet('jc_cur'), own = (S.me.classes || []).find(c => S.classes[c]); S.cur = S.myClasses.includes(saved) ? saved : own || S.myClasses[0] || null; }
   if (ks) { const by = {}; S.myClasses.forEach(c => { by[c] = []; }); ks.forEach(k => { if (by[k.classId]) by[k.classId].push(k); }); S.kids = by; }
   if (sc) S.schedule = sc.sort((a, b) => ko(a.date, b.date));
-  if (st) { const all = st.sort((a, b) => (a.order ?? 999) - (b.order ?? 999) || ko(a.name, b.name)); S.staff = all.filter(x => x.status !== 'left'); S.staffLeft = all.filter(x => x.status === 'left'); }
+  if (st) { const all = st.sort((a, b) => (a.order ?? 999) - (b.order ?? 999) || ko(a.name, b.name)); staffSplit(all); }
   const mine = S.staff.find(x => x.email && x.email === S.me.email); if (mine) S.me.name = mine.name;
 }
 async function loadAtt(c, cache) {
@@ -3705,7 +3706,7 @@ function rTeachers() {
 <div class="chips tchf">${chips.map(([k, lb, n]) => `<button class="chip ${TF.f === k ? 'on' : ''}" data-act="tchF" data-id="${k}">${esc(lb)} <small>${n}</small></button>`).join('')}</div></div>
 ${noInfo ? `<div class="note full soft">전화 · 생일이 비어 있는 선생님 ${noInfo}명 · 본인이 [내 카드 채우기]로 넣거나, 카드의 [고치기]로 넣어 주세요</div>` : ''}
 <div class="tgrid full" id="tgrid">${l.map(tchCard).join('') || '<div class="sub">해당하는 선생님이 없어요.</div>'}</div>
-<div class="s2 full">전화 · 메일 · 생일 · 소속은 모든 선생님이 함께 보고, 주소는 디렉터 · 관리자와 본인만 봐요.</div>`;
+<div class="s2 full">전화 · 메일 · 생일 · 소속은 모든 선생님이 함께 보고, 주소는 디렉터 · 관리자와 본인만 봐요.</div>${staffArchive()}`;
 }
 document.addEventListener('input', e => {
   if (e.target.id !== 'tq') return;
@@ -4250,3 +4251,97 @@ Object.assign(ACT, {
   infoXlsx,
   infoKids: () => { TF.view = 'table'; TF.who = 'kids'; TF.kf = S.cur || 'all'; lsSet('jc_tview', 'table'); R.tab = 'tch'; go('room'); }
 });
+
+/* ================= v31 · 선생님 휴지통 · 보관함(그만두신 선생님 · 휴지통) ================= */
+S.staffTrash = S.staffTrash || [];
+var SA = { tab: 'left' };
+function staffSplit(all) {
+  S.staff = all.filter(x => !x.status || x.status === 'active');
+  S.staffLeft = all.filter(x => x.status === 'left');
+  S.staffTrash = all.filter(x => x.status === 'trash').sort((a, b) => ko(b.trashedAt || '', a.trashedAt || ''));
+}
+const daysAgo = iso => { if (!iso) return ''; const n = Math.floor((Date.now() - new Date(iso).getTime()) / 86400000); return n <= 0 ? '오늘' : n === 1 ? '어제' : `${n}일 전`; };
+async function stripFromDuties(b, name) {
+  if (!Array.isArray(W.duties)) await loadDuties();
+  (W.duties || []).forEach(x => {
+    const p = (x.people || []).filter(n => n !== name), k = (x.backup || []).filter(n => n !== name);
+    if (p.length !== (x.people || []).length || k.length !== (x.backup || []).length) { const note = stripName(x.note, name); b.update(doc(db, 'duties', x.id), { people: p, backup: k, note }); Object.assign(x, { people: p, backup: k, note }); }
+  });
+}
+async function staffToTrash(id) {
+  const st = S.staff.find(x => x.id === id) || (S.staffLeft || []).find(x => x.id === id); if (!st) return;
+  if (st.email && st.email === OWNER_EMAIL.toLowerCase()) return toast('수퍼관리자 카드는 휴지통에 넣을 수 없어요');
+  const from = st.status === 'left' ? 'left' : 'active';
+  const patch = { status: 'trash', trashedAt: new Date().toISOString(), trashedBy: myName(), prevStatus: from };
+  if (from === 'active') Object.assign(patch, { prevClasses: st.classes || [], prevClassRole: st.classRole || {}, classes: [], classRole: {} });
+  try {
+    const b = writeBatch(db); b.set(doc(db, 'staff', id), patch, { merge: true });
+    if (from === 'active') await stripFromDuties(b, st.name);
+    await b.commit();
+    if (st.email && st.email !== OWNER_EMAIL.toLowerCase()) await deleteDoc(doc(db, 'teachers', st.email)).catch(() => { });
+    Object.assign(st, patch);
+    S.staff = S.staff.filter(x => x.id !== id); S.staffLeft = (S.staffLeft || []).filter(x => x.id !== id); S.staffTrash = [st, ...(S.staffTrash || []).filter(x => x.id !== id)];
+    closeSheet(); SA.tab = 'trash'; toast(`${st.name} 선생님 카드를 휴지통에 넣었어요 · 보관함에서 되돌릴 수 있어요`);
+    if (S.route === 'staff') { R.tab = 'tch'; go('room'); } else paint();
+  } catch (e) { toast('옮기지 못했어요: ' + errMsg(e)); }
+}
+async function staffRestore(id) {
+  const st = (S.staffTrash || []).find(x => x.id === id); if (!st) return;
+  const to = st.prevStatus === 'left' ? 'left' : 'active';
+  const patch = to === 'left' ? { status: 'left', trashedAt: '', trashedBy: '' } : { status: 'active', trashedAt: '', trashedBy: '', leftAt: '', classes: st.prevClasses || [], classRole: st.prevClassRole || {} };
+  try {
+    await setDoc(doc(db, 'staff', id), patch, { merge: true });
+    if (to === 'active' && st.email) await setDoc(doc(db, 'teachers', st.email), { staffId: id, name: st.name, role: st.role === 'director' || st.role === 'admin' ? st.role : 'teacher', classes: patch.classes }, { merge: true }).catch(() => { });
+    Object.assign(st, patch); S.staffTrash = S.staffTrash.filter(x => x.id !== id);
+    if (to === 'left') { S.staffLeft = [st, ...(S.staffLeft || [])]; SA.tab = 'left'; } else { S.staff.push(st); S.staff.sort((a, b) => (a.order ?? 999) - (b.order ?? 999) || ko(a.name, b.name)); }
+    toast(to === 'left' ? `${st.name} 선생님을 '그만두신 선생님'으로 되돌렸어요` : `${st.name} 선생님이 다시 명단에 들어왔어요 · 업무 분담은 새로 정해 주세요`); paint();
+  } catch (e) { toast('되돌리지 못했어요: ' + errMsg(e)); }
+}
+async function staffErase(ids) {
+  let n = 0;
+  for (const id of ids) {
+    try {
+      await deleteDoc(doc(db, 'staff', id));
+      await deleteDoc(doc(db, 'staffPhotos', id)).catch(() => { }); await deleteDoc(doc(db, 'staffPrivate', id)).catch(() => { });
+      S.staffTrash = S.staffTrash.filter(x => x.id !== id); n++;
+    } catch (e) { toast('지우지 못했어요: ' + errMsg(e)); break; }
+  }
+  closeSheet(); if (n) toast(n > 1 ? `${n}명의 카드를 완전히 지웠어요` : '완전히 지웠어요'); paint();
+}
+function staffArchive() {
+  if (!isAdminMe()) return '';
+  const L = S.staffLeft || [], T = S.staffTrash || [];
+  const prev = st => (st.prevClasses || []).map(clsName).join(' · ');
+  const card = (st, kind) => `<div class="acard ${kind}">${staffAv(st, 44)}<span class="grow"><b>${esc(st.name)}</b><small>${kind === 'left'
+    ? `${st.leftAt ? esc(st.leftAt.replace(/-/g, '.')) + ' 그만두심' : '그만두심'}${prev(st) ? ' · 전 ' + esc(prev(st)) : ''}`
+    : `${daysAgo(st.trashedAt)} · ${st.prevStatus === 'left' ? '그만두신 선생님에서' : '명단에서'}${st.trashedBy ? ' · ' + esc(st.trashedBy) : ''}`}</small></span>
+<span class="ab">${kind === 'left'
+    ? `<button class="sec sm" data-act="staffBack" data-id="${st.id}">다시 명단에</button><button class="ghost sm" data-act="staffTrashAsk" data-id="${st.id}">${svg('<path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/>', 15, 2)}휴지통</button>`
+    : `<button class="sec sm" data-act="staffRestore" data-id="${st.id}">${svg('<path d="M4 12a8 8 0 1 0 2.3-5.7M4 4v4h4"/>', 15, 2)}되돌리기</button><button class="ghost sm danger" data-act="staffEraseAsk" data-id="${st.id}">완전히 지우기</button>`}</span></div>`;
+  return `<section class="card full sarch" id="sarch"><div class="lbl"><span>보관함</span><span class="s2">디렉터 · 관리자만 보여요</span></div>
+<div class="seg sarseg"><button class="${SA.tab === 'left' ? 'on' : ''}" data-act="saTab" data-id="left">그만두신 선생님 <small>${L.length}</small></button><button class="${SA.tab === 'trash' ? 'on' : ''}" data-act="saTab" data-id="trash">${svg('<path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/>', 16, 2)}휴지통 <small>${T.length}</small></button></div>
+${SA.tab === 'left'
+    ? (L.length ? `<div class="agrid">${L.map(st => card(st, 'left')).join('')}</div><div class="s2">명단 · 조직도 · 업무 분담에서 빠지고 로그인도 막혀요. 기록은 그대로 남아요.</div>` : '<div class="sub">그만두신 선생님이 없어요. 선생님 카드 [고치기] → [그만두신 선생님으로]로 옮길 수 있어요.</div>')
+    : (T.length ? `<div class="agrid">${T.map(st => card(st, 'trash')).join('')}</div><div class="s2">휴지통의 카드는 [되돌리기]로 원래 자리(명단 · 그만두신 선생님)로 돌아가요. [완전히 지우기]는 되돌릴 수 없어요.</div><button class="ghost danger" data-act="staffEmptyAsk">휴지통 비우기 (${T.length}명)</button>` : '<div class="sub">휴지통이 비어 있어요. 지운 선생님 카드는 바로 없어지지 않고 여기에 먼저 들어와요.</div>')}
+</section>`;
+}
+const archLink = () => isAdminMe() ? `<button class="ghost" data-act="saGo" data-id="left">${svg('<path d="M4 7h16v13H4zM2 4h20v3H2zM10 11h4"/>', 16, 2)} 보관함 · 그만두신 선생님 ${(S.staffLeft || []).length} · 휴지통 ${(S.staffTrash || []).length}</button>` : '';
+Object.assign(ACT, {
+  saTab: d => { SA.tab = d.id; paint(); },
+  saGo: d => { SA.tab = d.id || 'left'; TF.view = 'card'; R.tab = 'tch'; closeSheet(); go('room'); setTimeout(() => document.getElementById('sarch')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 350); },
+  staffTrashAsk: d => {
+    const id = d.id || S.editStaff, st = S.staff.find(x => x.id === id) || (S.staffLeft || []).find(x => x.id === id); if (!st) return;
+    sheet(`<div class="ttl" style="font-size:22px">${esc(st.name)} 선생님 카드를 휴지통에 넣을까요?</div><div class="sub">명단 · 조직도 · 업무 분담에서 빠지고 구글 로그인도 막혀요. 바로 지워지지 않고 보관함 → 휴지통에 남아서 언제든 [되돌리기]로 돌아올 수 있어요.</div><div class="btns"><button class="pri danger" data-act="staffTrash" data-id="${st.id}">휴지통에 넣기</button><button class="sec" data-act="sheetClose">아니요</button></div>`);
+  },
+  staffTrash: d => staffToTrash(d.id),
+  staffRestore: d => staffRestore(d.id),
+  staffEraseAsk: d => { const st = (S.staffTrash || []).find(x => x.id === d.id); if (!st) return; sheet(`<div class="ttl" style="font-size:22px">${esc(st.name)} 선생님 카드를 완전히 지울까요?</div><div class="sub">사진 · 연락처 · 주소까지 지워지고 <b>되돌릴 수 없어요</b>. 그동안 쓴 공지 · 설교 · 기록은 남아요.</div><div class="btns"><button class="pri danger" data-act="staffErase" data-id="${st.id}">완전히 지우기</button><button class="sec" data-act="sheetClose">아니요</button></div>`); },
+  staffErase: d => staffErase([d.id]),
+  staffEmptyAsk: () => { const T = S.staffTrash || []; if (!T.length) return; sheet(`<div class="ttl" style="font-size:22px">휴지통을 비울까요?</div><div class="sub">${T.map(x => esc(x.name)).join(', ')} — ${T.length}명의 카드가 <b>완전히 지워지고 되돌릴 수 없어요</b>.</div><div class="btns"><button class="pri danger" data-act="staffEmpty">모두 지우기</button><button class="sec" data-act="sheetClose">아니요</button></div>`); },
+  staffEmpty: () => staffErase((S.staffTrash || []).map(x => x.id)),
+  /* 예전 '완전히 지우기'(그만두신 선생님) → 이제는 휴지통으로 */
+  staffPurgeAsk: d => ACT.staffTrashAsk(d)
+});
+['staffErase', 'staffEmpty'].forEach(delTwice);
+Object.assign(ACT, { staffLeaveAsk2: d => { S.editStaff = d.id; closeSheet(); setTimeout(() => ACT.staffLeaveAsk(), 60); } });
+Object.assign(ACT, { delStaffAsk: () => ACT.staffTrashAsk({ id: S.editStaff }), delStaff: () => staffToTrash(S.editStaff) });
