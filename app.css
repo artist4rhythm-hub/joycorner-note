@@ -1144,3 +1144,176 @@ button.ptile{cursor:pointer}button.ptile:hover{box-shadow:0 0 0 2px color-mix(in
 .acard .ab{display:flex;gap:6px;flex-wrap:wrap}.acard .ab button{display:inline-flex;align-items:center;gap:4px;white-space:nowrap}
 .sdanger{display:flex;gap:8px;flex-wrap:wrap;border-top:1px dashed #EBD9B8;padding-top:12px;margin-top:4px}
 .sdanger button{flex:1;min-width:140px;display:inline-flex;align-items:center;justify-content:center;gap:6px}
+/* ===== v32 · 새 학년 준비 · 졸업생 서랍장 · 학년 이력 ===== */
+.nyin{max-width:860px;margin:0 auto;width:100%;display:flex;flex-direction:column;gap:14px}
+.nyin.wide{max-width:1180px}
+.nyin .atitle{margin:0}.atitle.sm{font-size:28px}
+.nytop{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
+.nypill{display:inline-flex;align-items:center;gap:5px;border-radius:999px;padding:5px 12px;font-size:13px;background:#FDE3E1;color:#8E1B1B;white-space:nowrap;line-height:1.2}
+.nypill.k{background:#F1E6D2;color:#6B5646}.nypill.y{background:#FFF1C2;color:#7A5200}.nypill.g{background:#DDF1E3;color:#1E6B3E;white-space:normal}
+.nypill.b{background:#E3ECF7;color:#2A4F7C}.nypill.p{background:#EEE4FA;color:#5B3696}
+.nylg{display:flex;gap:8px;flex-wrap:wrap}
+.nybusy{display:flex;align-items:center;gap:10px;background:#fff;border:2px solid #C62828;border-radius:16px;padding:12px 14px;font-size:15px;position:sticky;top:0;z-index:5}
+/* 단계 */
+.nysteps{display:grid;grid-template-columns:repeat(5,1fr);gap:4px;position:relative}
+.nysteps::before{content:"";position:absolute;left:10%;right:10%;top:15px;height:3px;background:#EBD9B8;border-radius:2px}
+.nyst{display:flex;flex-direction:column;align-items:center;gap:4px;font-size:12px;color:#8A6A4A;position:relative;background:none;border:0;font-family:inherit;padding:0;cursor:pointer}
+.nyst i{width:30px;height:30px;border-radius:50%;background:#fff;border:2px solid #EBD9B8;display:flex;align-items:center;justify-content:center;font-style:normal;font-size:14px;color:#8A6A4A}
+.nyst.done i{background:#2F7D4F;border-color:#2F7D4F;color:#fff}
+.nyst.cur i{background:#C62828;border-color:#C62828;color:#fff;box-shadow:0 0 0 4px #FDE3E1}.nyst.cur{color:#8E1B1B}
+.nybtns{display:flex;gap:8px;flex-wrap:wrap}.nybtns>*{flex:1 1 0;min-width:0}
+.nybtns.three>*{flex:1 1 0}
+.nyfile{display:inline-flex;align-items:center;justify-content:center;cursor:pointer}
+/* 허브 */
+.nyhub{display:grid;grid-template-columns:minmax(0,1fr);gap:14px}
+@media (min-width:1000px){.nyhub{grid-template-columns:minmax(0,1.2fr) minmax(0,1fr);align-items:start}.nyhub .nytlc,.nyhub>.note{grid-column:1/-1}}
+.nyrows{display:flex;flex-direction:column;gap:8px}
+.nyrow{display:flex;align-items:center;gap:12px;background:#FFFBF3;border:1px solid #F0E2C8;border-radius:18px;padding:11px 12px;min-height:62px;font-family:inherit;color:#3B2A1E;text-align:left;cursor:pointer;width:100%}
+.nyrow .n{width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:#fff;border:2px solid #EBD9B8;font-size:15px;flex:none}
+.nyrow.done .n{background:#2F7D4F;border-color:#2F7D4F;color:#fff}
+.nyrow.cur{border:2px solid #C62828;background:#fff;padding:10px 11px}.nyrow.cur .n{background:#C62828;border-color:#C62828;color:#fff}
+.nyrow.lock{opacity:.65}
+.nyrow .t{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}.nyrow .t b{font-weight:400;font-size:16.5px}.nyrow .t small{font-size:12.5px;color:#6B5646}
+.nyrow .chev{color:#C9A77A;font-size:20px}
+/* 계단 */
+.nystair{display:grid;grid-template-columns:repeat(var(--n,5),minmax(0,1fr));gap:8px;align-items:end;height:250px;padding-top:12px}
+.nystp{position:relative;height:var(--h);border-radius:16px 16px 10px 10px;background:color-mix(in srgb,var(--c) 13%,#fff);border-top:6px solid var(--c);display:flex;flex-direction:column;align-items:center;padding:10px 2px 8px;text-align:center;gap:2px;min-width:0}
+.nystp .nm{font-size:13px;color:#5A4636;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%;color:var(--c)}
+.nystp .bg{font-size:30px;line-height:1.05;color:var(--c)}.nystp .bg small{font-size:12px;color:#6B5646;margin-left:1px}
+.nystp .was{font-size:11px;color:#8A6A4A;white-space:nowrap}
+.nystp .mv{position:absolute;left:-16px;top:-15px;z-index:2;background:#fff;border:2px solid var(--c);color:#3B2A1E;border-radius:999px;font-size:12px;padding:1px 7px;white-space:nowrap;box-shadow:0 6px 12px -8px rgba(0,0,0,.4)}
+@media (min-width:1000px){.nyhub .nystair{height:300px;gap:14px}.nyhub .nystp .bg{font-size:40px}.nyhub .nystp .nm{font-size:15px}}
+/* 언제 */
+.nytl{position:relative;display:grid;grid-template-columns:repeat(4,1fr);gap:6px;padding:6px 0 2px}
+.nytl::before{content:"";position:absolute;left:12.5%;right:12.5%;top:13px;height:4px;border-radius:2px;background:#EBD9B8}
+.nytn{display:flex;flex-direction:column;align-items:center;gap:5px;text-align:center;position:relative}
+.nytn i{width:18px;height:18px;border-radius:50%;background:#fff;border:3px solid #D9B98A}
+.nytn.on i{border-color:#C62828;background:#C62828}
+.nytn b{font-weight:400;font-size:14px}.nytn small{font-size:11.5px;color:#8A6A4A;line-height:1.35}
+/* 확인할 친구 · 고르기 */
+.nykr{display:grid;grid-template-columns:auto minmax(0,1fr);gap:8px 10px;align-items:center;padding:10px 0;border-top:1px dashed #EBD9B8}
+.nykr:first-of-type{border-top:0}
+.nykr .t{display:flex;flex-direction:column;gap:3px;min-width:0}.nykr .t b{font-weight:400;font-size:16px}
+.nykr .nyseg3{grid-column:1/-1}
+.nyseg3{display:grid;grid-template-columns:repeat(3,1fr);background:#F6EAD3;border-radius:999px;padding:3px;gap:3px}
+.nyseg3 button{display:flex;align-items:center;justify-content:center;min-height:36px;border-radius:999px;font-size:13.5px;color:#6B5646;background:none;border:0;font-family:inherit;cursor:pointer;padding:0 4px}
+.nyseg3 button.on{color:#fff}.nyseg3 button.on.up{background:#C62828}.nyseg3 button.on.stay{background:#2F7D4F}.nyseg3 button.on.left{background:#8A6A4A}
+.nyseg3.big button{min-height:48px;font-size:15px}
+.tile.sel.stay{opacity:1;border:2px dashed #3A6EA5;padding:6px 60px 6px 6px}
+.tile.sel.stay .tick{width:auto;padding:0 7px;border-radius:10px;background:#3A6EA5;font-size:10.5px}
+.tile.sel.stay .tick small{font-size:10.5px}
+.nyin .tile.sel.on{padding-right:32px}
+.nybdg{font-style:normal;font-size:11px;border-radius:7px;padding:0 6px;background:#FFF1C2;color:#7A5200}
+.nybdg.r{background:#FDE3E1;color:#8E1B1B}
+.nysib{display:flex;align-items:center;gap:10px;padding:10px;border-radius:16px;background:#FFFBF3;border:1px solid #F0E2C8;font-family:inherit;color:#3B2A1E;text-align:left;width:100%}
+button.nysib{cursor:pointer}
+.nysib .t{flex:1;min-width:0;display:flex;flex-direction:column;gap:3px;font-size:13.5px;color:#6B5646;line-height:1.45}
+.nysib .t b{font-weight:400;font-size:15.5px;color:#3B2A1E}
+.nysib .nysb{display:flex;flex-direction:column;gap:6px;flex:none}
+.nysib .chev{color:#C9A77A}
+.sec.ok{border-color:#2F7D4F;color:#2F7D4F}
+/* 선생님 */
+.nycls{border-radius:20px;background:#fff;border:1px solid #F0E2C8;padding:14px 14px 14px 20px;display:flex;flex-direction:column;gap:10px;position:relative;overflow:hidden}
+.nycls::before{content:"";position:absolute;left:0;top:0;bottom:0;width:6px;background:var(--c)}
+.nycls .hd{display:flex;align-items:center;gap:8px;flex-wrap:wrap}.nycls .hd b{font-weight:400;font-size:19px;color:var(--c)}.nycls .hd .r{margin-left:auto;font-size:14px;color:#6B5646}
+.nyratio{display:flex;flex-direction:column;gap:5px}
+.nyratio .nykb,.nyratio .nytb{display:flex;gap:3px;flex-wrap:wrap;align-items:center}
+.nyratio .nykb i{width:9px;height:9px;border-radius:50%;background:color-mix(in srgb,var(--c) 55%,#fff)}
+.nyratio .nykb small{font-size:11px;color:#8A6A4A;margin-left:4px}
+.nyratio .nytb u{width:18px;height:18px;border-radius:6px;background:var(--c);display:inline-block}
+.nytcs{display:flex;flex-wrap:wrap;gap:6px}
+.nytc{display:inline-flex;align-items:center;gap:6px;border-radius:999px;background:#FFF6E5;border:1px solid #F0E2C8;padding:3px 10px 3px 3px;font-size:14px;font-family:inherit;color:#3B2A1E;cursor:pointer;min-height:34px}
+.nytc em{font-style:normal;font-size:10.5px;background:#C62828;color:#fff;border-radius:6px;padding:1px 5px}
+.nytc u{text-decoration:none;font-size:10.5px;background:#E3ECF7;color:#2A4F7C;border-radius:6px;padding:1px 5px}
+.nytc small{font-size:11px;color:#8A6A4A}
+.nytc.add{background:#fff;border:2px dashed #D9B98A;color:#8A5A2B;padding:5px 12px}
+.nywarn{background:#FFF1C2;border-radius:14px;padding:9px 11px;font-size:13.5px;color:#6B4A00;line-height:1.45}
+.nysr{display:flex;flex-direction:column;gap:10px}
+.nysrow{display:grid;grid-template-columns:72px minmax(0,1fr);gap:10px;align-items:center}.nysrow b{font-weight:400;font-size:16px}
+/* 시작 전 확인 */
+.nychk{display:flex;flex-direction:column}
+.nyck{display:flex;align-items:center;gap:10px;padding:9px 2px;border-bottom:1px dashed #EBD9B8;font-size:15px}
+.nyck:last-child{border-bottom:0}
+.nyck i{width:24px;height:24px;border-radius:50%;background:#2F7D4F;color:#fff;display:flex;align-items:center;justify-content:center;font-style:normal;font-size:13px;flex:none}
+.nyck i.no{background:#fff;border:2px solid #EBD9B8}
+.nyck i.w{background:#E8B13A}
+.nyck span{flex:1;min-width:0}.nyck small{color:#6B5646;font-size:12.5px}
+.nytg{display:flex;align-items:center;gap:12px;font-size:15px;cursor:pointer}
+.nytg input{width:24px;height:24px;accent-color:#2F7D4F;flex:none}
+.nytg small{color:#6B5646;font-size:12.5px}
+.cta[disabled]{opacity:.45;box-shadow:none;cursor:not-allowed}
+/* 시작한 뒤 */
+.nydone{border-radius:26px;padding:22px 18px;color:#fff;text-align:center;display:flex;flex-direction:column;gap:10px;align-items:center;
+  background:radial-gradient(160px 160px at 92% 6%,rgba(255,214,107,.5),transparent 70%),radial-gradient(180px 180px at 4% 100%,rgba(255,160,140,.45),transparent 70%),linear-gradient(140deg,#EF5350,#C62828 60%,#A51F1F)}
+.nydone .big{font-size:26px;line-height:1.3}
+.nydone .nums{display:grid;grid-template-columns:repeat(auto-fit,minmax(64px,1fr));gap:6px;width:100%;max-width:460px}
+.nydone .nums span{background:rgba(255,255,255,.16);border-radius:14px;padding:8px 2px;display:flex;flex-direction:column;font-size:11.5px;gap:2px}
+.nydone .nums b{font-weight:400;font-size:24px}
+.nydone small{opacity:.9;font-size:12.5px}
+/* 홈 카드 */
+.nyhome{display:flex;align-items:stretch;gap:8px;border-radius:24px;background:#fff;border:2px solid #C62828;box-shadow:0 14px 28px -22px rgba(198,40,40,.8);padding:6px;font-family:inherit;color:#3B2A1E;text-align:left}
+button.nyhome{align-items:center;gap:12px;padding:12px 14px;cursor:pointer;width:100%}
+.nyhome.done{border-color:#2F7D4F;box-shadow:none}.nyhome.warn{background:#FFF8F7}
+.nyhome .ic{width:50px;height:50px;border-radius:16px;background:#FDE3E1;color:#C62828;display:flex;align-items:center;justify-content:center;flex:none}
+.nyhome.done .ic{background:#DDF1E3;color:#2F7D4F}
+.nyhome b{font-weight:400;font-size:18px;display:block}.nyhome small{font-size:13px;color:#6B5646}
+.nyhome .chev{margin-left:auto;color:#C9A77A;font-size:20px}
+.nyhm{flex:1;min-width:0;display:flex;align-items:center;gap:12px;background:none;border:0;font-family:inherit;color:inherit;text-align:left;padding:8px;cursor:pointer}
+.nyhm .grow{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
+.nyprog{display:flex;gap:4px;margin-top:6px}.nyprog i{flex:1;height:6px;border-radius:3px;background:#F1E6D2}.nyprog i.on{background:#2F7D4F}
+.nydd{display:flex;flex-direction:column;align-items:center;justify-content:center;width:62px;height:62px;border-radius:50%;background:#C62828;color:#fff;line-height:1.05;flex:none}
+.nydd small{color:#fff !important;font-size:10px !important}.nydd b{font-size:20px !important}
+.nyhide{background:none;border:0;border-left:1px dashed #EBD9B8;color:#A0703F;font-family:inherit;font-size:12.5px;padding:0 10px;cursor:pointer;writing-mode:horizontal-tb}
+@media (max-width:520px){.nyhide{padding:0 6px;font-size:11.5px}.nydd{width:54px;height:54px}}
+/* 서랍장 */
+.nygl{display:flex;align-items:center;justify-content:center;gap:6px}
+.nyyr{display:flex;flex-direction:column;gap:12px}
+.nycover{border-radius:22px;padding:16px 18px;color:#fff;display:flex;align-items:center;gap:14px;overflow:hidden;
+  background:radial-gradient(140px 140px at 92% 0%,rgba(255,214,107,.45),transparent 70%),linear-gradient(135deg,#9C6ADE,#7B4FB8 55%,#5B3696)}
+.nycover .cap2{width:56px;height:56px;border-radius:18px;background:rgba(255,255,255,.18);display:flex;align-items:center;justify-content:center;flex:none}
+.nycover .grow{flex:1;min-width:0}.nycover b{font-weight:400;font-size:21px;display:block}.nycover small{opacity:.92;font-size:13px}
+.nycover .ph{display:flex;flex:none}.nycover .ph>*{margin-left:-14px;border-radius:50%;box-shadow:0 0 0 3px #8A5CC9;background:#fff}
+@media (max-width:560px){.nycover .ph{display:none}}
+.nyggrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px}
+@media (max-width:420px){.nyggrid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.nyg{background:#fff;border:1px solid #F0E2C8;border-radius:20px;padding:14px 8px 12px;display:flex;flex-direction:column;align-items:center;gap:6px;text-align:center;position:relative;font-family:inherit;color:#3B2A1E;cursor:pointer}
+.nyg .avw,.nyg .ph{border-radius:50%}
+.nyg b{font-weight:400;font-size:16px}
+.nyg small{font-size:11.5px;color:#8A6A4A;line-height:1.35}
+.nyg .yr{display:flex;gap:3px;min-height:6px}.nyg .yr i{width:20px;height:6px;border-radius:3px}
+.nyg .rib{position:absolute;right:8px;top:8px;font-size:10px;color:#5B3696;background:#EEE4FA;border-radius:6px;padding:1px 6px}
+.nygh{display:flex;flex-direction:column;align-items:center;gap:6px;padding:4px 0}
+.nygh .ph{border-radius:50%}
+.nyphs{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}.nyphs img{width:100%;aspect-ratio:1;object-fit:cover;border-radius:16px}
+.nyhist{display:grid;grid-template-columns:repeat(var(--n,4),minmax(0,1fr));position:relative;padding-top:4px}
+.nyhist::before{content:"";position:absolute;left:calc(50% / var(--n,4));right:calc(50% / var(--n,4));top:24px;height:4px;border-radius:2px;background:var(--g,linear-gradient(90deg,#3A6EA5,#7B4FB8))}
+.nyhn{display:flex;flex-direction:column;align-items:center;gap:4px;position:relative;text-align:center}
+.nyhn i{width:42px;height:42px;border-radius:50%;background:var(--c);color:#fff;display:flex;align-items:center;justify-content:center;font-style:normal;font-size:15px;box-shadow:0 0 0 4px #fff}
+.nyhn b{font-weight:400;font-size:14px}.nyhn small{font-size:11.5px;color:#8A6A4A}
+.nyrec{display:flex;align-items:center;gap:14px}.nyb{font-weight:400;color:#7B4FB8;font-size:20px}
+.nymsg{background:#FFFBF3;border:1px solid #F0E2C8;border-radius:16px 16px 16px 4px;padding:10px 12px;font-size:15px;line-height:1.55;white-space:pre-wrap}
+.nytel{display:flex;gap:8px;flex-wrap:wrap}.nytel a{background:#FFF6E5;border:1px solid #F0E2C8;border-radius:12px;padding:6px 10px;color:#C62828;text-decoration:none;font-size:14px}
+.nylock{display:flex;align-items:center;gap:6px;font-size:12.5px;color:#8A6A4A;background:#F6EAD3;border-radius:10px;padding:6px 10px;align-self:flex-start}
+.nyprev{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.nyprev span{display:flex;flex-direction:column;align-items:center;background:#FFFBF3;border-radius:14px;padding:8px 4px}
+.nyprev b{font-weight:400;font-size:24px}.nyprev small{font-size:11.5px;color:#8A6A4A}
+/* 학년 이력 · 선교사 자녀 · 지난 학년 */
+.nyhc-row{display:flex;align-items:center;gap:4px;flex-wrap:wrap;margin-top:4px}
+.nyhc-row i{font-style:normal;color:#C9A77A;font-size:12px}
+.nyhc{font-size:12px;border-radius:8px;padding:2px 8px;background:color-mix(in srgb,var(--c) 14%,#fff);color:var(--c)}
+.nyhc.g{background:#EEE4FA;color:#5B3696}
+.chip.nygc{background:#EEE4FA;color:#5B3696;border-color:#D9C7F2}
+.atag.nymk{background:#E3ECF7;color:#2A4F7C}
+.nysep{display:flex;align-items:flex-start;width:2px;margin:0 3px;position:relative;align-self:stretch;background:repeating-linear-gradient(#C62828 0 4px,transparent 4px 8px)}
+.nysep span{position:absolute;top:-14px;left:50%;transform:translateX(-50%);font-size:10px;color:#C62828;white-space:nowrap}
+.dots:has(.nysep){padding-top:14px}
+.nypast{font-weight:400;color:#7B4FB8;background:#EEE4FA;border-radius:8px;padding:1px 8px;margin-right:4px}
+
+.nyeff .in{max-width:280px}
+.nyfile{display:inline-flex;align-items:center;justify-content:center;gap:5px;cursor:pointer}
+.nybtns.three>*{display:inline-flex;align-items:center;justify-content:center;gap:5px}
+.nyb2{min-height:34px;border-radius:17px;border:2px solid #EBD9B8;background:#fff;color:#6B5646;font-family:inherit;font-size:13.5px;padding:0 14px;cursor:pointer;white-space:nowrap}
+.nyb2.ok{border-color:#2F7D4F;color:#2F7D4F}
+.nytools{display:flex;gap:8px;flex-wrap:wrap}
+.nybtns.three>*{white-space:nowrap;padding:0 8px;font-size:13.5px;min-height:44px}
+.nybtns.stack>*{flex:1 1 220px}

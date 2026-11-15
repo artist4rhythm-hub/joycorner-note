@@ -57,6 +57,7 @@ const S = {
   kidFor: null, kidData: null, staff: [], staffEx: {}, editStaff: null, editStaff2: null, importOk: false, noteKind: '', bip: null, helpDev: null, showArchived: false, lastKey: ''
 };
 const appEl = $('#app');
+const PRM = { all: {}, done: [], latest: '', ok: false };  // v32 · 새 학년 기록 (학년도 나누기)
 
 /* ---------- 데이터 읽기 ---------- */
 async function loadFam(id) {
@@ -69,13 +70,15 @@ async function loadFam(id) {
 const activeKids = c => (S.kids[c] || []).filter(k => (k.status || 'active') === 'active').sort((a, b) => ko(a.name, b.name));
 const allKids = () => S.myClasses.flatMap(c => S.kids[c] || []);
 const findKid = id => allKids().find(k => k.id === id);
-const recorded = c => Object.keys(S.att[c] || {}).filter(d => Object.values(S.att[c][d] || {}).includes('p')).sort();
-const presentCount = (c, d) => activeKids(c).filter(k => (S.att[c]?.[d] || {})[k.id] === 'p').length;
+const recordedAll = c => Object.keys(S.att[c] || {}).filter(d => Object.values(S.att[c][d] || {}).includes('p')).sort();
+const recorded = c => { const a = recordedAll(c); return PRM.latest ? a.filter(d => d >= PRM.latest) : a; };
+const presentCount = (c, d) => { const m = S.att[c]?.[d] || {}; return syPast(d) ? Object.values(m).filter(v => v === 'p').length : activeKids(c).filter(k => m[k.id] === 'p').length; };
 function streak(c, kid) {
+  if (isMK(kid)) return 0;
   let n = 0;
-  for (const d of recorded(c).reverse()) {
+  for (const [d, cc] of kidDays(kid).reverse()) {
     if (kid.since && d < kid.since) break;
-    if (S.att[c][d][kid.id] === 'p') break;
+    if (S.att[cc][d][kid.id] === 'p') break;
     n++;
   }
   return n;
@@ -85,9 +88,10 @@ const careList = c => activeKids(c)
   .filter(x => x.n >= 2)
   .sort((a, b) => b.n - a.n);
 function kidRate(c, kid, weeks = 8) {
-  const ds = recorded(c).slice(-weeks).filter(d => !kid.since || d >= kid.since);
+  if (isMK(kid)) return null;
+  const ds = kidDays(kid).slice(-weeks).filter(([d]) => !kid.since || d >= kid.since);
   if (!ds.length) return null;
-  return ds.filter(d => S.att[c][d][kid.id] === 'p').length / ds.length;
+  return ds.filter(([d, cc]) => S.att[cc][d][kid.id] === 'p').length / ds.length;
 }
 const schedFor = d => S.schedule.find(x => x.date === d);
 // '김혜원, 김소명' 같은 칸에 이 이름이 정확히 들어 있는가 (현우 ≠ 김현우)
@@ -173,7 +177,7 @@ function vHomeClass() {
   const nextS = S.schedule.find(x => x.date >= todayStr && !x.noService) || S.schedule[S.schedule.length - 1];
   const diff = nextS ? Math.round((parseD(nextS.date) - parseD(todayStr)) / 86400000) : 99;
   const care = careList(c).slice(0, 6), bdays = upcomingBirthdays(c).slice(0, 4);
-  return `<div class="scroll cols">${header}${homeModeSeg()}${iosOtherNote()}${holBanner()}${gcalBanner()}${classChips()}
+  return `<div class="scroll cols">${header}${homeModeSeg()}${iosOtherNote()}${holBanner()}${gcalBanner()}${nyHomeCard()}${classChips()}
 <section class="card"><div class="rowtop"><div style="display:flex;padding-left:10px">${faces.map(k => `<span style="margin-left:-10px;border:3px solid #fff;border-radius:50%;display:block;line-height:0">${avatar(k, 46)}</span>`).join('')}</div><div><div class="big">${esc(cl.name)}</div><div class="sub">친구 ${kids.length}명</div></div></div>
 <div class="chips">${(() => { const cs = classStaff(c); const h = cs.homeroom.map(n => `<span class="chip">담임 ${esc(n)}</span>`).join('') + cs.assistants.map(n => `<span class="chip">${esc(n)}</span>`).join(''); return h || (S.me.role === 'admin' ? `<button class="chip dashed" data-act="go" data-to="settings">+ 교사 명단에서 정해 주세요</button>` : '<span class="chip">담임 미정</span>'); })()}</div>
 <button class="cta" data-act="go" data-to="attend">${svg(ICON.checkc, 28, 2.4)}출석 시작하기</button></section>
@@ -189,7 +193,7 @@ ${homeNoticeCard()}${homeEventsCard()}<section class="card homedock"><div class=
 /* ---------- 출석 ---------- */
 function vAttend() {
   const c = S.cur; if (!c) return `<div class="scroll">${noClass()}</div>${nav('attend')}`;
-  const kids = activeKids(c), d = S.attDate, marks = (S.att[c] || {})[d] || {};
+  const d = S.attDate, kids = attRoster(c, d), marks = (S.att[c] || {})[d] || {};
   const n = kids.filter(k => marks[k.id] === 'p').length, pct = kids.length ? Math.round(n / kids.length * 100) : 0;
   const sch = schedFor(d), maxD = ymd(sundayOnOrBefore(new Date()));
   const dd = parseD(d);
@@ -197,7 +201,7 @@ function vAttend() {
 <div class="date"><button data-act="week" data-n="-7" aria-label="지난 주">◀</button><span>${dd.getMonth() + 1}/${dd.getDate()} 주일</span><button data-act="week" data-n="7" aria-label="다음 주" ${d >= maxD ? 'disabled' : ''}>▶</button></div></div>
 <div class="row2"><div class="bar"><div class="fill" style="width:${pct}%"></div></div><span class="save ${S.pending ? 'wait' : ''}">${S.pending ? '대기 중' : '저장됨'}</span>${attLocked() ? `<button class="lockpill" data-act="attLockInfo">${svg(LOCK_IC, 18, 2.2)}마감됨</button>` : `<button class="pri sm" data-act="allIn">${svg(ICON.checkc, 20, 2.4)}전원 출석</button>`}</div></div>
 <div class="scroll" style="padding-top:8px">${classChips()}
-<div class="story">${sch ? (sch.noService ? '이 주일은 조이코너 예배가 없어요' : '오늘의 이야기 · ' + esc(sch.story || '')) : ''}${S.pending ? ' · 인터넷이 연결되면 저절로 올라가요' : ''}</div>
+<div class="story">${syPast(d) ? `<b class="nypast">${syOf(d)}학년도 출석부 · 그해 친구들이에요</b> ` : ''}${sch ? (sch.noService ? '이 주일은 조이코너 예배가 없어요' : '오늘의 이야기 · ' + esc(sch.story || '')) : ''}${S.pending ? ' · 인터넷이 연결되면 저절로 올라가요' : ''}</div>
 ${attLockBar(n, kids.length)}
 <div class="grid ${attLocked() ? 'locked' : ''}">${kids.map(k => { const on = marks[k.id] === 'p'; return `<button class="kid ${on ? 'on' : ''} ${k.gender ? 'g-' + k.gender : ''}" data-act="toggle" data-id="${k.id}" aria-pressed="${on}"><span class="stamp">${svg(ICON.check, 18, 3)}</span><span class="kav">${avatar(k, 84)}</span><b class="nm">${esc(k.name)}${genderMark(k)}</b><span class="st">${on ? '왔어요' : '아직'}</span></button>`; }).join('')}</div>
 <button class="addkid" data-act="addKid">+ 새로 온 친구 등록</button><button class="ghost" data-act="go" data-to="stats">출석 통계 보기</button></div>${nav('attend')}`;
@@ -233,7 +237,7 @@ function toggleKid(id) {
 /* ---------- 친구들 ---------- */
 function vFriends() {
   const c = S.cur; if (!c) return `<div class="scroll">${noClass()}</div>${nav('friends')}`;
-  const kids = activeKids(c), arch = (S.kids[c] || []).filter(k => (k.status || 'active') !== 'active').sort((a, b) => ko(a.name, b.name));
+  const kids = activeKids(c), arch = (S.kids[c] || []).filter(k => (k.status || 'active') !== 'active' && k.status !== 'graduated').sort((a, b) => ko(a.name, b.name));
   const row = k => {
     const n = streak(c, k);
     return `<button class="row" data-act="kid" data-id="${k.id}" data-name="${esc(k.name)}">${avatar(k, 48)}<span class="grow"><span class="nm">${esc(k.name)}</span><span class="sub">${k.birth ? k.birth.replace(/-/g, '.') + ' 생' : '생일 모름'}</span></span><span class="tagbox">${absTag(n)}${kidTags(k)}</span></button>`;
@@ -244,7 +248,7 @@ function vFriends() {
 <button class="infobtn" data-act="infoKids">${svg('<rect x="3" y="4" width="18" height="16" rx="2.5"/><path d="M3 9.5h18M9 9.5V20"/>', 18, 2)}<span>사진 · 생일 · 성별 · 가정 정보 입력 현황 표</span><span class="chev">보기 ›</span></button>
 <div class="list klist" id="klist">${kids.map(row).join('')}</div>
 ${arch.length ? (S.showArchived ? `<div class="lbl">함께하지 않는 친구</div><div class="list">${arch.map(row).join('')}</div>` : `<button class="ghost" data-act="showArch">함께하지 않는 친구 ${arch.length}명 보기</button>`) : ''}
-<button class="addkid" data-act="addKid">+ 새로 온 친구 등록</button></div>${nav('friends')}`;
+${gradLink(c)}<button class="addkid" data-act="addKid">+ 새로 온 친구 등록</button></div>${nav('friends')}`;
 }
 
 /* ---------- 아이 카드 ---------- */
@@ -270,16 +274,16 @@ function vKid() {
     const src = kd?.photos?.[s] || (s === 'main' ? k.thumb : null);
     return src ? `<div class="slot has ${cls}"><button class="sview" data-act="kidZoom" data-slot="${s}" aria-label="${label} 사진 크게 보기" style="--bg:url('${src}')"><img src="${src}" alt="${esc(k.name)} ${label}"></button><button class="plus" data-act="photo" data-slot="${s}" aria-label="${label} 사진 바꾸기">+</button></div>` : `<button class="slot ${cls}" data-act="photo" data-slot="${s}" aria-label="${label} 사진 넣기">사진 넣기<span class="plus">+</span></button>`;
   };
-  const ds = recorded(c).slice(-8);
+  const ds = kidDays(k).slice(-8);
   const p = (who, nm, cell, tel, role) => nm ? `<div class="person"><div><b>${esc(nm)}</b> <span class="sub">${role}</span>${cell ? `<div class="cell">${esc(/^\d?[A-Za-z]?\d+$/.test(cell) ? '셀 ' + cell : cell)}</div>` : ''}</div>${tel ? `<div class="contact"><a href="tel:${esc(tel)}">전화</a><a href="sms:${esc(tel)}">문자</a></div>` : ''}</div>` : '';
   const n = streak(c, k);
   return `<div class="scroll cols"><div class="hd"><button class="back" data-act="back">← 친구들</button><button class="sec" data-act="editKid" style="min-height:44px">고치기</button></div>
-<div class="rowtop"><div><div class="ttl">${esc(k.name)}</div><div class="sub">${esc(S.classes[c]?.name || '')} · ${k.birth ? k.birth.replace(/-/g, '.') + ' 생' : '생일 모름'}</div></div></div>
-<div class="chips gchips">${genderChip(k)}${absTag(n, true)}${kidTags(k)}<button class="tagedit" data-act="tagSheet">${svg('<path d="M4 20h4L19 9l-4-4L4 16z"/>', 14, 2)}표시 고치기</button></div>
+<div class="rowtop"><div><div class="ttl">${esc(k.name)}</div>${histChips(k)}<div class="sub">${esc(S.classes[c]?.name || '')} · ${k.birth ? k.birth.replace(/-/g, '.') + ' 생' : '생일 모름'}</div></div></div>
+<div class="chips gchips">${genderChip(k)}${absTag(n, true)}${kidTags(k)}${mkChip(k)}${k.status === 'graduated' ? `<button class="chip sm nygc" data-act="go" data-to="grad/${k.id}">${k.gradYear || ''} 졸업 · 서랍장 ›</button>` : ''}<button class="tagedit" data-act="tagSheet">${svg('<path d="M4 20h4L19 9l-4-4L4 16z"/>', 14, 2)}표시 고치기</button></div>
 ${k.remark && !TAG_AUTO.includes(k.remark) && !(k.flags || []).includes(k.remark) ? `<div class="note sm">메모 · ${esc(k.remark)}</div>` : ''}
 ${k.note ? `<div class="note">${esc(k.note)}</div>` : ''}
 <div class="photos">${slot('main', 'main', '대표')}${slot('1', '', '추가1')}${slot('2', '', '추가2')}</div>
-<section class="card"><div class="lbl"><span>최근 출석</span></div>${ds.length ? `<div class="dots">${ds.map(d => { const v = S.att[c][d][k.id] === 'p' ? 'p' : 'a'; const dd = parseD(d); return `<div class="dot"><i class="${(k.since && d < k.since) ? '' : v}"></i>${dd.getMonth() + 1}/${dd.getDate()}</div>`; }).join('')}</div><div class="sub">초록은 왔어요, 분홍은 못 왔어요</div>` : `<div class="sub">아직 출석 기록이 없어요.</div>`}</section>
+<section class="card"><div class="lbl"><span>최근 출석</span></div>${ds.length ? `<div class="dots">${ds.map(([d, cc], i) => { const v = S.att[cc][d][k.id] === 'p' ? 'p' : 'a'; const dd = parseD(d); return `${i && syOf(ds[i - 1][0]) !== syOf(d) ? '<span class="nysep"><span>새 학년</span></span>' : ''}<div class="dot"><i class="${(k.since && d < k.since) ? '' : v}"></i>${dd.getMonth() + 1}/${dd.getDate()}</div>`; }).join('')}</div><div class="sub">초록은 왔어요, 분홍은 못 왔어요</div>` : `<div class="sub">아직 출석 기록이 없어요.</div>`}</section>
 <section class="card"><div class="lbl"><span>가정</span></div>${fam ? `${p('f', fam.father, fam.fatherCell, fam.fatherTel, '아버지')}${p('m', fam.mother, fam.motherCell, fam.motherTel, '어머니')}${(fam.siblings || []).length ? `<div class="chips">${fam.siblings.map(s => `<span class="chip sm">${esc(s.name)}${s.org ? ' · ' + esc(s.org) : ''}</span>`).join('')}</div>` : ''}${(!fam.father && !fam.mother) ? '<div class="sub">부모님 정보가 아직 없어요. 고치기에서 적어 주세요.</div>' : ''}` : `<div class="sub">불러오는 중…</div>`}</section>
 ${(kd?.notes || []).some(x => x.kind === '기도제목') ? `<section class="card" style="border-color:#C62828"><div class="lbl"><span>기도 제목</span></div>${kd.notes.filter(x => x.kind === '기도제목').slice(0, 5).map(x => `<div class="note"><span style="white-space:pre-wrap">${esc(x.text)}</span><small><span>${esc(x.date || '')} · ${esc(x.byName || '')}</span></small></div>`).join('')}</section>` : ''}
 <section class="card"><div class="lbl"><span>돌봄 기록</span></div>
@@ -327,7 +331,7 @@ ${pushAdminCard()}${gcalSettingsCard()}
 ${vStaffList()}
 <section class="card"><div class="lbl"><span>시트 데이터 가져오기</span></div><div class="sub">처음에는 joycorner-import.json(전체). 그 뒤에 더할 때는 extra 파일(아이 정보는 건드리지 않아요).</div><label class="filebtn">${svg('<path d="M12 16V4m-5 5 5-5 5 5"/><path d="M4 16v3a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3"/>', 20, 1.8)}<span id="impName">파일 고르기</span><input type="file" id="impFile" accept="application/json,.json" hidden></label><div class="pbar hide" id="impBar"><i></i></div><div class="sub" id="impMsg"></div><button class="sec" data-act="runImport">가져오기 시작</button></section>
 <section class="card"><div class="lbl"><span>연도별 백업</span></div><div class="sub">한 해의 기록을 파일 하나로 내려받아 보관해요.</div><div class="two"><label class="fld">연도<select class="in" id="bk_year">${[new Date().getFullYear() + 1, new Date().getFullYear(), new Date().getFullYear() - 1].map(y => `<option ${y === new Date().getFullYear() ? 'selected' : ''}>${y}</option>`).join('')}</select></label><span></span></div><div class="btns" style="flex-wrap:wrap"><button class="ghost" data-act="backup" data-id="0">사진 빼고</button><button class="ghost" data-act="backup" data-id="1">사진까지</button></div><div class="s2" id="bk_msg"></div></section>
-${isDirectorMe() ? `<section class="card"><div class="lbl"><span>새해 반 올리기</span><span class="s2">디렉터</span></div><div class="sub">해가 바뀌면 모든 반이 한 학년씩 올라가고, 7세반은 졸업해요.</div><button class="sec" data-act="go" data-to="promote">반 올리기 화면 열기</button></section>` : ''}
+${nySettingsCard()}
 ${S.me.owner ? `<section class="card"><div class="lbl"><span>사용 현황</span><span class="s2">수퍼관리자</span></div><div class="sub">누가 언제 어떤 화면을 많이 쓰는지 봐요.</div><button class="sec" data-act="go" data-to="usage">사용 현황 보기</button></section>` : ''}
 <section class="card"><div class="lbl"><span>출석 기록 내려받기</span></div><div class="sub">엑셀로 열 수 있는 파일(CSV)이에요. 백업용으로 좋아요.</div><div class="btns" style="flex-wrap:wrap">${S.myClasses.map(c => `<button class="ghost" data-act="csv" data-id="${c}">${esc(S.classes[c].name)}</button>`).join('')}</div></section>` : ''}
 <div class="s2 full" style="text-align:center">조이코너 노트 ${APP_VERSION} · 아이들의 얼굴과 정보는 로그인한 선생님에게만 보여요<br>이 앱에는 카페24(주)가 제공한 Cafe24 동동 글꼴이 적용되어 있어요.</div></div>${nav('home')}`;
@@ -376,18 +380,22 @@ function route() {
   S.route = VIEWS[r] ? r : 'home'; S.arg = a || '';
   if (S.phase !== 'ready') return paint();
   ensureAttWatch();
-  if (S.route !== 'kid') S.kidFor = null;
+  if (S.route !== 'kid' && S.route !== 'grad') S.kidFor = null;
+  if (S.route === 'newyear' && NY.lastRoute !== 'newyear') NY.ok = false;
+  NY.lastRoute = S.route;
   usageScreen(S.route);
   if (S.route === 'promote') { PROMO.inc = null; }
   if (S.route === 'worship') loadWorship().then(() => { if (S.route === 'worship') paint(); });
   if (['home', 'attend', 'friends', 'stats'].includes(S.route) && S.cur) ensureAtt(S.cur);
   if (S.route === 'home' && HM.mode === 'all') S.myClasses.forEach(c => ensureAtt(c));
   if (S.route === 'kid') { const k = findKid(S.arg); if (k) ensureAtt(k.classId); }
+  if (PRM.latest || ['grads', 'grad'].includes(S.route)) S.myClasses.forEach(c => ensureAtt(c));
   if (['room', 'notice', 'home', 'event', 'staff'].includes(S.route)) { const was = Array.isArray(R.events) && Array.isArray(R.notices); loadRoom().then(() => { if (!was && ['room', 'notice', 'home', 'event', 'staff'].includes(S.route)) softPaint(); }); }
   if (S.route === 'settings' || S.route === 'room') loadCfg().then(c => { if (S.route === 'settings') softPaint(); if (c.gcalClientId) loadGIS().catch(() => { }); });
   if (S.route === 'room' || S.route === 'settings') gcalLoad().then(() => softPaint());
   if (S.route === 'staff' && S.arg && !(S.staffEx[S.arg] && S.staffEx[S.arg].notes)) { S.staffEx[S.arg] = { notes: null }; loadStaffExtra(S.arg); }
-  if (S.route === 'kid' && S.kidFor !== S.arg) { S.kidData = null; S.kidFor = S.arg; loadKid(S.arg).catch(() => { }); }
+  if ((S.route === 'kid' || S.route === 'grad') && S.kidFor !== S.arg) { S.kidData = null; S.kidFor = S.arg; loadKid(S.arg).catch(() => { }); }
+  if (S.route === 'grad') { const k = findKid(S.arg); if (k && k.familyId) loadFam(k.familyId).then(() => softPaint()); }
   paint();
 }
 window.addEventListener('hashchange', () => { closeSheet(); route(); });
@@ -751,9 +759,10 @@ async function dutyDel() {
 }
 
 /* ---------- 교사실 (공지 · 캘린더 · 업무 분담 · 조직도 · 통계) ---------- */
-const APP_VERSION = 'v31';
+const APP_VERSION = 'v32';
 const APP_DATE = '2026-11-12';
 const CHANGELOG = [
+  { v: 'v32', date: '11월 15일', items: ['새 학년 준비 (설정 · 홈 카드) — ① 졸업 ② 진급 ③ 신입 ④ 선생님 반 배정 ⑤ 시작, 단계마다 저장 · 디렉터 · 관리자가 함께 준비', '새 학년 기준 주일은 언제든 정해요 (2월 · 3월) · 그 주에 디렉터가 [새 학년 시작] · 14일 안에 되돌리기', '졸업생 서랍장 — 학년도별 · 학년 이력 · 함께한 기록 · 인계 메모 · 모든 선생님이 봐요 (연락처는 디렉터 · 관리자만) · 인계 명단 엑셀', '신입 명단 — 한 명 추가 · 엑셀 양식 받기 · 엑셀 올리기 · 형제 확인 · 이미 있는 친구 알려 주기', '학년 이력 — 반이 바뀌어도 연속 결석 · 출석률 · 최근 출석이 이어져요 · 지난 학년 출석부는 그해 친구들로', '선교사 표시가 있는 친구는 출석은 그대로, 장기 결석 알림 · 돌봄 신호에서 빠져요'] },
   { v: 'v31', date: '11월 14일', items: ['선생님 카드 휴지통 — 지우면 바로 없어지지 않고 휴지통에 들어가요 · [되돌리기]로 원래 자리로 · [완전히 지우기]는 두 번 확인', '교사실 → 선생님 맨 아래 [보관함] — 그만두신 선생님 · 휴지통을 한곳에서 (디렉터 · 관리자)', '선생님 카드 [고치기]와 명단 고치기 창에 [그만두신 선생님으로] [휴지통에 넣기]', '설정 교사 명단에 보관함 바로 가기'] },
   { v: 'v30', date: '11월 14일', items: ['선생님 카드에 구글 메일 (누르면 메일 쓰기) · 메일로도 찾기', '교사실 선생님 탭 [입력 현황 표] — 선생님 · 친구들 정보가 채워졌는지 ✓ 로 한눈에, 채움 % 링 · 빈칸 많은 칸 · 빈칸 많은 순 정렬 · 엑셀로 받기', '친구들 화면에서 [입력 현황 표] 바로 가기'] },
   { v: 'v29', date: '11월 13일', items: ['도우미에 [알림 켜기] 안내 — 아이폰·아이패드 / 안드로이드 / 컴퓨터별 순서와 알림 미리보기 그림, 막혔을 때 고치는 법', '홈에 "새 공지를 알림으로 받아 보세요" — 알림이 꺼진 기기에서 한 번 권해요 (닫으면 다시 안 떠요)', '설정 알림 카드에 [켜는 법 ›]'] },
@@ -2062,7 +2071,7 @@ const ACT = {
   back: () => { if (S.route === 'kid') go('friends'); else go('home'); },
   cls: d => { S.cur = d.id; lsSet('jc_cur', d.id); route(); },
   toggle: d => toggleKid(d.id),
-  allIn: () => { if (attLocked()) return attLockedToast(); const c = S.cur, d = S.attDate; const m = ((S.att[c] ||= {})[d] ||= {}); const patch = {}; activeKids(c).forEach(k => { if (m[k.id] !== 'p') { m[k.id] = 'p'; patch[k.id] = 'p'; } }); paint(); if (Object.keys(patch).length) { writeMarks(patch); attLog('all', { n: Object.keys(patch).length }); } },
+  allIn: () => { if (attLocked()) return attLockedToast(); const c = S.cur, d = S.attDate; const m = ((S.att[c] ||= {})[d] ||= {}); const patch = {}; attRoster(c, d).forEach(k => { if (m[k.id] !== 'p') { m[k.id] = 'p'; patch[k.id] = 'p'; } }); paint(); if (Object.keys(patch).length) { writeMarks(patch); attLog('all', { n: Object.keys(patch).length }); } },
   clearAsk: () => sheet(`<div class="ttl" style="font-size:22px">출석을 모두 지울까요?</div><div class="sub">이 주일의 체크가 전부 사라져요. 누가 언제 지웠는지 기록에 남아요.</div><div class="btns"><button class="pri" data-act="clearYes">네, 지울게요</button><button class="sec" data-act="sheetClose">아니요</button></div>`),
   clearYes: () => { if (attLocked()) { closeSheet(); return attLockedToast(); } const c = S.cur, d = S.attDate; const m = (S.att[c] ||= {}); const patch = {}; const before = Object.keys(m[d] || {}).length; Object.keys(m[d] || {}).forEach(id => { patch[id] = deleteField(); }); m[d] = {}; closeSheet(); paint(); if (Object.keys(patch).length) { writeMarks(patch); attLog('clear', { n: before }); } },
   week: d => { const nd = addDays(S.attDate, Number(d.n)); if (nd > ymd(sundayOnOrBefore(new Date()))) return; S.attDate = nd; route(); },
@@ -2165,7 +2174,7 @@ async function start(user) {
     };
     setMe(snap.data());
     await loadAll();
-    S.phase = 'ready'; route(); setTimeout(checkVersion, 1500); if (!NT.booted) { NT.booted = true; ntBoot(); }
+    S.phase = 'ready'; route(); prmLoad(); setTimeout(checkVersion, 1500); if (!NT.booted) { NT.booted = true; ntBoot(); }
     // 권한이 바뀌었는지 서버에서 한 번 더 확인해요
     if (fromCache) getDoc(doc(db, 'teachers', email)).then(n => {
       if (!n.exists()) { if (email !== OWNER_EMAIL.toLowerCase()) { S.phase = 'pending'; route(); } return; }
@@ -2970,9 +2979,9 @@ const EXP = [
   { k: 'att', t: '출석부', d: '반별 · 주일마다 O, 출석률', ic: 'att', who: 'all', orient: 'landscape', year: true,
     need: () => Promise.all(exClasses().map(ensureAtt)),
     tables: () => exClasses().map(c => {
-      const ds = recorded(c).filter(d => d.startsWith(String(EX.year)));
-      const kids = activeKids(c);
-      const rows = kids.map((k, i) => { const own = ds.filter(d => !k.since || d >= k.since); const n = own.filter(d => (S.att[c][d] || {})[k.id] === 'p').length; return [i + 1, k.name, ...ds.map(d => (k.since && d < k.since) ? '·' : ((S.att[c][d] || {})[k.id] === 'p' ? 'O' : '')), n, own.length ? Math.round(n / own.length * 100) + '%' : '']; });
+      const ds = recordedAll(c).filter(d => d.startsWith(String(EX.year)));
+      const kids = PRM.latest ? allKids().filter(k => ds.some(d => classOn(k, d) === c) && ((k.status || 'active') === 'active' || ds.some(d => (S.att[c][d] || {})[k.id] === 'p'))).sort((a, b) => ko(a.name, b.name)) : activeKids(c);
+      const rows = kids.map((k, i) => { const own = ds.filter(d => (!k.since || d >= k.since) && (!PRM.latest || classOn(k, d) === c)); const n = own.filter(d => (S.att[c][d] || {})[k.id] === 'p').length; return [i + 1, k.name, ...ds.map(d => ((k.since && d < k.since) || (PRM.latest && classOn(k, d) !== c)) ? '·' : ((S.att[c][d] || {})[k.id] === 'p' ? 'O' : '')), n, own.length ? Math.round(n / own.length * 100) + '%' : '']; });
       rows.push(['', '출석', ...ds.map(d => presentCount(c, d)), '', '']);
       return { title: `${clsName(c)} · ${EX.year}년 ${ds.length}주`, cols: [['번호', 5], ['이름', 9], ...ds.map(d => [fmtShort(d), 5]), ['출석', 6], ['출석률', 7]], rows, dense: ds.length > 14, foot: true };
     }) },
@@ -3411,7 +3420,7 @@ Object.assign(ACT, {
 /* ================= v15 · 아이 표시 · 결석 단계 · 교사실 서랍 ================= */
 const TAG_AUTO = ['장기결석', '장기 결석'];
 const TAG_PRESET = [['선교사 가정', 'mis'], ['VIP', 'vip'], ['새친구', 'new'], ['돌봄 필요', 'care'], ['알레르기', 'alg'], ['형제 함께', 'sib'], ['다문화 가정', 'mul'], ['특별한 도움', 'help']];
-const tagCls = t => (TAG_PRESET.find(x => x[0] === t) || [0, 'etc'])[1];
+const tagCls = t => (TAG_PRESET.find(x => x[0] === t) || [0, /선교사/.test(t) ? 'mis' : t === '신입' ? 'new' : 'etc'])[1];
 const kidTags = k => (k.flags || []).filter(f => !TAG_AUTO.includes(f)).map(f => `<span class="ktag ${tagCls(f)}">${esc(f)}</span>`).join('');
 // 출석부에서 계산 — 주일이 지나 출석을 기록할 때마다 자동으로 바뀌어요
 function absTag(n, long) {
@@ -3428,7 +3437,7 @@ function tagSheet() {
   };
   TS.draw = draw;
   sheet(`<div class="ttl" style="font-size:24px">${esc(k.name)} · 표시</div>
-<div class="sub">누르면 켜지고 다시 누르면 꺼져요. 결석 표시는 출석부로 자동 계산돼서 여기서 고치지 않아요.</div>
+<div class="sub">누르면 켜지고 다시 누르면 꺼져요. 결석 표시는 출석부로 자동 계산돼서 여기서 고치지 않아요. '선교사' 표시가 있는 친구는 출석은 그대로 부르고 장기 결석 알림만 꺼져요.</div>
 <div class="tagpick" id="tagbox"></div>
 <div class="addtag"><input class="in" id="tag_new" placeholder="새 표시 (예: 우유 알레르기)" maxlength="16"><button class="sec sm" data-act="tagAdd">더하기</button></div>
 <label class="fld">메모 <span class="s2">(표시로 쓰기 긴 이야기)</span><input class="in" id="tag_remark" value="${esc(TAG_AUTO.includes(k.remark || '') ? '' : (k.remark || ''))}"></label>
@@ -3822,7 +3831,7 @@ function dashBase() {
   const care = cls.flatMap(c => careList(c).map(x => ({ ...x, c }))).sort((a, b) => b.n - a.n);
   return { cls, wk, last, prev, kidsN, care, pres: last ? last.tot : 0, delta: last && prev ? last.tot - prev.tot : null };
 }
-const deltaPill = (dl, light) => dl === null ? '' : `<span class="dpill ${dl > 0 ? 'up' : dl < 0 ? 'dn' : ''} ${light ? 'lt' : ''}">${dl > 0 ? '▲' : dl < 0 ? '▼' : '='} 지난주보다 ${dl === 0 ? '같아요' : Math.abs(dl) + '명'}</span>`;
+const deltaPill = (dl, light) => dl === null ? nyFirstPill(light) : `<span class="dpill ${dl > 0 ? 'up' : dl < 0 ? 'dn' : ''} ${light ? 'lt' : ''}">${dl > 0 ? '▲' : dl < 0 ? '▼' : '='} 지난주보다 ${dl === 0 ? '같아요' : Math.abs(dl) + '명'}</span>`;
 function quickActs() {
   const q = [['go', 'attend', '출석 시작', ICON.att, '#2F7D4F'], ['go', 'worship', '주일 예배', '<path d="M9 18V5l11-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="17" cy="16" r="3"/>', '#7B4FB8'], ['rtab', 'notice', '공지', ROOM_INFO.notice[2], '#C62828'], ['rtab', 'cal', '캘린더', ROOM_INFO.cal[2], '#E08A00']];
   return `<div class="qacts">${q.map(([a, id, l, ic, c]) => `<button class="qa" data-act="${a}" ${a === 'go' ? `data-to="${id}"` : `data-id="${id}"`} style="--c:${c}"><span class="qi">${svg(ic, 20, 2)}</span>${l}</button>`).join('')}</div>`;
@@ -3847,7 +3856,7 @@ function dashA() {
   const B = dashBase(), { cls, wk, last, kidsN, care } = B;
   const pct = last && kidsN ? last.tot / kidsN : 0;
   const hero = `<section class="dhero d5"><div class="dh-l">${ringSvg(pct, '#fff', 150, 16, 'rgba(255,255,255,.22)', `<b>${Math.round(pct * 100)}<small>%</small></b><small>출석률</small>`)}</div>
-<div class="dh-r"><small class="k">${last ? fmtMDs(last.d) + ' 주일 출석' : '출석 기록 전'}</small><div class="v"><b>${B.pres}</b><small>/ ${kidsN}명</small></div>${deltaPill(B.delta, true)}</div>
+<div class="dh-r"><small class="k">${last ? fmtMDs(last.d) + ' 주일 출석' : PRM.latest ? `새 학년 · ${fmtMDs(PRM.latest)} 주일부터` : '출석 기록 전'}</small><div class="v"><b>${B.pres}</b><small>/ ${kidsN}명</small></div>${deltaPill(B.delta, true)}</div>
 <div class="dh-cls">${cls.map(c => { const p = last ? last.parts.find(x => x.c === c).v : 0, t = activeKids(c).length; return `<button class="dhc" data-act="homeCls" data-id="${c}"><span class="dot" style="background:${clsCol(c)}"></span><span class="nm">${esc(clsName(c))}</span><i><em style="width:${t ? Math.round(p / t * 100) : 0}%"></em></i><span class="n">${p}/${t}</span></button>`; }).join('')}</div></section>`;
   const mx = Math.max(kidsN, 1);
   const trend = `<section class="card d7 trend"><div class="lbl"><span>주일 출석 흐름 · 최근 ${wk.length}주</span><span class="lg">${cls.map(c => `<span><i style="background:${clsCol(c)}"></i>${esc(clsName(c))}</span>`).join('')}</span></div>
@@ -3873,7 +3882,7 @@ function dashA() {
 }
 
 function vHomeDash() {
-  return `<div class="scroll dashwrap">${homeHeader()}${homeModeSeg()}${iosOtherNote()}${holBanner()}${gcalBanner()}
+  return `<div class="scroll dashwrap">${homeHeader()}${homeModeSeg()}${iosOtherNote()}${holBanner()}${gcalBanner()}${nyHomeCard()}
 <div class="hdash">${dashA()}</div>
 <div class="dash2">${homeNoticeCard()}${homeEventsCard()}<section class="card homedock"><div class="lbl"><span>교사실 바로 가기</span></div>${roomDock('')}</section>${versionCard()}</div></div>${nav('home')}`;
 }
@@ -3963,8 +3972,8 @@ function vStats() {
 <section class="card"><div class="lbl"><span>돌봄이 필요해요</span><small class="s2">연속 결석 주</small></div>${careBars(care.map(x => ({ ...x, c })), 6)}</section>
 ${low.length ? `<section class="card"><div class="lbl"><span>출석이 적은 친구 · 최근 8주</span></div><div class="lowl">${low.map(x => `<button class="lowr" data-act="kid" data-id="${x.k.id}">${ringSvg(x.r, x.r < .4 ? '#C62828' : x.r < .7 ? '#E07A2E' : col, 46, 6, 'rgba(0,0,0,.06)', `<b>${Math.round(x.r * 100)}</b>`)}${avatar(x.k, 36)}<b class="nm">${esc(x.k.name)}</b></button>`).join('')}</div></section>` : ''}
 ${S.myClasses.length > 1 ? `<section class="card"><div class="lbl"><span>반별 비교 · 최근 4주 평균</span></div><div class="cmpr">${clsSorted().map(k => { const a = classAvg(k); return `<button class="cmp1 ${k === c ? 'on' : ''}" data-act="cls" data-id="${k}" style="--c:${clsCol(k)}">${ringSvg(a || 0, clsCol(k), 84, 10, 'rgba(0,0,0,.06)', `<b>${a === null ? '-' : Math.round(a * 100)}<small>%</small></b>`)}<span>${esc(S.classes[k].name)}</span></button>`; }).join('')}</div></section>` : ''}
-${countsCard()}
-<div class="s2 full">* 비율은 지금 함께하는 친구 수를 기준으로 계산해요.</div></div>${nav('room')}`;
+${prevYearCard(c)}${countsCard()}
+<div class="s2 full">* 비율은 지금 함께하는 친구 수를 기준으로 계산해요. 선교사 자녀는 돌봄 신호 · 출석이 적은 친구에서 빠져요.${PRM.latest ? ` 새 학년(${fmtMDs(PRM.latest)}~) 기록만 세요.` : ''}</div></div>${nav('room')}`;
 }
 
 /* ================= v28 · 공지 알림 (이 기기 · 앱이 닫혀 있어도) ================= */
@@ -4345,3 +4354,775 @@ Object.assign(ACT, {
 ['staffErase', 'staffEmpty'].forEach(delTwice);
 Object.assign(ACT, { staffLeaveAsk2: d => { S.editStaff = d.id; closeSheet(); setTimeout(() => ACT.staffLeaveAsk(), 60); } });
 Object.assign(ACT, { delStaffAsk: () => ACT.staffTrashAsk({ id: S.editStaff }), delStaff: () => staffToTrash(S.editStaff) });
+
+/* ================= v32 · 새 학년 준비 (졸업 · 진급 · 신입) · 학년 이력 · 졸업생 서랍장 · 선교사 자녀 ================= */
+/* ---------- 선교사 자녀: 출석은 부르고, 장기 결석 알림은 세지 않아요 ---------- */
+const isMK = k => (k.flags || []).some(f => /선교사/.test(f));
+const mkChip = k => isMK(k) ? '<span class="atag nymk">결석 알림 꺼짐 · 선교사 자녀</span>' : '';
+
+/* ---------- 학년 이력: 새 학년 기준 주일로 학년도를 나눠요 ---------- */
+function prmSet(list) {
+  PRM.all = {}; list.forEach(p => { PRM.all[String(p.id || p.year)] = p; });
+  PRM.done = list.filter(p => p.status === 'done' && p.effective).sort((a, b) => ko(a.effective, b.effective));
+  PRM.latest = PRM.done.length ? PRM.done[PRM.done.length - 1].effective : '';
+  PRM.ok = true;
+}
+async function prmLoad() {
+  const c = await qDocs(collection(db, 'promotions'), true);
+  if (c && c.length) { prmSet(c); softPaint(); }
+  const s = await qDocs(collection(db, 'promotions'), false);
+  if (s) { const before = PRM.latest; prmSet(s); if (PRM.latest) S.myClasses.forEach(x => ensureAtt(x)); if (before !== PRM.latest) softPaint(); }
+}
+// 그 날짜가 몇 학년도인지 (새 학년을 한 번도 안 했으면 null)
+function syOf(d) {
+  const L = PRM.done; if (!L.length || !d) return null;
+  let y = Number(L[0].year) - 1;
+  for (const p of L) if (d >= p.effective) y = Number(p.year);
+  return y;
+}
+// 그 날짜에 이 아이가 있던 반
+function classOn(k, d) {
+  if (!PRM.done.length) return k.classId;
+  const y = syOf(d), v = k.years ? k.years[y] : undefined;
+  if (v !== undefined) return v || null;
+  return d >= PRM.latest && (k.status || 'active') !== 'graduated' ? k.classId : null;
+}
+const syPast = d => !!PRM.latest && d < PRM.latest;
+// 출석부 명단: 지난 학년 날짜는 그해 그 반 친구들로
+function attRoster(c, d) {
+  if (!syPast(d)) return activeKids(c);
+  return allKids().filter(k => classOn(k, d) === c && (!k.since || d >= k.since)).sort((a, b) => ko(a.name, b.name));
+}
+// 아이 한 명의 출석 날짜 [날짜, 반] — 반이 바뀌어도 이어서
+function kidDays(kid) {
+  if (!PRM.done.length) return recordedAll(kid.classId).map(d => [d, kid.classId]);
+  const out = [];
+  for (const c of Object.keys(S.att)) for (const d of recordedAll(c)) if (classOn(kid, d) === c) out.push([d, c]);
+  return out.sort((a, b) => a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0);
+}
+const kidPresentAll = k => Object.keys(S.att).reduce((s, c) => s + Object.values(S.att[c]).filter(m => m && m[k.id] === 'p').length, 0);
+function histList(k) {
+  const ys = Object.entries(k.years || {}).filter(([, c]) => c).sort((a, b) => Number(a[0]) - Number(b[0]));
+  if (ys.length) return ys.map(([y, c]) => ({ y: Number(y), c }));
+  return k.status === 'graduated' ? [{ y: k.gradYear || '', c: k.classId }] : [];
+}
+const clsAgeOf = c => (S.classes[c] || {}).age || '';
+function histChips(k) {
+  const L = histList(k); if (L.length < 2 && k.status !== 'graduated') return '';
+  return `<span class="nyhc-row">${L.map(x => `<span class="nyhc" style="--c:${clsCol(x.c)}">${esc(clsName(x.c))} ${x.y}</span>`).join('<i>›</i>')}${k.status === 'graduated' ? `<i>›</i><span class="nyhc g">졸업 ${k.gradYear || ''}</span>` : ''}</span>`;
+}
+function nyFirstPill(light) {
+  if (!PRM.latest) return '';
+  const t = ymd(new Date());
+  return t >= PRM.latest && t <= addDays(PRM.latest, 13) ? `<span class="dpill ${light ? 'lt' : ''}">새 학년 첫 주</span>` : '';
+}
+
+/* ---------- 새 학년 준비 상태 ---------- */
+const NY = { year: 0, d: null, inc: null, ok: false, loading: false, busy: '', dirty: false, saveT: null, err: '' };
+const NY_ST = ['졸업', '진급', '신입', '선생님', '시작'];
+const NY_KEYS = ['year', 'effective', 'gradTo', 'kid', 'memo', 'sib', 'skipInc', 'incCls', 'staff', 'staffMode', 'backupAt', 'done', 'push'];
+const nyYear = () => { const n = new Date(); return n.getMonth() >= 8 ? n.getFullYear() + 1 : n.getFullYear(); };
+const nyBlank = y => ({ year: y, status: 'draft', effective: '', gradTo: '조이랜드', kid: {}, memo: {}, sib: {}, skipInc: {}, incCls: {}, staff: {}, staffMode: 'stay', backupAt: '', done: {}, push: true });
+const nyCls = () => Object.values(S.classes).sort((a, b) => (a.age || 0) - (b.age || 0));
+const nyFields = d => { const o = {}; NY_KEYS.forEach(k => { o[k] = d[k] === undefined ? null : d[k]; }); return o; };
+const fmtMDw = s => { if (!s) return ''; const x = parseD(s); return `${x.getMonth() + 1}/${x.getDate()}(${'일월화수목금토'[x.getDay()]})`; };
+async function nyLoad() {
+  if (NY.loading) return; NY.loading = true; NY.err = '';
+  const y = nyYear(); NY.year = y;
+  try {
+    const [p, inc] = await Promise.all([getDoc(doc(db, 'promotions', String(y))), getDocs(collection(db, 'incoming'))]);
+    const cur = p.exists() ? p.data() : null;
+    NY.d = { ...nyBlank(y), ...(cur || {}), year: y };
+    if (cur && !cur.status && cur.moved !== undefined) { NY.d.status = 'draft'; NY.d.oldRun = cur.at || true; }
+    ['kid', 'memo', 'sib', 'skipInc', 'incCls', 'staff', 'done'].forEach(k => { NY.d[k] = NY.d[k] || {}; });
+    NY.inc = inc.docs.map(x => ({ id: x.id, ...x.data() })).sort((a, b) => ko(a.name, b.name));
+    await loadFamsAll();
+  } catch (e) { NY.err = errMsg(e); NY.d = NY.d || nyBlank(y); NY.inc = NY.inc || []; }
+  NY.loading = false; NY.ok = true;
+  if (['newyear', 'home', 'settings'].includes(S.route)) paint();
+}
+function nySave(now) {
+  NY.dirty = true; clearTimeout(NY.saveT);
+  NY.saveT = setTimeout(nySaveNow, now ? 0 : 700);
+}
+async function nySaveNow() {
+  const d = NY.d; if (!d || ['running', 'done'].includes(d.status)) return;
+  const out = { ...nyFields(d), status: 'draft', updatedAt: new Date().toISOString(), updatedBy: S.me.email, updatedByName: myName() };
+  try {
+    await setDoc(doc(db, 'promotions', String(d.year)), out);
+    NY.dirty = false; Object.assign(d, { status: 'draft', updatedAt: out.updatedAt, updatedByName: out.updatedByName });
+    PRM.all[String(d.year)] = { id: String(d.year), ...out };
+    const el = document.getElementById('nysaved'); if (el) el.textContent = `저장됨 · ${fmtMDs(out.updatedAt.slice(0, 10))} ${out.updatedByName}`;
+  } catch (e) { toast('저장하지 못했어요: ' + errMsg(e)); }
+}
+
+/* ---------- 계획 계산 ---------- */
+const kidBY = k => k.birthYear || (k.birth ? Number(String(k.birth).slice(0, 4)) : null);
+const incClass = (x, y) => {
+  const cls = nyCls(); if (NY.d.incCls[x.id] && S.classes[NY.d.incCls[x.id]]) return NY.d.incCls[x.id];
+  const by = kidBY(x), age = by ? y - by + 1 : null, hit = age && cls.find(c => c.age === age);
+  return (hit || cls[0] || {}).id;
+};
+function nyPlan() {
+  const d = NY.d, y = d.year, cls = nyCls(), byAge = a => cls.find(c => c.age === a);
+  const rows = [];
+  for (const c of cls) {
+    const nx = byAge((c.age || 0) + 1);
+    for (const k of activeKids(c.id)) {
+      let act = d.kid[k.id] || (nx ? 'up' : 'grad');
+      if (!nx && act === 'up') act = 'grad';
+      if (nx && act === 'grad') act = 'up';
+      rows.push({ k, from: c.id, to: act === 'up' ? nx.id : act === 'stay' ? c.id : null, act, last: !nx });
+    }
+  }
+  const inc = (NY.inc || []).filter(x => String(x.year) === String(y) && !x.added);
+  const incRows = inc.map(x => ({ x, skip: !!d.skipInc[x.id], to: incClass(x, y) }));
+  const next = {}; cls.forEach(c => { next[c.id] = 0; });
+  rows.forEach(r => { if (r.to) next[r.to] = (next[r.to] || 0) + 1; });
+  incRows.filter(r => !r.skip).forEach(r => { next[r.to] = (next[r.to] || 0) + 1; });
+  const n = a => rows.filter(r => r.act === a).length;
+  return { cls, rows, incRows, next, grad: n('grad'), stay: n('stay'), up: n('up'), left: n('left'), add: incRows.filter(r => !r.skip).length };
+}
+function famCands(x) {
+  const f0 = (x.father || '').trim(), m0 = (x.mother || '').trim(); if (!f0 && !m0) return [];
+  return Object.values(S.fam).filter(f => {
+    const f1 = (f.father || '').trim(), m1 = (f.mother || '').trim();
+    if (f0 && m0) return f1 === f0 && m1 === m0;
+    return f0 ? (f1 === f0 && !m1) : (m1 === m0 && !f1);
+  }).filter(f => allKids().some(k => k.familyId === f.id));
+}
+const famKidsTxt = f => allKids().filter(k => k.familyId === f.id).map(k => `${k.name}(${k.status === 'graduated' ? '졸업' : clsName(k.classId)})`).join(', ');
+const dupKid = x => allKids().find(k => k.name === x.name && (!k.birth || !x.birth || k.birth === x.birth));
+const sibLeft = () => nyPlan().incRows.filter(r => !r.skip && famCands(r.x).length && NY.d.sib[r.x.id] === undefined).length;
+function youngerSib(k) {
+  return allKids().filter(x => x.familyId && x.familyId === k.familyId && x.id !== k.id && (x.status || 'active') === 'active');
+}
+function nyAgeOff(k, to) {
+  const by = kidBY(k); if (!by || !to) return false;
+  return (NY.d.year - by + 1) !== (S.classes[to] || {}).age;
+}
+function nyStaffBase(st) {
+  const cls = nyCls();
+  if (NY.d.staffMode !== 'follow') return { classes: (st.classes || []).filter(c => S.classes[c]), classRole: { ...(st.classRole || {}) } };
+  const mp = c => { const i = cls.findIndex(x => x.id === c); return i < 0 ? c : cls[(i + 1) % cls.length].id; };
+  const classRole = {}; Object.entries(st.classRole || {}).forEach(([c, r]) => { classRole[mp(c)] = r; });
+  return { classes: [...new Set((st.classes || []).filter(c => S.classes[c]).map(mp))], classRole };
+}
+const nyStaffFinal = st => NY.d.staff[st.id] || nyStaffBase(st);
+const sameStaff = (a, b) => JSON.stringify([...(a.classes || [])].sort()) === JSON.stringify([...(b.classes || [])].sort())
+  && (a.classes || []).every(c => ((a.classRole || {})[c] || '보조') === ((b.classRole || {})[c] || '보조'));
+
+/* ---------- 그림 조각 ---------- */
+function nyStair(P) {
+  const cls = P.cls, inc = P.incRows.filter(r => !r.skip), from = (inc[0] && inc[0].x.from) || '신입';
+  const cols = [{ nm: '신입', big: inc.length, was: from, c: '#C2185B', mv: '' }]
+    .concat(cls.map((c, i) => {
+      const inN = i === 0 ? inc.filter(r => r.to === c.id).length : P.rows.filter(r => r.act === 'up' && r.to === c.id).length;
+      return { nm: c.name, big: P.next[c.id] || 0, was: `지금 ${activeKids(c.id).length}명`, c: clsCol(c.id), mv: inN };
+    }))
+    .concat([{ nm: '졸업', big: P.grad, was: '서랍장으로', c: '#7B4FB8', mv: P.grad, cap: true }]);
+  const n = cols.length, nowN = cls.reduce((s, c) => s + activeKids(c.id).length, 0), nextN = Object.values(P.next).reduce((s, v) => s + v, 0);
+  return `<div class="nystair" style="--n:${n}">${cols.map((x, i) => `<div class="nystp" style="--c:${x.c};--h:${Math.round(40 + 60 * i / (n - 1))}%">${x.mv !== '' && i ? `<span class="mv">→ ${x.mv}</span>` : ''}<span class="nm">${x.cap ? svg(NY_CAP, 14, 2.2) + ' ' : ''}${esc(x.nm)}</span><span class="bg">${x.big}<small>명</small></span><span class="was">${esc(x.was)}</span></div>`).join('')}</div>
+<div class="nylg"><span class="nypill k">지금 ${nowN}명 → ${NY.d.year}년 ${nextN}명</span>${P.stay ? `<span class="nypill b">한 해 더 ${P.stay}</span>` : ''}${P.left ? `<span class="nypill k">쉬는 친구로 ${P.left}</span>` : ''}</div>`;
+}
+const NY_CAP = '<path d="M22 10 12 5 2 10l10 5 10-5z"/><path d="M6 12v5c3 3 9 3 12 0v-5"/>';
+const NY_LOCK = '<rect x="5" y="11" width="14" height="10" rx="2.5"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/>';
+function nyTimeline() {
+  const e = NY.d.effective, t = ymd(new Date());
+  const nodes = [
+    ['지금', '준비하기', '언제든 저장', true],
+    [e ? fmtMDw(addDays(e, -7)) : '마지막 주일', '지난 학년 마지막 출석', '출석 마감', e && t >= addDays(e, -7)],
+    [e ? `${fmtMDw(addDays(e, -6))} ~` : '그 주', '새 학년 시작 누르기', '디렉터가 한 번', e && t >= addDays(e, -6)],
+    [e ? fmtMDw(e) : '기준 주일', '새 반 첫 출석', e ? `${fmtMDs(addDays(e, 14))}까지 되돌리기` : '아직 안 정했어요', e && t >= e]];
+  return `<div class="nytl">${nodes.map(([a, b, c, on]) => `<div class="nytn ${on ? 'on' : ''}"><i></i><b>${a}</b><small>${b}<br>${c}</small></div>`).join('')}</div>
+<label class="fld nyeff">새 학년 기준 주일<input class="in" type="date" id="ny_eff" value="${esc(e || '')}"><span class="s2">보통 2월이나 3월 · 언제든 바꿀 수 있어요 · 주일이 아닌 날을 고르면 그다음 주일로 맞춰요</span></label>`;
+}
+function nyStepState(i, P) {
+  const d = NY.d;
+  if (i === 3) { const s = sibLeft(); return d.done[3] ? (s ? ['cur', `신입 ${P.add}명 · 형제 확인 ${s}명 남음`, `<span class="nypill y">확인 ${s}</span>`] : ['done', `신입 ${P.add}명`, '']) : ['', `${(P.incRows[0] && P.incRows[0].x.from) || '신입'} ${P.add}명${s ? ` · 형제 확인 ${s}명` : ''}`, s ? `<span class="nypill y">확인 ${s}</span>` : '']; }
+  if (i === 1) return [d.done[1] ? 'done' : '', `졸업 ${P.grad}명${P.stay ? ` · 한 해 더 ${P.stay}` : ''}`, ''];
+  if (i === 2) { const chk = nyChecks(P).length; return [d.done[2] ? 'done' : '', `${P.up}명 올라가요${P.left ? ` · 쉬는 친구로 ${P.left}` : ''}${chk ? ` · 확인할 친구 ${chk}` : ''}`, chk && !d.done[2] ? `<span class="nypill y">확인 ${chk}</span>` : '']; }
+  if (i === 4) { const n = S.staff.filter(st => nyStaffFinal(st).classes.length).length; return [d.done[4] ? 'done' : '', `${n}분 반 배정 · ${d.staffMode === 'follow' ? '아이들 따라' : '반 그대로'}`, '']; }
+  const w = nyWindow();
+  return [w.ok ? '' : 'lock', w.msg, w.ok ? '' : svg(NY_LOCK, 18, 2)];
+}
+function nyWindow() {
+  const e = NY.d.effective, t = ymd(new Date());
+  if (!e) return { ok: false, msg: '기준 주일을 먼저 정해 주세요' };
+  if (t < addDays(e, -6)) return { ok: false, msg: `${fmtMDw(addDays(e, -6))}부터 누를 수 있어요` };
+  if (t > e) return { ok: false, msg: '기준 주일이 지났어요 · 다음 주일로 바꿔 주세요' };
+  return { ok: true, msg: `지금 시작할 수 있어요 · 기준 ${fmtMDw(e)}` };
+}
+function nyChecks(P) {
+  const out = [];
+  P.rows.filter(r => !r.last).forEach(r => {
+    const nx = P.cls[P.cls.findIndex(c => c.id === r.from) + 1], n = streak(r.from, r.k), age = nyAgeOff(r.k, nx && nx.id);
+    if (n >= 8) out.push({ r, why: `${n}주 못 왔어요`, pc: '' });
+    else if (age) out.push({ r, why: `${kidBY(r.k)}년생 · 나이로는 다른 반`, pc: 'y' });
+  });
+  return out;
+}
+const nyTopBar = (to, label, right) => `<div class="nytop"><button class="back" data-act="go" data-to="${to}">← ${label}</button>${right || ''}</div>`;
+const nySavedPill = () => `<span class="nypill k" id="nysaved">${NY.d.updatedAt ? `저장됨 · ${fmtMDs(NY.d.updatedAt.slice(0, 10))} ${esc(NY.d.updatedByName || '')}` : '아직 저장 전'}</span>`;
+function nySteps(cur) {
+  return `<div class="nysteps">${NY_ST.map((t, i) => { const n = i + 1, st = NY.d.done[n] ? 'done' : ''; return `<button class="nyst ${n === cur ? 'cur' : st}" data-act="go" data-to="newyear/${n}"><i>${st && n !== cur ? svg(ICON.check, 15, 3) : n}</i>${t}</button>`; }).join('')}</div>`;
+}
+const nyNav = (cur, nextLbl) => `<div class="nybtns"><button class="sec" data-act="go" data-to="newyear/${cur - 1 || ''}">← ${cur > 1 ? NY_ST[cur - 2] : '준비 처음'}</button><button class="pri" data-act="nyNext" data-id="${cur}">${nextLbl} →</button></div>`;
+const nyWrap = (inner, wide) => `<div class="scroll"><div class="nyin ${wide ? 'wide' : ''}">${NY.busy ? `<div class="nybusy"><span class="spin"></span>${esc(NY.busy)}</div>` : ''}${NY.err ? `<div class="note">불러오지 못한 것이 있어요: ${esc(NY.err)}</div>` : ''}${inner}</div></div>${nav('home')}`;
+function nyTile(k, sub, cls, bdg, act) {
+  return `<button class="tile sel ${cls}" data-act="${act}" data-id="${k.id}">${avatar(k, 36)}<span class="tt"><b>${esc(k.name)}</b><span>${bdg ? `<em class="nybdg ${bdg[1] || ''}">${esc(bdg[0])}</em>` : esc(sub)}</span></span><span class="tick">${cls.includes('stay') ? '<small>그대로</small>' : cls.includes('off') ? '' : svg(ICON.check, 13, 3)}</span></button>`;
+}
+
+/* ---------- 화면: 새 학년 준비 ---------- */
+function vNewYear() {
+  if (!isAdminMe()) return `<div class="scroll narrow"><button class="back" data-act="go" data-to="settings">← 설정</button><div class="sub">새 학년 준비는 디렉터 · 시스템 관리자만 할 수 있어요.</div></div>${nav('home')}`;
+  if (!NY.ok || NY.year !== nyYear()) { nyLoad(); return `<div class="scroll narrow"><div class="sub">불러오는 중…</div></div>${nav('home')}`; }
+  const st = NY.d.status || 'draft';
+  if (st === 'done' || st === 'running') return nyResult();
+  const step = Math.max(0, Math.min(5, Number(S.arg) || 0));
+  return [nyHub, nyS1, nyS2, nyS3, nyS4, nyS5][step]();
+}
+function nyHub() {
+  const P = nyPlan(), d = NY.d;
+  const rows = [1, 2, 3, 4, 5].map(i => { const [c, s, tag] = nyStepState(i, P); return `<button class="nyrow ${c}" data-act="go" data-to="newyear/${i}"><span class="n">${c === 'done' ? svg(ICON.check, 16, 3) : i}</span><span class="t"><b>${['졸업 확인', '진급 확인', '신입 등록', '선생님 반 배정', '확인하고 시작'][i - 1]}</b><small>${s}</small></span>${tag}<span class="chev">›</span></button>`; }).join('');
+  return nyWrap(`${nyTopBar('settings', '설정', nySavedPill())}
+<div><div class="eyebrow">디렉터 · 관리자</div><h1 class="atitle">${d.year} 새 학년 준비</h1></div>
+${d.status === 'undone' ? `<div class="note">${esc((d.undoneAt || '').slice(0, 10))}에 새 학년 시작을 되돌렸어요. 고친 뒤 다시 시작할 수 있어요.</div>` : ''}${d.oldRun ? '<div class="note">이 해는 예전 방식(새해 반 올리기)으로 한 기록이 있어요. 아이들이 이미 올라갔는지 먼저 확인해 주세요.</div>' : ''}
+<div class="nyhub"><section class="card"><div class="lbl"><span>이렇게 바뀌어요 · 지금 고른 대로</span></div>${nyStair(P)}</section>
+<section class="card"><div class="lbl"><span>준비 단계</span><span class="s2">${Object.keys(d.done).filter(k => d.done[k]).length} / 5</span></div><div class="nyrows">${rows}</div></section>
+<section class="card nytlc"><div class="lbl"><span>언제 할까요</span>${d.effective ? `<span class="nypill">기준 주일까지 ${Math.max(0, Math.round((parseD(d.effective) - parseD(ymd(new Date()))) / 86400000))}일</span>` : ''}</div>${nyTimeline()}</section>
+<div class="note soft"><span>시작하기 전까지 앱은 지금 그대로예요. 준비는 디렉터 · 시스템 관리자가 함께, 시작과 되돌리기는 디렉터만 해요. 고른 것은 저절로 저장돼요.</span></div></div>`, true);
+}
+function nyS1() {
+  const P = nyPlan(), d = NY.d, G = P.rows.filter(r => r.last), last = P.cls[P.cls.length - 1];
+  const tiles = G.map(r => {
+    const sib = youngerSib(r.k).filter(x => x.classId !== r.from), stay = r.act === 'stay';
+    const bdg = !r.k.birth ? ['생일 없음', 'r'] : sib.length ? [`동생 ${clsName(sib[0].classId)}`, ''] : null;
+    return nyTile(r.k, stay ? '한 해 더' : (r.k.birth ? r.k.birth.replace(/-/g, '.') : ''), stay ? 'stay' : 'on', bdg, 'nyGrad');
+  }).join('');
+  const memos = G.filter(r => d.memo[r.k.id]);
+  return nyWrap(`${nyTopBar('newyear', '새 학년 준비', nySavedPill())}${nySteps(1)}<h1 class="atitle sm">졸업 확인${last ? ' · ' + esc(last.name) : ''}</h1>
+<div class="sub">모두 '졸업'으로 되어 있어요. 누르면 '${esc(last ? last.name : '')} 한 해 더'로 바뀌어요.</div>
+<label class="fld">졸업 후 가는 곳<input class="in" id="ny_gto" value="${esc(d.gradTo || '')}" placeholder="예: 조이랜드"><span class="s2">서랍장 · 인계 명단에 쓰여요</span></label>
+<div class="nylg"><span class="nypill p">${svg(NY_CAP, 14, 2.2)} 졸업 ${P.grad}</span>${P.stay ? `<span class="nypill b">한 해 더 ${P.stay}</span>` : ''}<span class="nypill y">동생 있음 ${G.filter(r => youngerSib(r.k).some(x => x.classId !== r.from)).length}</span></div>
+${G.length ? `<div class="tilegrid">${tiles}</div>` : '<div class="sub">졸업할 친구가 없어요.</div>'}
+<section class="card"><div class="lbl"><span>한 줄 인계 메모 · 고를 때만</span><span class="s2">${memos.length}개</span></div>
+${memos.map(r => `<button class="nysib" data-act="nyMemo" data-id="${r.k.id}">${avatar(r.k, 32)}<span class="t"><b>${esc(r.k.name)}</b>${esc(d.memo[r.k.id])}</span></button>`).join('')}
+<button class="ghost sm" data-act="nyMemo" style="align-self:flex-start">+ 메모 쓰기</button><div class="s2">${esc(d.gradTo || '다음 부서')} 선생님께 꼭 전할 말만 적어 주세요. 돌봄 기록은 넘어가지 않아요.</div></section>
+${nyNav(1, '다음 · 진급')}`);
+}
+function nyS2() {
+  const P = nyPlan(), chk = nyChecks(P), cls = P.cls.slice(0, -1).reverse();
+  const seg = r => `<div class="nyseg3">${[['up', '올라가요'], ['stay', '그대로'], ['left', '쉬는 친구로']].map(([v, l]) => `<button class="${r.act === v ? 'on ' + v : ''}" data-act="nyKidSet" data-id="${r.k.id}" data-v="${v}">${l}</button>`).join('')}</div>`;
+  const drawer = c => {
+    const rs = P.rows.filter(r => r.from === c.id), nx = P.cls[P.cls.findIndex(x => x.id === c.id) + 1];
+    return `<details class="drawer" ${c === cls[0] ? 'open' : ''}><summary><b>${esc(c.name)}</b>${svg('<path d="M5 12h14m-5-5 5 5-5 5"/>', 18, 2)}<b class="to">${esc(nx ? nx.name : '')}</b><span class="s2">${rs.filter(r => r.act === 'up').length} / ${rs.length}명</span></summary><div class="tilegrid nydt">${rs.map(r => nyTile(r.k, r.act === 'up' ? `${clsName(r.from)} → ${clsName(r.to)}` : r.act === 'stay' ? `${clsName(r.from)} 그대로` : '쉬는 친구로', r.act === 'up' ? 'on' : r.act === 'stay' ? 'stay' : 'off', nyAgeOff(r.k, r.to || r.from) && r.act === 'up' ? [`${kidBY(r.k)}년생`, ''] : null, 'nyKidSheet')).join('')}</div></details>`;
+  };
+  return nyWrap(`${nyTopBar('newyear', '새 학년 준비', nySavedPill())}${nySteps(2)}<h1 class="atitle sm">진급 확인</h1>
+${chk.length ? `<section class="card"><div class="lbl"><span>먼저 확인할 친구</span><span class="nypill y">${chk.length}명</span></div>${chk.map(({ r, why, pc }) => `<div class="nykr">${avatar(r.k, 40)}<span class="t"><b>${esc(r.k.name)} <span class="s2">${esc(clsName(r.from))}</span></b><span><span class="nypill ${pc}">${esc(why)}</span></span></span>${seg(r)}</div>`).join('')}
+<div class="s2">'쉬는 친구로'는 친구들 화면의 '함께하지 않는 친구'로 가요. 기록은 그대로 남고 언제든 다시 '함께해요'로 바꿀 수 있어요. 정리 전에 한 번 연락해 보세요. 선교사 자녀는 결석으로 세지 않아요.</div></section>` : '<div class="note soft"><span>오래 못 온 친구나 나이와 반이 다른 친구가 없어요.</span></div>'}
+${cls.map(drawer).join('')}
+<div class="s2">친구를 누르면 올라가요 · 그대로 · 쉬는 친구로 중에 고를 수 있어요.</div>
+${nyNav(2, '다음 · 신입')}`);
+}
+function nyS3() {
+  const P = nyPlan(), d = NY.d, y = d.year;
+  const cands = P.incRows.filter(r => !r.skip && famCands(r.x).length);
+  const others = (NY.inc || []).filter(x => String(x.year) !== String(y) && !x.added).length;
+  const sibRow = r => {
+    const fs = famCands(r.x), v = d.sib[r.x.id], f = fs.find(z => z.id === v) || fs[0];
+    return `<div class="nysib">${avatar({ id: r.x.id, name: r.x.name }, 38)}<span class="t"><b>${esc(r.x.name)} <span class="s2">${esc((r.x.birth || '').replace(/-/g, '.'))}</span></b>${v && v !== 'no' ? `<span class="nypill g">같은 가정으로 묶어요 · ${esc(famKidsTxt(f))}</span>` : v === 'no' ? '<span class="nypill k">다른 가정이에요</span>' : `${esc(famKidsTxt(f))}의 동생인가요?<span class="s2">부모님 이름이 같아요</span>`}</span><span class="nysb">${v === undefined ? `<button class="nyb2 ok" data-act="nySib" data-id="${r.x.id}" data-v="${f.id}">맞아요</button><button class="nyb2" data-act="nySib" data-id="${r.x.id}" data-v="no">아니에요</button>` : `<button class="linkbtn" data-act="nySib" data-id="${r.x.id}" data-v="">다시</button>`}</span></div>`;
+  };
+  const tile = r => {
+    const x = r.x, dup = dupKid(x), cand = famCands(x).length && d.sib[x.id] === undefined;
+    const by = kidBY(x), off = by && (y - by + 1) !== (S.classes[r.to] || {}).age;
+    const bdg = dup ? ['이미 있어요?', 'r'] : !x.birth ? ['생일 없음', 'r'] : cand ? ['형제?', ''] : off ? [`${by}년생`, ''] : null;
+    return `<button class="tile sel ${r.skip ? 'off' : 'on'}" data-act="nyIncSheet" data-id="${x.id}">${avatar({ id: x.id, name: x.name }, 36)}<span class="tt"><b>${esc(x.name)}</b><span>${r.skip ? '이번엔 빼요' : bdg ? `<em class="nybdg ${bdg[1]}">${esc(bdg[0])}</em>` : `${esc((x.birth || '').slice(0, 4))}${x.gender ? ' · ' + esc(x.gender) : ''}${r.to !== (P.cls[0] || {}).id ? ' → ' + esc(clsName(r.to)) : ''}`}</span></span><span class="tick">${r.skip ? '' : svg(ICON.check, 13, 3)}</span></button>`;
+  };
+  return nyWrap(`${nyTopBar('newyear', '새 학년 준비', nySavedPill())}${nySteps(3)}<h1 class="atitle sm">신입 등록</h1>
+<div class="nybtns three"><button class="sec sm" data-act="nyIncSheet">+ 한 명 추가</button><button class="sec sm" data-act="nyIncTpl">${svg('<path d="M12 4v11m-5-5 5 5 5-5M5 20h14"/>', 15, 2.2)} 엑셀 양식</button><label class="sec sm nyfile">${svg('<path d="M12 20V9m-5 5 5-5 5 5M5 4h14"/>', 15, 2.2)} 엑셀 올리기<input type="file" id="nyIncFile" accept=".xlsx,.xls,.csv" hidden></label></div>
+${cands.length ? `<section class="card"><div class="lbl"><span>형제 같아요 · 확인해 주세요</span>${sibLeft() ? `<span class="nypill y">${sibLeft()}명 남음</span>` : '<span class="nypill g">다 확인했어요</span>'}</div>${cands.map(sibRow).join('')}<div class="s2">같은 이름의 부모님이 있을 수 있어서 저절로 묶지 않아요. [맞아요]를 누른 친구만 같은 가정으로 들어가요.</div></section>` : ''}
+<section class="card"><div class="lbl"><span>${y}년 신입</span><span class="s2">${P.add}명${P.incRows.length - P.add ? ` · 빼기 ${P.incRows.length - P.add}` : ''}</span></div>
+${P.incRows.length ? `<div class="tilegrid">${P.incRows.map(tile).join('')}</div>` : '<div class="sub">아직 신입 명단이 없어요. [한 명 추가]나 [엑셀 올리기]로 넣어 주세요.</div>'}
+<div class="s2">누르면 고치거나, 반을 바꾸거나, 이번엔 뺄 수 있어요. 태어난 해로 반을 정해요 (${y}년 기준 ${P.cls.map(c => `${esc(c.name)} ${y - (c.age || 0) + 1}년생`).join(' · ')}). 들어온 친구에게는 '신입' 표시가 붙어요.${others ? ` 다른 해 명단 ${others}명은 그해에 보여요.` : ''}</div></section>
+${nyNav(3, '다음 · 선생님')}`);
+}
+function nyS4() {
+  const P = nyPlan(), d = NY.d, cls = P.cls;
+  const fin = S.staff.map(st => ({ st, f: nyStaffFinal(st) }));
+  const chip = ({ st, f }, c) => `<button class="nytc" data-act="nyStaffSheet" data-id="${st.id}">${staffAv(st, 24)}<span>${esc(st.name)}</span>${(f.classRole || {})[c] === '담임' ? '<em>담임</em>' : ''}${d.staff[st.id] ? '<u>바꿈</u>' : ''}</button>`;
+  const card = c => {
+    const ts = fin.filter(x => x.f.classes.includes(c.id)).sort((a, b) => ((a.f.classRole || {})[c.id] === '담임' ? 0 : 1) - ((b.f.classRole || {})[c.id] === '담임' ? 0 : 1) || ko(a.st.name, b.st.name));
+    const kids = P.next[c.id] || 0, r = ts.length ? kids / ts.length : 0, newN = P.incRows.filter(x => !x.skip && x.to === c.id).length;
+    return `<div class="nycls" style="--c:${clsCol(c.id)}"><div class="hd"><b>${esc(c.name)}</b><span class="nypill k">아이 ${kids} · 선생님 ${ts.length}</span><span class="r">${ts.length ? `1 : ${Math.round(r * 10) / 10}` : '선생님 없음'}</span></div>
+<div class="nyratio"><div class="nykb">${'<i></i>'.repeat(Math.min(kids, 40))}${kids > 40 ? `<small>+${kids - 40}</small>` : ''}</div><div class="nytb">${'<u></u>'.repeat(ts.length)}</div></div>
+<div class="nytcs">${ts.map(x => chip(x, c.id)).join('')}<button class="nytc add" data-act="nyAddSheet" data-id="${c.id}">+ 더하기</button></div>
+${(newN >= 10 && ts.length && r > 5) || (kids && !ts.length) ? `<div class="nywarn">${kids && !ts.length ? '이 반에 선생님이 없어요.' : `신입 ${newN}명이 오는 반이에요. 손이 더 필요해 보여요.`}</div>` : ''}</div>`;
+  };
+  const none = fin.filter(x => !x.f.classes.length);
+  return nyWrap(`${nyTopBar('newyear', '새 학년 준비', nySavedPill())}${nySteps(4)}<h1 class="atitle sm">선생님 반 배정</h1>
+<div class="seg"><button class="${d.staffMode !== 'follow' ? 'on' : ''}" data-act="nyMode" data-id="stay">선생님은 반 그대로</button><button class="${d.staffMode === 'follow' ? 'on' : ''}" data-act="nyMode" data-id="follow">아이들 따라 올라가기</button></div>
+<div class="s2">${d.staffMode === 'follow' ? `아이들과 함께 한 반씩 올라가고, ${esc((cls[cls.length - 1] || {}).name || '')} 선생님은 ${esc((cls[0] || {}).name || '')}으로 가요.` : '지금 반에 그대로 계세요.'} 선생님을 누르면 한 분씩 바꿀 수 있어요. 시작하기 전까지는 미리 정해 두는 것이라 지금 반 배정은 그대로예요.</div>
+${cls.map(card).join('')}
+<section class="card"><div class="lbl"><span>반 배정 안 된 선생님</span><span class="s2">${none.length}분</span></div>${none.length ? `<div class="nytcs">${none.map(x => chip(x, '')).join('')}</div>` : '<div class="sub">모든 선생님이 반에 계세요.</div>'}
+<div class="s2">이번에 그만두시는 선생님은 교사실 → 선생님 카드 [고치기] → [그만두신 선생님으로].</div></section>
+${nyNav(4, '다음 · 시작')}`);
+}
+function nyS5() {
+  const P = nyPlan(), d = NY.d, w = nyWindow(), e = d.effective;
+  const prevSun = e ? addDays(e, -7) : '';
+  const miss = prevSun ? P.cls.filter(c => !Object.values((S.att[c.id] || {})[prevSun] || {}).includes('p')) : [];
+  const bkOk = d.backupAt && (Date.now() - new Date(d.backupAt).getTime()) < 3 * 864e5;
+  const ck = (ok, t, s, warn) => `<div class="nyck"><i class="${ok ? '' : warn ? 'w' : 'no'}">${ok ? svg(ICON.check, 13, 3.2) : warn ? '!' : ''}</i><span>${t}<br><small>${s}</small></span></div>`;
+  const s = sibLeft();
+  const ready = w.ok && bkOk && isDirectorMe();
+  return nyWrap(`${nyTopBar('newyear', '새 학년 준비', nySavedPill())}${nySteps(5)}<h1 class="atitle sm">확인하고 시작</h1>
+<section class="card">${nyStair(P)}</section>
+<section class="card"><div class="lbl"><span>시작 전 확인</span></div><div class="nychk">
+${ck(d.done[1], `졸업 ${P.grad}${P.stay ? ` · 한 해 더 ${P.stay}` : ''}`, `${esc(d.gradTo || '가는 곳 미정')}로 · 인계 메모 ${Object.keys(d.memo).filter(k => d.memo[k]).length}개`)}
+${ck(d.done[2], `진급 ${P.up}${P.left ? ` · 쉬는 친구로 ${P.left}` : ''}`, P.cls.slice(0, -1).map(c => `${esc(c.name)} → ${P.rows.filter(r => r.from === c.id && r.act === 'up').length}`).join(' · '))}
+${ck(d.done[3] && !s, `신입 ${P.add}`, s ? `형제 확인 ${s}명 남음 (확인 안 하면 새 가정으로 들어가요)` : '형제 확인 끝', s)}
+${ck(d.done[4], `선생님 ${S.staff.filter(st => nyStaffFinal(st).classes.length).length}분 반 배정`, d.staffMode === 'follow' ? '아이들 따라 올라가기' : '반 그대로')}
+${ck(!!e, e ? `기준 주일 ${fmtMDw(e)}` : '기준 주일', e ? '이날부터 새 반으로 출석해요' : '아래에서 정해 주세요')}
+${e ? ck(!miss.length, `${fmtMDw(prevSun)} 출석`, miss.length ? `${miss.map(c => esc(c.name)).join(' · ')} 아직 안 불렀어요` : '모든 반 출석 기록 있음', miss.length) : ''}
+${ck(bkOk, bkOk ? '백업 받았어요' : '백업 받기 (꼭)', bkOk ? `${esc(d.backupAt.slice(5, 16).replace('T', ' ').replace('-', '/'))}` : '시작하기 전 모습을 파일로 보관해요')}
+</div><button class="${bkOk ? 'ghost' : 'sec'} sm" data-act="nyBackup" style="align-self:flex-start">${svg('<path d="M12 4v11m-5-5 5 5 5-5M5 20h14"/>', 15, 2.2)} ${bkOk ? '다시 받기' : '백업 받기'}</button></section>
+<section class="card"><label class="fld nyeff">새 학년 기준 주일<input class="in" type="date" id="ny_eff" value="${esc(e || '')}"></label>
+<label class="nytg"><input type="checkbox" id="ny_push" ${d.push !== false ? 'checked' : ''}><span>선생님들께 알림 보내기<br><small>"${d.year} 새 학년이 시작됐어요! 우리 반 친구들을 확인해 주세요"</small></span></label></section>
+<button class="cta" data-act="nyRunAsk" ${ready ? '' : 'disabled'}>${d.year} 새 학년 시작</button>
+<div class="s2" style="text-align:center">${!isDirectorMe() ? '시작은 디렉터가 해요. 준비해 두시면 디렉터가 확인하고 눌러요.' : !w.ok ? esc(w.msg) : !bkOk ? '백업을 받으면 버튼이 켜져요.' : '확인 창에서 한 번 더 눌러야 시작돼요 · 14일 안에 되돌릴 수 있어요.'}</div>`);
+}
+function nyResult() {
+  const d = NY.d, c = d.counts || {}, run = d.status === 'running', t = ymd(new Date());
+  const canUndo = isDirectorMe() && (run || (d.undoUntil && t <= d.undoUntil));
+  return nyWrap(`${nyTopBar('settings', '설정')}
+${run ? `<section class="card" style="border-color:#C62828"><div class="lbl"><span>새 학년 시작이 중간에 멈췄어요</span></div><div class="sub">인터넷이 끊겼거나 창이 닫힌 것 같아요. [되돌리기]로 시작 전 모습으로 돌린 뒤 다시 시작해 주세요.</div></section>`
+    : `<div class="nydone"><span>${svg(NY_CAP, 44, 1.8)}</span><div class="big">${d.year} 새 학년이<br>시작됐어요!</div><div class="nums">${nyCls().map(x => `<span><b>${allKids().filter(k => (k.status || 'active') === 'active' && k.classId === x.id).length}</b>${esc(x.name)}</span>`).join('')}<span><b>${c.grad || 0}</b>졸업</span></div><small>기준 주일 ${fmtMDw(d.effective)} · ${esc(d.byName || '')}</small></div>`}
+<section class="card"><div class="lbl"><span>이렇게 했어요</span></div><div class="nychk">
+<div class="nyck"><i>${svg(ICON.check, 13, 3.2)}</i><span>졸업 ${c.grad || 0}명 → 졸업생 서랍장 · ${esc(d.gradTo || '')}</span></div>
+<div class="nyck"><i>${svg(ICON.check, 13, 3.2)}</i><span>진급 ${c.up || 0}명${c.stay ? ` · 한 해 더 ${c.stay}` : ''}${c.left ? ` · 쉬는 친구로 ${c.left}` : ''}</span></div>
+<div class="nyck"><i>${svg(ICON.check, 13, 3.2)}</i><span>신입 ${c.added || 0}명</span></div>
+<div class="nyck"><i>${svg(ICON.check, 13, 3.2)}</i><span>선생님 반 배정 ${c.staff || 0}분 바꿈${(d.skippedStaff || []).length ? ` <small>· ${esc(d.skippedStaff.join(', '))} 선생님은 직접 바꿔 주세요</small>` : ''}${d.staffError ? ` <small>· 선생님 반 배정은 바꾸지 못했어요</small>` : ''}</span></div></div></section>
+<div class="nybtns stack"><button class="pri" data-act="go" data-to="home">우리 반 친구들 보기</button><button class="sec" data-act="go" data-to="grads">${svg(NY_CAP, 16, 2)} 졸업생 서랍장</button></div>
+${canUndo ? `<section class="card soft"><div class="lbl"><span>되돌리기</span>${run ? '' : `<span class="nypill k">${fmtMDs(d.undoUntil)}까지</span>`}</div><div class="sub">시작 전 모습으로 그대로 돌아가요 (아이 반 · 졸업 · 신입 · 가정 · 선생님 반 배정). 새 학년에 부른 출석은 남아요.</div><button class="ghost sm" data-act="nyUndoAsk" style="align-self:flex-start">${svg('<path d="M9 14 4 9l5-5"/><path d="M4 9h10a6 6 0 0 1 0 12h-3"/>', 15, 2.2)} 되돌리기</button></section>` : ''}`);
+}
+
+/* ---------- 홈 · 설정 카드 ---------- */
+function nyHomeCard() {
+  if (!isAdminMe()) return '';
+  const y = nyYear(), p = PRM.all[String(y)], st = p ? (p.status || 'draft') : '', t = ymd(new Date()), m = new Date().getMonth();
+  if (st === 'running') return `<button class="nyhome warn full" data-act="go" data-to="newyear"><span class="ic">${svg(NY_CAP, 26, 2)}</span><span><b>${y} 새 학년 시작이 멈췄어요</b><small>눌러서 확인해 주세요</small></span><span class="chev">›</span></button>`;
+  if (st === 'done') return p.undoUntil && t <= p.undoUntil ? `<button class="nyhome done full" data-act="go" data-to="newyear"><span class="ic">${svg(NY_CAP, 26, 2)}</span><span><b>${y} 새 학년이 시작됐어요</b><small>졸업 ${(p.counts || {}).grad || 0} · 신입 ${(p.counts || {}).added || 0} · ${fmtMDs(p.undoUntil)}까지 되돌릴 수 있어요</small></span><span class="chev">›</span></button>` : '';
+  if (![10, 11, 0, 1, 2].includes(m)) return '';
+  if ((lsGet('jc_nyhide') || '') > t) return '';
+  const dn = p && p.done ? [1, 2, 3, 4, 5].filter(i => p.done[i]).length : 0, e = p && p.effective;
+  const dd = e ? Math.round((parseD(e) - parseD(t)) / 86400000) : null;
+  return `<div class="nyhome full"><button class="nyhm" data-act="go" data-to="newyear"><span class="ic">${svg('<path d="M12 21v-8"/><path d="M12 13c0-4 3-7 8-7 0 4-3 7-8 7z"/><path d="M12 15c0-3-2.5-5.5-7-5.5 0 3 2.5 5.5 7 5.5z"/>', 28, 2)}</span><span class="grow"><b>${y} 새 학년 준비</b><small>${dn ? `${dn}/5 단계 · ` : ''}${e ? `기준 주일 ${fmtMDw(e)}` : '졸업 · 진급 · 신입을 미리 준비해요'}</small><span class="nyprog">${[1, 2, 3, 4, 5].map(i => `<i class="${p && p.done && p.done[i] ? 'on' : ''}"></i>`).join('')}</span></span>${dd !== null && dd >= 0 ? `<span class="nydd"><small>기준 주일</small><b>D-${dd}</b></span>` : ''}</button><button class="nyhide" data-act="nyHide" aria-label="일주일 동안 숨기기">나중에</button></div>`;
+}
+function nySettingsCard() {
+  const y = nyYear(), p = PRM.all[String(y)], st = p ? (p.status || 'draft') : '';
+  const gN = allKids().filter(k => k.status === 'graduated').length;
+  return `${isAdminMe() ? `<section class="card"><div class="lbl"><span>${y} 새 학년 준비</span><span class="s2">디렉터 · 관리자</span></div><div class="sub">${st === 'done' ? `${y} 새 학년을 ${fmtMDw(p.effective)}부터 시작했어요.` : st === 'running' ? '새 학년 시작이 중간에 멈췄어요. 눌러서 확인해 주세요.' : '졸업 · 진급 · 신입 등록 · 선생님 반 배정을 미리 준비해 두고, 기준 주일에 한 번에 시작해요.'}</div><button class="sec" data-act="go" data-to="newyear">${st === 'done' || st === 'running' ? '결과 보기' : '준비하기'}</button></section>` : ''}
+<section class="card"><div class="lbl"><span>졸업생 서랍장</span><span class="s2">${gN}명</span></div><div class="sub">졸업한 친구들을 학년도별로 보관해요. 모든 선생님이 볼 수 있어요.</div><button class="sec" data-act="go" data-to="grads">${svg(NY_CAP, 16, 2)} 서랍장 열기</button></section>`;
+}
+function gradLink(c) {
+  const cls = nyCls(); if (!cls.length || cls[cls.length - 1].id !== c) return '';
+  const n = allKids().filter(k => k.status === 'graduated').length;
+  return n ? `<button class="ghost nygl" data-act="go" data-to="grads">${svg(NY_CAP, 16, 2)} 졸업한 친구들 ${n}명 · 서랍장 ›</button>` : '';
+}
+
+/* ---------- 졸업생 서랍장 ---------- */
+const GR = { q: '' };
+function vGrads() {
+  const G = allKids().filter(k => k.status === 'graduated');
+  const by = {}; G.forEach(k => { const y = k.gradYear || '연도 모름'; (by[y] ||= []).push(k); });
+  const ys = Object.keys(by).sort((a, b) => (b === '연도 모름' ? -1 : a === '연도 모름' ? 1 : Number(b) - Number(a)));
+  const card = k => {
+    const L = histList(k), n = kidPresentAll(k);
+    const span = L.length ? (L[0].y && L[L.length - 1].y && L[0].y !== L[L.length - 1].y ? `${L[0].y}–${L[L.length - 1].y}` : `${L[L.length - 1].y || ''}`) : '';
+    return `<button class="nyg" data-act="go" data-to="grad/${k.id}" data-nm="${esc(k.name)}">${youngerSib(k).length ? `<span class="rib">동생 ${esc(clsName(youngerSib(k)[0].classId))}</span>` : ''}${avatar(k, 64)}<b>${esc(k.name)}</b><span class="yr">${L.map(x => `<i style="background:${clsCol(x.c)}"></i>`).join('')}</span><small>${span ? span + ' · ' : ''}출석 ${n}번</small></button>`;
+  };
+  const admin = isAdminMe();
+  return `<div class="scroll"><div class="nyin wide">${nyTopBar('settings', '설정')}<h1 class="atitle sm">졸업생 서랍장</h1>
+${G.length ? `<input class="search" id="gq" type="search" placeholder="졸업생 이름 찾기 · 모든 해" autocomplete="off" value="${esc(GR.q)}">` : ''}
+${ys.map(y => {
+    const L = by[y].sort((a, b) => ko(a.name, b.name)), to = (L.find(k => k.gradTo) || {}).gradTo || '', at = (L.find(k => k.gradAt) || {}).gradAt || '';
+    return `<section class="nyyr" data-yr="${esc(y)}"><div class="nycover"><span class="cap2">${svg(NY_CAP, 34, 1.8)}</span><span class="grow"><b>${y === '연도 모름' ? '졸업 연도 모름' : `${y}학년도 졸업`} · ${L.length}명</b><small>${at ? fmtMDw(at).replace(/\(.\)/, '') + ' 졸업' : ''}${to ? `${at ? ' · ' : ''}${esc(to)}로` : ''}</small></span><span class="ph">${L.slice(0, 5).map(k => avatar(k, 44)).join('')}</span></div>
+${admin ? `<div class="nytools"><button class="sec sm" data-act="grXlsx" data-id="${esc(y)}">${svg('<rect x="4" y="3" width="16" height="18" rx="2.5"/><path d="M4 9h16M4 15h16M10 3v18"/>', 15, 2)} 인계 명단 (엑셀)</button></div>` : ''}
+<div class="nyggrid">${L.map(card).join('')}</div></section>`;
+  }).join('') || '<div class="note soft"><span>아직 졸업생이 없어요. 새 학년을 시작하면 졸업한 친구들이 학년도별 서랍에 들어와요.</span></div>'}
+<div class="note soft"><span>이름 · 사진 · 학년 이력은 추억으로 계속 남아요. 졸업 가정의 부모님 연락처는 디렉터 · 관리자만 봐요.</span></div>
+${admin ? archLink() : ''}</div></div>${nav('home')}`;
+}
+function vGrad() {
+  const k = findKid(S.arg);
+  if (!k) return `<div class="scroll narrow">${nyTopBar('grads', '서랍장')}<div class="sub">찾을 수 없어요.</div></div>${nav('home')}`;
+  const kd = S.kidData && S.kidFor === k.id ? S.kidData : null, fam = S.fam[k.familyId] || kd?.fam;
+  const L = histList(k), days = kidDays(k).filter(([d]) => !k.since || d >= k.since), pres = kidPresentAll(k);
+  const firstP = Object.keys(S.att).flatMap(c => Object.entries(S.att[c]).filter(([, m]) => m && m[k.id] === 'p').map(([d]) => d)).sort()[0];
+  const sib = youngerSib(k), admin = isAdminMe(), gc = GRC[k.familyId];
+  const ph = ['main', '1', '2'].map(s => kd?.photos?.[s] || (s === 'main' ? k.thumb : null)).filter(Boolean);
+  if (admin && fam && gc === undefined) loadGradContact(k.familyId);
+  const tel = gc ? [gc.fatherTel, gc.motherTel, ...Object.values(gc.phones || {})].filter(Boolean) : [fam?.fatherTel, fam?.motherTel].filter(Boolean);
+  return `<div class="scroll"><div class="nyin">${nyTopBar('grads', '서랍장', `<span class="nypill p">${k.gradYear ? k.gradYear + '학년도 ' : ''}졸업</span>`)}
+<div class="nygh">${avatar(k, 96)}<h1 class="atitle sm">${esc(k.name)}</h1><div class="s2">${k.birth ? k.birth.replace(/-/g, '.') + ' 생' : '생일 모름'}${k.gradTo ? ' · ' + esc(k.gradTo) + '로' : ''}</div></div>
+${ph.length > 1 ? `<div class="nyphs">${ph.map(src => `<img src="${src}" alt="${esc(k.name)}">`).join('')}</div>` : ''}
+<section class="card"><div class="lbl"><span>학년 이력</span></div><div class="nyhist" style="--n:${L.length + 1};--g:linear-gradient(90deg,${[...L.map(x => clsCol(x.c)), '#7B4FB8'].join(',')})">${L.map(x => `<div class="nyhn" style="--c:${clsCol(x.c)}"><i>${clsAgeOf(x.c)}</i><b>${esc(clsName(x.c))}</b><small>${x.y}</small></div>`).join('')}<div class="nyhn" style="--c:#7B4FB8"><i>${svg(NY_CAP, 20, 2)}</i><b>졸업</b><small>${k.gradAt ? esc(k.gradAt.replace(/-/g, '.')) : esc(String(k.gradYear || ''))}</small></div></div></section>
+<section class="card"><div class="lbl"><span>함께한 기록</span></div><div class="nyrec">${ringSvg(days.length ? Math.min(1, pres / days.length) : 0, '#7B4FB8', 92, 10, 'rgba(0,0,0,.06)', `<b>${days.length ? Math.round(Math.min(1, pres / days.length) * 100) : '-'}<small>%</small></b>`)}<div class="sub" style="color:#3B2A1E">주일 ${days.length}번 중 <b class="nyb">${pres}번</b> 왔어요${firstP ? `<br><span class="s2">앱 기록으로 첫 출석 ${esc(firstP.replace(/-/g, '.'))}</span>` : ''}</div></div></section>
+${k.gradMemo ? `<section class="card"><div class="lbl"><span>인계 메모</span><span class="s2">${esc(k.gradTo || '다음 부서')} 선생님께</span></div><div class="nymsg">${esc(k.gradMemo)}</div></section>` : ''}
+<section class="card"><div class="lbl"><span>가정</span></div>${fam ? `<div class="sub" style="color:#3B2A1E">${fam.father ? `${esc(fam.father)} <span class="s2">아버지</span>` : ''}${fam.father && fam.mother ? ' · ' : ''}${fam.mother ? `${esc(fam.mother)} <span class="s2">어머니</span>` : ''}</div>` : '<div class="sub">가정 정보가 없어요.</div>'}
+${admin ? (tel.length ? `<div class="nytel">${tel.map(x => `<a href="tel:${esc(x)}">${esc(x)}</a>`).join('')}</div><div class="s2">디렉터 · 관리자에게만 보여요</div>` : '') : `<div class="nylock">${svg(NY_LOCK, 14, 2.2)} 연락처는 디렉터 · 관리자만 보여요</div>`}
+${sib.map(x => `<button class="nysib" data-act="kid" data-id="${x.id}">${avatar(x, 30)}<span class="t"><b>${esc(x.name)}</b>동생 · ${esc(clsName(x.classId))}</span><span class="chev">›</span></button>`).join('')}</section>
+${isDirectorMe() ? `<div class="nybtns"><button class="ghost" data-act="grCancelAsk" data-id="${k.id}">졸업 취소 · 다시 ${esc(clsName(k.classId))}으로</button></div>` : ''}</div></div>${nav('home')}`;
+}
+const GRC = {};
+async function loadGradContact(fid) {
+  if (!fid || GRC[fid] !== undefined) return; GRC[fid] = null;
+  try { const s = await getDoc(doc(db, 'gradContacts', fid)); GRC[fid] = s.exists() ? s.data() : null; if (s.exists()) softPaint(); } catch { GRC[fid] = null; }
+}
+
+/* ---------- 신입 명단 고치기 · 엑셀 ---------- */
+function nyIncSheet(id) {
+  const x = id ? (NY.inc || []).find(z => z.id === id) : null, y = NY.d.year, P = nyPlan(), r = x && P.incRows.find(z => z.x.id === x.id);
+  const dup = x && dupKid(x);
+  sheet(`<div class="ttl" style="font-size:24px">${x ? esc(x.name) + ' · 신입' : `${y}년 신입 한 명 추가`}</div>
+${dup ? `<div class="note">이미 '${esc(dup.name)}'(${esc(dup.status === 'graduated' ? '졸업' : clsName(dup.classId))}) 친구가 있어요. 같은 친구면 [이번엔 빼기]를 눌러 주세요.</div>` : ''}
+<div class="two"><label class="fld">이름<input class="in" id="ni_name" value="${esc(x?.name || '')}"></label><label class="fld">생일<input class="in" type="date" id="ni_birth" value="${esc(x?.birth || '')}"></label></div>
+<div class="two"><label class="fld">성별<select class="in" id="ni_g"><option value="">모름</option><option ${x?.gender === '남' ? 'selected' : ''}>남</option><option ${x?.gender === '여' ? 'selected' : ''}>여</option></select></label><label class="fld">어디서<input class="in" id="ni_from" value="${esc(x?.from || '조이베이비')}"></label></div>
+<div class="two"><label class="fld">아버지<input class="in" id="ni_fa" value="${esc(x?.father || '')}"></label><label class="fld">어머니<input class="in" id="ni_mo" value="${esc(x?.mother || '')}"></label></div>
+<div class="two"><label class="fld">아버지 연락처<input class="in" type="tel" id="ni_ft" value="${esc(x?.fatherTel || '')}"></label><label class="fld">어머니 연락처<input class="in" type="tel" id="ni_mt" value="${esc(x?.motherTel || '')}"></label></div>
+<div class="two"><label class="fld">셀<input class="in" id="ni_cell" value="${esc(x?.cell || '')}"></label><label class="fld">메모<input class="in" id="ni_note" value="${esc(x?.note || '')}"></label></div>
+${x ? `<label class="fld">들어갈 반<select class="in" id="ni_cls">${nyCls().map(c => `<option value="${c.id}" ${r && r.to === c.id ? 'selected' : ''}>${esc(c.name)}</option>`).join('')}</select></label>` : ''}
+<div class="btns"><button class="pri" data-act="nyIncSave" data-id="${x ? x.id : ''}">저장</button>${x ? `<button class="sec" data-act="nyIncSkip" data-id="${x.id}">${r && r.skip ? '다시 넣기' : '이번엔 빼기'}</button>` : '<button class="sec" data-act="sheetClose">취소</button>'}</div>
+${x ? `<button class="ghost danger sm" data-act="nyIncDel" data-id="${x.id}">명단에서 지우기</button>` : ''}`);
+}
+async function nyIncSave(id) {
+  const name = val('ni_name'); if (!name) return toast('이름을 적어 주세요');
+  const birth = val('ni_birth'), y = NY.d.year;
+  const data = { year: y, name, birth, birthYear: birth ? Number(birth.slice(0, 4)) : null, gender: val('ni_g'), from: val('ni_from') || '조이베이비', father: val('ni_fa'), mother: val('ni_mo'), fatherTel: val('ni_ft'), motherTel: val('ni_mt'), cell: val('ni_cell'), note: val('ni_note'), updatedAt: new Date().toISOString(), by: S.me.email };
+  try {
+    const ref = id ? doc(db, 'incoming', id) : doc(collection(db, 'incoming'));
+    await setDoc(ref, data, { merge: true });
+    const old = (NY.inc || []).find(z => z.id === ref.id);
+    if (old) Object.assign(old, data); else NY.inc.push({ id: ref.id, ...data });
+    if (id) { const c = val('ni_cls'); const auto = (() => { const by = data.birthYear, age = by ? y - by + 1 : null, hit = age && nyCls().find(z => z.age === age); return (hit || nyCls()[0] || {}).id; })(); if (c && c !== auto) NY.d.incCls[id] = c; else delete NY.d.incCls[id]; nySave(); }
+    closeSheet(); toast('저장했어요'); paint();
+  } catch (e) { toast('저장하지 못했어요: ' + errMsg(e)); }
+}
+const NY_TPL = ['이름', '생일 (2023-04-02)', '성별 (남/여)', '아버지', '어머니', '셀', '아버지 연락처', '어머니 연락처', '메모', '어디서'];
+async function nyIncTpl() {
+  try {
+    const XLSX = await loadXLSX();
+    const ws = XLSX.utils.aoa_to_sheet([NY_TPL, ['(예) 김조이', '2023-04-02', '여', '김아빠', '이엄마', '3진 2셀', '010-0000-0000', '', '땅콩 알레르기', '조이베이비']]);
+    ws['!cols'] = NY_TPL.map((t, i) => ({ wch: [10, 16, 10, 10, 10, 10, 15, 15, 18, 12][i] }));
+    const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, `${NY.d.year} 신입`);
+    XLSX.writeFile(wb, `조이코너_신입명단_양식_${NY.d.year}.xlsx`);
+    toast('양식을 내려받았어요. 예시 줄은 지우고 채워 주세요');
+  } catch (e) { toast(e.message || '양식을 만들지 못했어요'); }
+}
+function normBirth(v, XLSX) {
+  if (v === undefined || v === null || v === '') return '';
+  if (typeof v === 'number' && XLSX && XLSX.SSF) { const p = XLSX.SSF.parse_date_code(v); if (p) return `${p.y}-${pad(p.m)}-${pad(p.d)}`; }
+  if (v instanceof Date) return ymd(v);
+  const s = String(v).trim(), m = s.match(/(\d{4})\D*(\d{1,2})\D*(\d{1,2})/);
+  if (m) return `${m[1]}-${pad(Number(m[2]))}-${pad(Number(m[3]))}`;
+  const m2 = s.match(/^(\d{2})(\d{2})(\d{2})$/); if (m2) return `20${m2[1]}-${m2[2]}-${m2[3]}`;
+  return '';
+}
+async function nyIncFile(file) {
+  try {
+    const XLSX = await loadXLSX();
+    const wb = XLSX.read(await file.arrayBuffer(), { type: 'array', cellDates: false });
+    const rows = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1, defval: '' });
+    const head = (rows[0] || []).map(h => String(h).replace(/\s|\(.*\)/g, ''));
+    const at = key => head.findIndex(h => h.startsWith(key));
+    const ix = { name: at('이름'), birth: at('생일'), g: at('성별'), fa: at('아버지') >= 0 && head[at('아버지')] === '아버지' ? at('아버지') : head.indexOf('아버지'), mo: head.indexOf('어머니'), cell: head.indexOf('셀'), ft: head.indexOf('아버지연락처'), mt: head.indexOf('어머니연락처'), note: head.indexOf('메모'), from: head.indexOf('어디서') };
+    if (ix.name < 0) return toast('첫 줄에 "이름" 칸이 있는 양식으로 올려 주세요');
+    const y = NY.d.year, have = new Set((NY.inc || []).map(z => `${z.name}|${z.birth || ''}`));
+    let add = 0, skip = 0; const b = writeBatch(db);
+    for (const r of rows.slice(1)) {
+      const name = String(r[ix.name] || '').trim(); if (!name || name.startsWith('(예)')) continue;
+      const birth = ix.birth >= 0 ? normBirth(r[ix.birth], XLSX) : '', key = `${name}|${birth}`;
+      if (have.has(key)) { skip++; continue; } have.add(key);
+      const g = ix.g >= 0 ? String(r[ix.g]).trim() : '', cell = c => c >= 0 ? String(r[c] || '').trim() : '';
+      const data = { year: y, name, birth, birthYear: birth ? Number(birth.slice(0, 4)) : null, gender: /남|m/i.test(g) ? '남' : /여|f/i.test(g) ? '여' : '', father: cell(ix.fa), mother: cell(ix.mo), cell: cell(ix.cell), fatherTel: cell(ix.ft), motherTel: cell(ix.mt), note: cell(ix.note), from: cell(ix.from) || '조이베이비', at: new Date().toISOString(), by: S.me.email };
+      const ref = doc(collection(db, 'incoming')); b.set(ref, data); NY.inc.push({ id: ref.id, ...data }); add++;
+      if (add >= 400) break;
+    }
+    if (add) await b.commit();
+    toast(`${add}명을 넣었어요${skip ? ` · 이미 있는 ${skip}명은 건너뛰었어요` : ''}`); paint();
+  } catch (e) { toast('엑셀을 읽지 못했어요: ' + (e.message || e)); }
+}
+
+/* ---------- 선생님 반 고르기 ---------- */
+function nyStaffSheet(id) {
+  const st = S.staff.find(x => x.id === id); if (!st) return;
+  const f = nyStaffFinal(st), cls = nyCls(), now = { classes: st.classes || [], classRole: st.classRole || {} };
+  sheet(`<div class="ttl" style="font-size:22px">${esc(st.name)} 선생님 · ${NY.d.year}년 반</div>
+<div class="sub">지금: ${now.classes.length ? now.classes.map(c => `${esc(clsName(c))}${(now.classRole[c] || '') === '담임' ? '(담임)' : ''}`).join(' · ') : '반 없음'}</div>
+<div class="nysr">${cls.map(c => { const v = f.classes.includes(c.id) ? ((f.classRole || {})[c.id] === '담임' ? '담임' : '보조') : ''; return `<div class="nysrow"><b style="color:${clsCol(c.id)}">${esc(c.name)}</b><div class="nyseg3" data-cls="${c.id}">${[['', '안 함'], ['보조', '보조'], ['담임', '담임']].map(([v2, l]) => `<button type="button" class="${v === v2 ? 'on ' + (v2 === '담임' ? 'up' : v2 ? 'stay' : 'left') : ''}" data-act="nySr" data-id="${c.id}" data-v="${v2}">${l}</button>`).join('')}</div></div>`; }).join('')}</div>
+<div class="btns"><button class="pri" data-act="nyStaffSave" data-id="${st.id}">정하기</button>${NY.d.staff[st.id] ? `<button class="sec" data-act="nyStaffReset" data-id="${st.id}">처음대로</button>` : '<button class="sec" data-act="sheetClose">취소</button>'}</div>`);
+}
+function nyAddSheet(c) {
+  const list = S.staff.filter(st => !nyStaffFinal(st).classes.includes(c)).sort((a, b) => (nyStaffFinal(a).classes.length - nyStaffFinal(b).classes.length) || ko(a.name, b.name));
+  sheet(`<div class="ttl" style="font-size:22px">${esc(clsName(c))}에 선생님 더하기</div><div class="sub">누르면 ${esc(clsName(c))} 보조로 들어가요. 반이 없는 선생님이 먼저 보여요.</div>
+<div class="nytcs">${list.map(st => `<button class="nytc" data-act="nyAddPick" data-id="${st.id}" data-c="${c}">${staffAv(st, 24)}<span>${esc(st.name)}</span>${nyStaffFinal(st).classes.length ? `<small>${esc(nyStaffFinal(st).classes.map(clsName).join('·'))}</small>` : '<small>반 없음</small>'}</button>`).join('') || '<div class="sub">더할 선생님이 없어요.</div>'}</div>
+<div class="btns"><button class="sec" data-act="sheetClose">닫기</button></div>`);
+}
+
+/* ---------- 백업 · 시작 · 되돌리기 ---------- */
+async function nyBackup() {
+  NY.busy = '백업 파일을 만드는 중…'; paint();
+  const out = { kind: 'backup', app: '조이코너 노트', version: APP_VERSION, note: `${NY.d.year} 새 학년 시작 전`, at: new Date().toISOString(), by: S.me.email, collections: {} };
+  let n = 0;
+  for (const name of ['classes', 'staff', 'teachers', 'children', 'families', 'incoming', 'promotions', 'attendance', 'careNotes', 'gradContacts']) {
+    try { const s = await getDocs(collection(db, name)); const m = {}; s.docs.forEach(x => { m[x.id] = x.data(); n++; }); out.collections[name] = m; } catch { out.collections[name] = { _error: '권한이 없어 빠졌어요' }; }
+  }
+  const blob = new Blob([JSON.stringify(out)], { type: 'application/json' });
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `조이코너_새학년전_백업_${ymd(new Date())}.json`;
+  document.body.appendChild(a); a.click(); a.remove();
+  NY.d.backupAt = new Date().toISOString(); NY.busy = ''; nySave(true);
+  toast(`${n}건을 내려받았어요. 컴퓨터나 드라이브에 보관해 주세요`); usageAct('backup'); paint();
+}
+async function nyRun() {
+  if (!isDirectorMe()) return toast('시작은 디렉터만 할 수 있어요');
+  const d = NY.d, y = Number(d.year), prevY = y - 1, eff = d.effective, now = new Date().toISOString();
+  if (!eff || !nyWindow().ok) return toast(nyWindow().msg);
+  closeSheet(); NY.busy = '확인하는 중…'; paint();
+  try {
+    const fresh = await getDoc(doc(db, 'promotions', String(y)));
+    if (fresh.exists() && ['running', 'done'].includes(fresh.data().status)) { NY.busy = ''; NY.ok = false; toast('이미 시작했어요 — 다시 불러올게요'); return nyLoad(); }
+    await loadFamsAll();
+    const P = nyPlan();
+    const undo = { kids: {}, newKids: [], fams: {}, newFams: [], gradFams: [], inc: [], staff: {}, teachers: [], photos: {}, notes: {} };  // Firestore는 배열 안 배열을 못 담아서 지도(map)로
+    const ops = [], after = {}, nv = v => v === undefined ? null : v;
+    NY.busy = '사진 · 돌봄 기록을 찾는 중…'; paint();
+    await Promise.all(P.rows.filter(r => r.act === 'up').map(async r => {
+      await Promise.all(['main', '1', '2'].map(async s => { try { if ((await getDoc(doc(db, 'photos', `${r.k.id}_${s}`))).exists()) { ops.push(['m', doc(db, 'photos', `${r.k.id}_${s}`), { classId: r.to }]); undo.photos[`${r.k.id}_${s}`] = r.from; } } catch { /* 없음 */ } }));
+      try { const ns = await getDocs(query(collection(db, 'careNotes'), where('classId', '==', r.from), where('childId', '==', r.k.id))); ns.docs.forEach(x => { ops.push(['m', doc(db, 'careNotes', x.id), { classId: r.to }]); undo.notes[x.id] = r.from; }); } catch { /* 없음 */ }
+    }));
+    for (const r of P.rows) {
+      const k = r.k;
+      undo.kids[k.id] = { classId: k.classId, status: k.status || 'active', years: nv(k.years), classSince: nv(k.classSince), gradYear: nv(k.gradYear), gradTo: nv(k.gradTo), gradAt: nv(k.gradAt), gradMemo: nv(k.gradMemo), pausedAt: nv(k.pausedAt) };
+      const Y = { ...(k.years || {}) }; Y[prevY] = r.from;
+      let patch;
+      if (r.act === 'up') { Y[y] = r.to; patch = { classId: r.to, years: Y, classSince: eff }; }
+      else if (r.act === 'stay') { Y[y] = r.from; patch = { years: Y }; }
+      else if (r.act === 'left') patch = { status: 'paused', years: Y, pausedAt: eff };
+      else patch = { status: 'graduated', years: Y, gradYear: prevY, gradTo: d.gradTo || '', gradAt: eff, gradMemo: d.memo[k.id] || '' };
+      ops.push(['u', doc(db, 'children', k.id), patch]);
+      after[k.id] = { familyId: k.familyId, status: patch.status || 'active', classId: patch.classId || k.classId };
+    }
+    const famNew = {}, addTo = {};
+    for (const ir of P.incRows.filter(r => !r.skip)) {
+      const x = ir.x, kidRef = doc(collection(db, 'children')), to = ir.to;
+      let famId = d.sib[x.id] && d.sib[x.id] !== 'no' && S.fam[d.sib[x.id]] ? d.sib[x.id] : null;
+      if (famId) (addTo[famId] ||= []).push(kidRef.id);
+      else { const fr = doc(collection(db, 'families')); famId = fr.id; famNew[famId] = { father: x.father || '', mother: x.mother || '', fatherCell: x.cell || '', motherCell: x.cell || '', fatherTel: x.fatherTel || '', motherTel: x.motherTel || '', siblings: [], childIds: [kidRef.id], classIds: [to] }; undo.newFams.push(famId); }
+      const by = x.birthYear || (x.birth ? Number(String(x.birth).slice(0, 4)) : null);
+      const kid = { classId: to, name: x.name, birth: x.birth || '', birthYear: by || null, gender: x.gender === '남' || x.gender === 'm' ? 'm' : x.gender === '여' || x.gender === 'f' ? 'f' : '', status: 'active', familyId: famId, flags: ['신입'], remark: x.note || '', note: `${y}년 ${x.from || '신입'}에서 왔어요`, thumb: '', since: eff, years: { [y]: to }, classSince: eff };
+      ops.push(['s', kidRef, kid]); undo.newKids.push(kidRef.id);
+      ops.push(['m', doc(db, 'incoming', x.id), { added: true, childId: kidRef.id }]); undo.inc.push(x.id);
+      after[kidRef.id] = { familyId: famId, status: 'active', classId: to, isNew: true };
+    }
+    // 가정: 반 목록 · 새 동생 · 졸업 가정 연락처
+    const famKids = {};
+    allKids().forEach(k => { if (!k.familyId) return; (famKids[k.familyId] ||= []).push(after[k.id] || { status: k.status || 'active', classId: k.classId }); });
+    Object.values(after).filter(a => a.isNew && a.familyId).forEach(a => { (famKids[a.familyId] ||= []).push(a); });
+    for (const [fid, list] of Object.entries(famKids)) {
+      if (famNew[fid]) continue;
+      const f = S.fam[fid]; if (!f) continue;
+      const cids = [...new Set(list.filter(a => a.status === 'active').map(a => a.classId))].sort(), patch = {};
+      if (cids.length && JSON.stringify((f.classIds || []).slice().sort()) !== JSON.stringify(cids)) patch.classIds = cids;
+      if (addTo[fid]) patch.childIds = [...new Set([...(f.childIds || []), ...addTo[fid]])];
+      const gradNow = Object.values(after).some(a => a.familyId === fid && a.status === 'graduated');
+      if (!cids.length && gradNow && (f.fatherTel || f.motherTel || Object.values(f.phones || {}).some(Boolean))) {
+        ops.push(['s', doc(db, 'gradContacts', fid), { fatherTel: f.fatherTel || '', motherTel: f.motherTel || '', phones: f.phones || {}, year: prevY, at: now }]);
+        Object.assign(patch, { fatherTel: '', motherTel: '', phones: {} }); undo.gradFams.push(fid);
+      }
+      if (Object.keys(patch).length) { undo.fams[fid] = { childIds: f.childIds || [], classIds: f.classIds || [] }; ops.push(['u', doc(db, 'families', fid), patch]); }
+    }
+    Object.entries(famNew).forEach(([fid, fd]) => ops.push(['s', doc(db, 'families', fid), fd]));
+    // 선생님 반 배정
+    const staffOps = [], skipped = [];
+    for (const st of S.staff) {
+      const fin = nyStaffFinal(st), cur = { classes: st.classes || [], classRole: st.classRole || {} };
+      if (sameStaff(fin, cur)) continue;
+      if (!canEditStaff(st)) { skipped.push(st.name); continue; }
+      const role = {}; fin.classes.forEach(c => { role[c] = (fin.classRole || {})[c] === '담임' ? '담임' : '보조'; });
+      undo.staff[st.id] = cur; staffOps.push([doc(db, 'staff', st.id), { classes: fin.classes, classRole: role }]);
+      if (st.email) undo.teachers.push({ em: st.email, from: cur.classes, to: fin.classes });
+    }
+    const counts = { grad: P.grad, stay: P.stay, up: P.up, left: P.left, added: P.add, staff: staffOps.length };
+    const rec = { ...nyFields(d), status: 'running', at: now, by: S.me.email, byName: myName(), counts, undo, undoUntil: addDays(ymd(new Date()), 14), skippedStaff: skipped };
+    await setDoc(doc(db, 'promotions', String(y)), rec);
+    for (let i = 0; i < ops.length; i += 400) {
+      NY.busy = `바꾸는 중… ${Math.round(i / ops.length * 100)}%`; paint();
+      const b = writeBatch(db);
+      ops.slice(i, i + 400).forEach(([t, r, x]) => { if (t === 'u') b.update(r, x); else if (t === 'm') b.set(r, x, { merge: true }); else b.set(r, x); });
+      await b.commit();
+    }
+    let staffError = '';
+    if (staffOps.length) { try { const b = writeBatch(db); staffOps.forEach(([r, x]) => b.update(r, x)); await b.commit(); } catch (e) { staffError = errMsg(e); } }
+    undo.teachers.forEach(v => { setDoc(doc(db, 'teachers', v.em), { classes: v.to }, { merge: true }).catch(() => { }); });
+    await setDoc(doc(db, 'promotions', String(y)), { status: 'done', doneAt: new Date().toISOString(), ...(staffError ? { staffError, undo: { ...undo, staff: {}, teachers: [] } } : {}) }, { merge: true });
+    if (d.push !== false) { try { await setDoc(doc(collection(db, 'pushQueue')), { kind: 'newyear', ref: String(y), title: `${y} 새 학년이 시작됐어요!`, body: '우리 반 친구들을 확인해 주세요', url: './#/home', tag: 'newyear', by: S.me.email, byName: myName(), at: new Date().toISOString(), status: 'wait' }); } catch { /* 알림은 못 보내도 괜찮아요 */ } }
+    usageAct('newyear');
+    NY.busy = '새로 불러오는 중…'; paint();
+    await loadAll(); await prmLoad(); NY.ok = false; NY.busy = '';
+    toast(`${y} 새 학년이 시작됐어요!`); go('newyear');
+  } catch (e) { NY.busy = ''; toast('중간에 멈췄어요: ' + errMsg(e)); NY.ok = false; nyLoad(); }
+}
+async function nyUndo() {
+  if (!isDirectorMe()) return toast('되돌리기는 디렉터만 할 수 있어요');
+  const y = String(NY.d.year); closeSheet(); NY.busy = '되돌리는 중…'; paint();
+  try {
+    const p = (await getDoc(doc(db, 'promotions', y))).data() || {}, u = p.undo || {}, del = deleteField(), nz = v => v === null || v === undefined ? del : v;
+    await loadAll(); await loadFamsAll();
+    const ops = [], kidIds = new Set(allKids().map(k => k.id));
+    let inc = []; try { inc = (await getDocs(collection(db, 'incoming'))).docs.map(x => x.id); } catch { /* 권한 */ }
+    for (const [id, o] of Object.entries(u.kids || {})) if (kidIds.has(id)) {
+      ops.push(['m', doc(db, 'children', id), { years: del }]);
+      ops.push(['m', doc(db, 'children', id), { classId: o.classId, status: o.status || 'active', years: nz(o.years), classSince: nz(o.classSince), gradYear: nz(o.gradYear), gradTo: nz(o.gradTo), gradAt: nz(o.gradAt), gradMemo: nz(o.gradMemo), pausedAt: nz(o.pausedAt) }]);
+    }
+    (u.newKids || []).forEach(id => ops.push(['d', doc(db, 'children', id)]));
+    (u.newFams || []).forEach(id => ops.push(['d', doc(db, 'families', id)]));
+    for (const [id, o] of Object.entries(u.fams || {})) if (S.fam[id]) ops.push(['u', doc(db, 'families', id), { childIds: o.childIds || [], classIds: o.classIds || [] }]);
+    for (const id of u.gradFams || []) { try { const g = await getDoc(doc(db, 'gradContacts', id)); if (g.exists() && S.fam[id]) { const x = g.data(); ops.push(['u', doc(db, 'families', id), { fatherTel: x.fatherTel || '', motherTel: x.motherTel || '', phones: x.phones || {} }]); ops.push(['d', doc(db, 'gradContacts', id)]); delete GRC[id]; } } catch { /* 없음 */ } }
+    (u.inc || []).filter(id => inc.includes(id)).forEach(id => ops.push(['u', doc(db, 'incoming', id), { added: false, childId: del }]));
+    await Promise.all([...Object.entries(u.photos || {}).map(([id, from]) => ['photos', id, from]), ...Object.entries(u.notes || {}).map(([id, from]) => ['careNotes', id, from])].map(async ([cn, id, from]) => { try { if ((await getDoc(doc(db, cn, id))).exists()) ops.push(['m', doc(db, cn, id), { classId: from }]); } catch { /* 없음 */ } }));
+    for (let i = 0; i < ops.length; i += 400) {
+      const b = writeBatch(db);
+      ops.slice(i, i + 400).forEach(([t, r, x]) => { if (t === 'u') b.update(r, x); else if (t === 'm') b.set(r, x, { merge: true }); else if (t === 'd') b.delete(r); });
+      await b.commit();
+    }
+    const all = [...S.staff, ...(S.staffLeft || []), ...(S.staffTrash || [])];
+    const sOps = Object.entries(u.staff || {}).filter(([id]) => all.some(x => x.id === id));
+    if (sOps.length) { try { const b = writeBatch(db); sOps.forEach(([id, o]) => b.update(doc(db, 'staff', id), { classes: o.classes || [], classRole: o.classRole || {} })); await b.commit(); } catch (e) { toast('선생님 반 배정은 되돌리지 못했어요: ' + errMsg(e)); } }
+    (Array.isArray(u.teachers) ? u.teachers : []).forEach(v => { setDoc(doc(db, 'teachers', v.em), { classes: v.from || [] }, { merge: true }).catch(() => { }); });
+    await setDoc(doc(db, 'promotions', y), { status: 'undone', undoneAt: new Date().toISOString(), undoneBy: S.me.email, undoneByName: myName(), undo: del, counts: del, backupAt: '' }, { merge: true });
+    NY.busy = '새로 불러오는 중…'; paint();
+    await loadAll(); await prmLoad(); NY.ok = false; NY.busy = '';
+    toast('시작 전 모습으로 되돌렸어요'); go('newyear');
+  } catch (e) { NY.busy = ''; toast('되돌리지 못했어요: ' + errMsg(e)); paint(); }
+}
+async function grCancel(id) {
+  const k = findKid(id); if (!k) return;
+  const del = deleteField();
+  try {
+    await updateDoc(doc(db, 'children', id), { status: 'active', gradYear: del, gradTo: del, gradAt: del });
+    const g = await getDoc(doc(db, 'gradContacts', k.familyId || '-')).catch(() => null);
+    if (g && g.exists()) { const x = g.data(); await updateDoc(doc(db, 'families', k.familyId), { fatherTel: x.fatherTel || '', motherTel: x.motherTel || '', phones: x.phones || {} }); await deleteDoc(doc(db, 'gradContacts', k.familyId)); delete GRC[k.familyId]; }
+    Object.assign(k, { status: 'active' }); delete k.gradYear; delete k.gradTo; delete k.gradAt;
+    closeSheet(); toast(`${k.name} — 다시 ${clsName(k.classId)}으로 돌아왔어요`); go('grads');
+  } catch (e) { toast('바꾸지 못했어요: ' + errMsg(e)); }
+}
+async function grXlsx(y, withTel) {
+  closeSheet();
+  try {
+    const XLSX = await loadXLSX();
+    const L = allKids().filter(k => k.status === 'graduated' && String(k.gradYear || '연도 모름') === String(y)).sort((a, b) => ko(a.name, b.name));
+    await Promise.all(L.map(k => k.familyId ? loadFam(k.familyId) : null));
+    if (withTel) await Promise.all(L.map(k => loadGradContact(k.familyId)));
+    const head = ['번호', '이름', '생일', '성별', '아버지', '어머니', '셀', '인계 메모', ...(withTel ? ['연락처'] : [])];
+    const rows = L.map((k, i) => { const f = famOf(k), g = GRC[k.familyId]; return [i + 1, k.name, k.birth || '', k.gender === 'm' ? '남' : k.gender === 'f' ? '여' : '', f.father || '', f.mother || '', [f.fatherCell, f.motherCell].filter(Boolean).filter((v, j, a) => a.indexOf(v) === j).join(' · '), k.gradMemo || '', ...(withTel ? [(g ? [g.fatherTel, g.motherTel, ...Object.values(g.phones || {})] : [f.fatherTel, f.motherTel]).filter(Boolean).join(' / ')] : [])]; });
+    const ws = XLSX.utils.aoa_to_sheet([head, ...rows]); ws['!cols'] = head.map((h, i) => ({ wch: [5, 10, 12, 6, 10, 10, 12, 36, 28][i] }));
+    const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, `${y} 졸업`);
+    XLSX.writeFile(wb, `조이코너_${y}학년도_졸업생_인계명단${withTel ? '_연락처포함' : ''}.xlsx`);
+    toast('인계 명단을 내려받았어요');
+  } catch (e) { toast(e.message || '명단을 만들지 못했어요'); }
+}
+
+/* ---------- 지난 학년 요약 (통계) ---------- */
+function prevYearCard(c) {
+  if (!PRM.done.length) return '';
+  const py = Number(PRM.done[PRM.done.length - 1].year) - 1;
+  const ds = recordedAll(c).filter(d => syOf(d) === py), counts = ds.map(d => presentCount(c, d));
+  if (!ds.length) return '';
+  const roster = allKids().filter(k => k.years && k.years[py] === c).length, avg = counts.reduce((s, v) => s + v, 0) / ds.length;
+  return `<section class="card"><div class="lbl"><span>지난 학년 · ${py}학년도 ${esc(clsName(c))}</span><span class="s2">${ds.length}주</span></div><div class="nyprev"><span><b>${Math.round(avg)}</b><small>평균 출석</small></span><span><b>${Math.max(...counts)}</b><small>가장 많이</small></span><span><b>${roster || '-'}</b><small>그해 친구</small></span></div>${sparkSvg(counts, clsCol(c), 300, 46)}<div class="s2">그해 이 반이었던 친구들 기록이에요 (지금은 한 학년씩 올라갔어요).</div></section>`;
+}
+
+/* ---------- 이벤트 ---------- */
+appEl.addEventListener('change', e => {
+  const t = e.target;
+  if (t.id === 'ny_eff') {
+    let v = t.value; if (!v) { NY.d.effective = ''; nySave(); return paint(); }
+    const dd = parseD(v); if (dd.getDay() !== 0) { dd.setDate(dd.getDate() + (7 - dd.getDay()) % 7); v = ymd(dd); toast(`주일로 맞췄어요 · ${fmtMDw(v)}`); }
+    NY.d.effective = v; nySave(); paint();
+  } else if (t.id === 'ny_gto') { NY.d.gradTo = t.value.trim(); nySave(); }
+  else if (t.id === 'ny_push') { NY.d.push = t.checked; nySave(); }
+  else if (t.id === 'nyIncFile' && t.files[0]) { nyIncFile(t.files[0]); t.value = ''; }
+});
+appEl.addEventListener('input', e => {
+  if (e.target.id !== 'gq') return;
+  GR.q = e.target.value.trim();
+  document.querySelectorAll('.nyg').forEach(b => { b.style.display = !GR.q || (b.dataset.nm || '').includes(GR.q) ? '' : 'none'; });
+  document.querySelectorAll('.nyyr').forEach(s => { s.style.display = [...s.querySelectorAll('.nyg')].some(b => b.style.display !== 'none') ? '' : 'none'; });
+});
+const nyTwice = (el, label, fn) => {
+  if (!el || el.dataset.armed === '1') { if (el) el.dataset.armed = ''; return fn(); }
+  el.dataset.lbl0 = el.innerHTML; el.dataset.armed = '1'; el.classList.add('armed'); el.innerHTML = label;
+  clearTimeout(el._dt); el._dt = setTimeout(() => { if (el.dataset.armed === '1') { el.dataset.armed = ''; el.classList.remove('armed'); el.innerHTML = el.dataset.lbl0; } }, 4000);
+};
+Object.assign(ACT, {
+  nyNext: d => { const i = Number(d.id); NY.d.done[i] = true; nySave(); go(i >= 5 ? 'newyear' : `newyear/${i + 1}`); },
+  nyGrad: d => { const cur = NY.d.kid[d.id]; if (cur === 'stay') delete NY.d.kid[d.id]; else NY.d.kid[d.id] = 'stay'; nySave(); paint(); },
+  nyKidSet: d => { if (d.v === 'up') delete NY.d.kid[d.id]; else NY.d.kid[d.id] = d.v; nySave(); closeSheet(); paint(); },
+  nyKidSheet: d => {
+    const k = findKid(d.id); if (!k) return; const r = nyPlan().rows.find(x => x.k.id === k.id); if (!r) return;
+    const nx = r.to && r.act === 'up' ? r.to : nyPlan().cls[nyPlan().cls.findIndex(c => c.id === r.from) + 1]?.id;
+    sheet(`<div class="ttl" style="font-size:22px">${esc(k.name)} · ${NY.d.year}년</div><div class="sub">지금 ${esc(clsName(r.from))}${streak(r.from, k) >= 2 ? ` · ${streak(r.from, k)}주째 못 왔어요` : ''}${isMK(k) ? ' · 선교사 자녀' : ''}</div>
+<div class="nyseg3 big">${[['up', `${clsName(nx)}으로`], ['stay', '그대로'], ['left', '쉬는 친구로']].map(([v, l]) => `<button class="${r.act === v ? 'on ' + v : ''}" data-act="nyKidSet" data-id="${k.id}" data-v="${v}">${esc(l)}</button>`).join('')}</div>
+<div class="s2">'쉬는 친구로'는 친구들 화면의 '함께하지 않는 친구'로 가요. 기록은 남아요.</div><div class="btns"><button class="sec" data-act="sheetClose">닫기</button></div>`);
+  },
+  nyMemo: d => {
+    const G = nyPlan().rows.filter(r => r.last && r.act === 'grad'), id = d.id || (G[0] && G[0].k.id); if (!id) return toast('졸업할 친구가 없어요');
+    sheet(`<div class="ttl" style="font-size:22px">한 줄 인계 메모</div><label class="fld">친구<select class="in" id="nm_kid">${G.map(r => `<option value="${r.k.id}" ${r.k.id === id ? 'selected' : ''}>${esc(r.k.name)}</option>`).join('')}</select></label>
+<label class="fld">${esc(NY.d.gradTo || '다음 부서')} 선생님께<textarea id="nm_text" maxlength="120" placeholder="예: 처음 가는 곳은 엄마 손 잡고 들어가면 금방 웃어요">${esc(NY.d.memo[id] || '')}</textarea></label>
+<div class="btns"><button class="pri" data-act="nyMemoSave">저장</button><button class="sec" data-act="sheetClose">취소</button></div>`);
+    $('#nm_kid').addEventListener('change', ev => { $('#nm_text').value = NY.d.memo[ev.target.value] || ''; });
+  },
+  nyMemoSave: () => { const id = val('nm_kid'), t = ($('#nm_text').value || '').trim(); if (t) NY.d.memo[id] = t; else delete NY.d.memo[id]; nySave(); closeSheet(); paint(); },
+  nySib: d => { if (d.v === '') delete NY.d.sib[d.id]; else NY.d.sib[d.id] = d.v; nySave(); paint(); },
+  nyIncSheet: d => nyIncSheet(d.id),
+  nyIncSave: d => nyIncSave(d.id),
+  nyIncSkip: d => { if (NY.d.skipInc[d.id]) delete NY.d.skipInc[d.id]; else NY.d.skipInc[d.id] = true; nySave(); closeSheet(); paint(); },
+  nyIncDel: async (d, el) => nyTwice(el, '한 번 더 누르면 지워요', async () => { try { await deleteDoc(doc(db, 'incoming', d.id)); NY.inc = NY.inc.filter(x => x.id !== d.id); delete NY.d.skipInc[d.id]; delete NY.d.sib[d.id]; delete NY.d.incCls[d.id]; nySave(); closeSheet(); toast('명단에서 지웠어요'); paint(); } catch (e) { toast('지우지 못했어요: ' + errMsg(e)); } }),
+  nyIncTpl: () => nyIncTpl(),
+  nyMode: d => { const had = Object.keys(NY.d.staff).length; NY.d.staffMode = d.id; NY.d.staff = {}; nySave(); paint(); if (had) setTimeout(() => toast('한 분씩 바꾼 것은 처음대로 돌렸어요'), 300); },
+  nyStaffSheet: d => nyStaffSheet(d.id),
+  nySr: (d, el) => { el.parentElement.querySelectorAll('button').forEach(b => { b.className = ''; }); el.className = 'on ' + (d.v === '담임' ? 'up' : d.v ? 'stay' : 'left'); },
+  nyStaffSave: d => {
+    const st = S.staff.find(x => x.id === d.id); if (!st) return;
+    const classes = [], classRole = {};
+    document.querySelectorAll('#sheet .nyseg3[data-cls]').forEach(g => { const on = g.querySelector('button.on'); const v = on ? on.dataset.v : ''; if (v) { classes.push(g.dataset.cls); classRole[g.dataset.cls] = v; } });
+    const f = { classes, classRole };
+    if (sameStaff(f, nyStaffBase(st))) delete NY.d.staff[st.id]; else NY.d.staff[st.id] = f;
+    nySave(); closeSheet(); paint();
+  },
+  nyStaffReset: d => { delete NY.d.staff[d.id]; nySave(); closeSheet(); paint(); },
+  nyAddSheet: d => nyAddSheet(d.id),
+  nyAddPick: d => { const st = S.staff.find(x => x.id === d.id); if (!st) return; const f = nyStaffFinal(st); NY.d.staff[st.id] = { classes: [...new Set([...f.classes, d.c])], classRole: { ...(f.classRole || {}), [d.c]: '보조' } }; nySave(); closeSheet(); paint(); },
+  nyBackup: () => nyBackup(),
+  nyRunAsk: () => {
+    const P = nyPlan(), d = NY.d;
+    sheet(`<div class="ttl" style="font-size:24px">${d.year} 새 학년을 시작할까요?</div>
+<div class="sub">기준 주일 <b>${fmtMDw(d.effective)}</b>부터 새 반으로 출석해요.</div>
+<div class="nychk"><div class="nyck"><i>${svg(ICON.check, 13, 3.2)}</i><span>졸업 ${P.grad}명 → 졸업생 서랍장${P.stay ? ` · 한 해 더 ${P.stay}` : ''}</span></div><div class="nyck"><i>${svg(ICON.check, 13, 3.2)}</i><span>진급 ${P.up}명${P.left ? ` · 쉬는 친구로 ${P.left}` : ''}</span></div><div class="nyck"><i>${svg(ICON.check, 13, 3.2)}</i><span>신입 ${P.add}명</span></div><div class="nyck"><i>${svg(ICON.check, 13, 3.2)}</i><span>선생님 반 배정 바꾸기 · 알림 ${d.push !== false ? '보내기' : '안 보내기'}</span></div></div>
+<div class="s2">${fmtMDs(addDays(ymd(new Date()), 14))}까지 되돌릴 수 있어요. 끝날 때까지 창을 닫지 말아 주세요.</div>
+<div class="btns"><button class="pri" data-act="nyRun">시작하기</button><button class="sec" data-act="sheetClose">아직이요</button></div>`);
+  },
+  nyRun: (d, el) => nyTwice(el, '한 번 더 누르면 시작해요', () => nyRun()),
+  nyUndoAsk: () => sheet(`<div class="ttl" style="font-size:24px">${NY.d.year} 새 학년 시작을 되돌릴까요?</div><div class="sub">아이들 반 · 졸업 · 신입 등록 · 가정 · 선생님 반 배정이 시작 전 모습으로 돌아가요. 새로 들어온 신입 친구 카드는 지워지고 신입 명단으로 돌아가요 (그동안 붙인 사진 · 기록도 함께 지워져요). 새 학년에 부른 출석은 남아요.</div>
+<div class="btns"><button class="pri" data-act="nyUndo">되돌리기</button><button class="sec" data-act="sheetClose">아니요</button></div>`),
+  nyUndo: (d, el) => nyTwice(el, '한 번 더 누르면 되돌려요', () => nyUndo()),
+  nyHide: () => { lsSet('jc_nyhide', addDays(ymd(new Date()), 7)); paint(); },
+  grXlsx: d => sheet(`<div class="ttl" style="font-size:22px">${esc(d.id)}학년도 졸업생 인계 명단</div><div class="sub">이름 · 생일 · 성별 · 부모님 · 셀 · 인계 메모가 들어가요. 연락처는 꼭 필요할 때만 넣어 주세요. 받은 파일은 깃허브에 올리지 마세요.</div><div class="btns"><button class="pri" data-act="grXlsxGo" data-id="${esc(d.id)}" data-v="0">연락처 빼고</button><button class="sec" data-act="grXlsxGo" data-id="${esc(d.id)}" data-v="1">연락처까지</button></div>`),
+  grXlsxGo: d => grXlsx(d.id, d.v === '1'),
+  grCancelAsk: d => { const k = findKid(d.id); if (!k) return; sheet(`<div class="ttl" style="font-size:22px">${esc(k.name)} 졸업을 취소할까요?</div><div class="sub">다시 ${esc(clsName(k.classId))} 친구가 돼요. 졸업 가정으로 옮겨 둔 연락처도 돌아와요.</div><div class="btns"><button class="pri" data-act="grCancel" data-id="${k.id}">졸업 취소</button><button class="sec" data-act="sheetClose">아니요</button></div>`); },
+  grCancel: (d, el) => nyTwice(el, '한 번 더 누르면 바꿔요', () => grCancel(d.id))
+});
+VIEWS.newyear = vNewYear; VIEWS.promote = vNewYear; VIEWS.grads = vGrads; VIEWS.grad = vGrad;
+Object.assign(SCREEN_NAME, { newyear: '새 학년 준비', grads: '졸업생 서랍장', grad: '졸업생 카드' });
+Object.assign(ACT_NAME, { newyear: '새 학년 시작' });
