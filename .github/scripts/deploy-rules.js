@@ -14,11 +14,11 @@ const admin = require('firebase-admin');
   const norm = s => String(s || '').replace(/\r/g, '').trim();
   const same = (live.source || []).some(f => norm(f.content) === norm(src));
   const line = `${same ? '✅ 게시 완료' : '❌ 게시된 규칙이 파일과 달라요'} · ${sa.project_id} · ${rs.name} · ${rs.createTime}`;
-  console.log(line);
+  console.log(`::${same ? 'notice' : 'error'} title=보안 규칙::${line}`);
   if (process.env.GITHUB_STEP_SUMMARY) fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, `### 조이코너 보안 규칙\n${line}\n`);
   if (!same) process.exit(1);
 })().catch(e => {
-  console.error('❌ 게시 실패:', e && (e.message || e));
+  console.log(`::error title=보안 규칙::❌ 게시 실패: ${String(e && (e.message || e)).replace(/\n/g, ' ')}`);
   if (process.env.GITHUB_STEP_SUMMARY) fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, `### 조이코너 보안 규칙\n❌ 게시 실패: ${e && (e.message || e)}\n`);
   process.exit(1);
 });
