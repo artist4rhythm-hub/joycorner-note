@@ -177,7 +177,7 @@ function vHomeClass() {
   const nextS = S.schedule.find(x => x.date >= todayStr && !x.noService) || S.schedule[S.schedule.length - 1];
   const diff = nextS ? Math.round((parseD(nextS.date) - parseD(todayStr)) / 86400000) : 99;
   const care = careList(c).slice(0, 6), bdays = upcomingBirthdays(c).slice(0, 4);
-  return `<div class="scroll cols">${header}${homeModeSeg()}${iosOtherNote()}${holBanner()}${gcalBanner()}${nyHomeCard()}${classChips()}
+  return `<div class="scroll cols">${header}${homeModeSeg()}${iosOtherNote()}${holBanner()}${gcalBanner()}${nyHomeCard()}${sfHomeCard(S.cur)}${classChips()}
 <section class="card"><div class="rowtop"><div style="display:flex;padding-left:10px">${faces.map(k => `<span style="margin-left:-10px;border:3px solid #fff;border-radius:50%;display:block;line-height:0">${avatar(k, 46)}</span>`).join('')}</div><div><div class="big">${esc(cl.name)}</div><div class="sub">친구 ${kids.length}명</div></div></div>
 <div class="chips">${(() => { const cs = classStaff(c); const h = cs.homeroom.map(n => `<span class="chip">담임 ${esc(n)}</span>`).join('') + cs.assistants.map(n => `<span class="chip">${esc(n)}</span>`).join(''); return h || (S.me.role === 'admin' ? `<button class="chip dashed" data-act="go" data-to="settings">+ 교사 명단에서 정해 주세요</button>` : '<span class="chip">담임 미정</span>'); })()}</div>
 <button class="cta" data-act="go" data-to="attend">${svg(ICON.checkc, 28, 2.4)}출석 시작하기</button></section>
@@ -203,7 +203,7 @@ function vAttend() {
 <div class="scroll" style="padding-top:8px">${classChips()}
 <div class="story">${syPast(d) ? `<b class="nypast">${syOf(d)}학년도 출석부 · 그해 친구들이에요</b> ` : ''}${sch ? (sch.noService ? '이 주일은 조이코너 예배가 없어요' : '오늘의 이야기 · ' + esc(sch.story || '')) : ''}${S.pending ? ' · 인터넷이 연결되면 저절로 올라가요' : ''}</div>
 ${attLockBar(n, kids.length)}
-<div class="grid ${attLocked() ? 'locked' : ''}">${kids.map(k => { const on = marks[k.id] === 'p'; return `<button class="kid ${on ? 'on' : ''} ${k.gender ? 'g-' + k.gender : ''}" data-act="toggle" data-id="${k.id}" aria-pressed="${on}"><span class="stamp">${svg(ICON.check, 18, 3)}</span><span class="kav">${avatar(k, 84)}</span><b class="nm">${esc(k.name)}${genderMark(k)}</b><span class="st">${on ? '왔어요' : '아직'}</span></button>`; }).join('')}</div>
+<div class="grid ${attLocked() ? 'locked' : ''}">${kids.map(k => { const on = marks[k.id] === 'p'; return `<button class="kid ${on ? 'on' : ''} ${k.gender ? 'g-' + k.gender : ''}" data-act="toggle" data-id="${k.id}" aria-pressed="${on}"><span class="stamp">${svg(ICON.check, 18, 3)}</span>${sfBadge(k)}<span class="kav">${avatar(k, 84)}</span><b class="nm">${esc(k.name)}${genderMark(k)}</b><span class="st">${on ? '왔어요' : '아직'}</span></button>`; }).join('')}</div>
 <button class="addkid" data-act="addKid">+ 새로 온 친구 등록</button><button class="ghost" data-act="go" data-to="stats">출석 통계 보기</button></div>${nav('attend')}`;
 }
 function ensureAttWatch() {
@@ -240,7 +240,7 @@ function vFriends() {
   const kids = activeKids(c), arch = (S.kids[c] || []).filter(k => (k.status || 'active') !== 'active' && k.status !== 'graduated').sort((a, b) => ko(a.name, b.name));
   const row = k => {
     const n = streak(c, k);
-    return `<button class="row" data-act="kid" data-id="${k.id}" data-name="${esc(k.name)}">${avatar(k, 48)}<span class="grow"><span class="nm">${esc(k.name)}</span><span class="sub">${k.birth ? k.birth.replace(/-/g, '.') + ' 생' : '생일 모름'}</span></span><span class="tagbox">${absTag(n)}${kidTags(k)}</span></button>`;
+    return `<button class="row" data-act="kid" data-id="${k.id}" data-name="${esc(k.name)}">${avatar(k, 48)}<span class="grow"><span class="nm">${esc(k.name)}</span><span class="sub">${k.birth ? k.birth.replace(/-/g, '.') + ' 생' : '생일 모름'}</span></span><span class="tagbox">${sfTags(k)}${absTag(n)}${kidTags(k)}</span></button>`;
   };
   const noG = activeKids(c).filter(k => !k.gender).length;
   return `<div class="scroll"><div class="ttl">친구들</div>${classChips()}${noG ? `<button class="gnote" data-act="gBulk">${svg('<circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/>', 18, 1.9)}<span>남자 · 여자 아직 모르는 친구 <b>${noG}명</b></span><span class="chev">정하기 ›</span></button>` : ''}
@@ -280,6 +280,7 @@ function vKid() {
   return `<div class="scroll cols"><div class="hd"><button class="back" data-act="back">← 친구들</button><button class="sec" data-act="editKid" style="min-height:44px">고치기</button></div>
 <div class="rowtop"><div><div class="ttl">${esc(k.name)}</div>${histChips(k)}<div class="sub">${esc(S.classes[c]?.name || '')} · ${k.birth ? k.birth.replace(/-/g, '.') + ' 생' : '생일 모름'}</div></div></div>
 <div class="chips gchips">${genderChip(k)}${absTag(n, true)}${kidTags(k)}${mkChip(k)}${k.status === 'graduated' ? `<button class="chip sm nygc" data-act="go" data-to="grad/${k.id}">${k.gradYear || ''} 졸업 · 서랍장 ›</button>` : ''}<button class="tagedit" data-act="tagSheet">${svg('<path d="M4 20h4L19 9l-4-4L4 16z"/>', 14, 2)}표시 고치기</button></div>
+${sfCard(k)}
 ${k.remark && !TAG_AUTO.includes(k.remark) && !(k.flags || []).includes(k.remark) ? `<div class="note sm">메모 · ${esc(k.remark)}</div>` : ''}
 ${k.note ? `<div class="note">${esc(k.note)}</div>` : ''}
 <div class="photos">${slot('main', 'main', '대표')}${slot('1', '', '추가1')}${slot('2', '', '추가2')}</div>
@@ -606,7 +607,7 @@ const linkify = s => esc(s).replace(/(https?:\/\/[^\s<]+)/g, '<a href="$1" targe
 const isAdminMe = () => S.me.role === 'admin';
 const myName = () => S.me.name || S.user.displayName || '';
 const statusLabel = st => st === 'done' ? '점검 완료' : st === 'review' ? '점검 요청' : '작성 중';
-const errMsg = e => (e && e.code === 'permission-denied') ? '권한이 없어요 (구글 계정이 교사 명단에 연결되어 있어야 해요)' : (e && e.message) || '';
+const errMsg = e => (usageErr(e), (e && e.code === 'permission-denied') ? '권한이 없어요 (구글 계정이 교사 명단에 연결되어 있어야 해요)' : (e && e.message) || '');
 
 async function loadWorship() {
   if (!W.date) W.date = nextSunday();
@@ -759,9 +760,10 @@ async function dutyDel() {
 }
 
 /* ---------- 교사실 (공지 · 캘린더 · 업무 분담 · 조직도 · 통계) ---------- */
-const APP_VERSION = 'v32';
+const APP_VERSION = 'v33';
 const APP_DATE = '2026-11-12';
 const CHANGELOG = [
+  { v: 'v33', date: '11월 18일', items: ['안전 표시 — 알레르기 · 건강 · 귀가 · 행동 주의를 친구 카드에 적으면 출석부 · 친구들에 ! 표시 · 응급 대응 표시', '홈에 안전 주의 친구 카드 · 반별로 모아 보는 화면 (오늘 온 친구 표시)', '사용 현황 새 단장 (수퍼관리자) — 쓰는 선생님 · 오늘/이번 주 · 하루 평균 · 홈 화면 앱 · 최신 버전 · 오류 · 날마다 · 요일×시간 · 기기 · 운영체제 · 브라우저 · 선생님별 · 개선 힌트 · 접속 기록(들어온 · 나간 시각 · 머문 시간 · 본 화면 순서) · CSV', '눈으로 악보 넘기기 개선 — 켤 때 사용 안내 · 내 눈에 맞춰 2초 기준 잡기 · 길게 감기(추천) / 두 번 깜빡 고르기 · 감는 동안 막대 표시 · 두 번째부터 바로 켜짐'] },
   { v: 'v32', date: '11월 15일', items: ['새 학년 준비 (설정 · 홈 카드) — ① 졸업 ② 진급 ③ 신입 ④ 선생님 반 배정 ⑤ 시작, 단계마다 저장 · 디렉터 · 관리자가 함께 준비', '새 학년 기준 주일은 언제든 정해요 (2월 · 3월) · 그 주에 디렉터가 [새 학년 시작] · 14일 안에 되돌리기', '졸업생 서랍장 — 학년도별 · 학년 이력 · 함께한 기록 · 인계 메모 · 모든 선생님이 봐요 (연락처는 디렉터 · 관리자만) · 인계 명단 엑셀', '신입 명단 — 한 명 추가 · 엑셀 양식 받기 · 엑셀 올리기 · 형제 확인 · 이미 있는 친구 알려 주기', '학년 이력 — 반이 바뀌어도 연속 결석 · 출석률 · 최근 출석이 이어져요 · 지난 학년 출석부는 그해 친구들로', '선교사 표시가 있는 친구는 출석은 그대로, 장기 결석 알림 · 돌봄 신호에서 빠져요'] },
   { v: 'v31', date: '11월 14일', items: ['선생님 카드 휴지통 — 지우면 바로 없어지지 않고 휴지통에 들어가요 · [되돌리기]로 원래 자리로 · [완전히 지우기]는 두 번 확인', '교사실 → 선생님 맨 아래 [보관함] — 그만두신 선생님 · 휴지통을 한곳에서 (디렉터 · 관리자)', '선생님 카드 [고치기]와 명단 고치기 창에 [그만두신 선생님으로] [휴지통에 넣기]', '설정 교사 명단에 보관함 바로 가기'] },
   { v: 'v30', date: '11월 14일', items: ['선생님 카드에 구글 메일 (누르면 메일 쓰기) · 메일로도 찾기', '교사실 선생님 탭 [입력 현황 표] — 선생님 · 친구들 정보가 채워졌는지 ✓ 로 한눈에, 채움 % 링 · 빈칸 많은 칸 · 빈칸 많은 순 정렬 · 엑셀로 받기', '친구들 화면에서 [입력 현황 표] 바로 가기'] },
@@ -938,7 +940,7 @@ function openViewer(pages, start) {
   closeViewer(true);
   VW.pages = pages; VW.i = Math.max(0, Math.min(start || 0, pages.length - 1));
   const el = document.createElement('div'); el.className = 'viewer'; el.id = 'viewer';
-  el.innerHTML = `<div class="vtop"><div class="vtitle"><b id="vLab"></b><span id="vSub"></span></div>${pages.some(p => p.coll === 'scorePages') ? `<button class="vbtn" data-v="blink" aria-label="눈 깜빡임으로 넘기기" title="눈 깜빡임으로 넘기기 (실험)">${svg(EYE, 22, 1.8)}</button>` : ''}<button class="vbtn" data-v="close" aria-label="닫기">${svg('<path d="M6 6l12 12M18 6L6 18"/>', 22, 2)}</button></div>
+  el.innerHTML = `<div class="vtop"><div class="vtitle"><b id="vLab"></b><span id="vSub"></span></div>${pages.some(p => p.coll === 'scorePages') ? `<button class="vbtn" data-v="blink" aria-label="눈으로 악보 넘기기" title="눈으로 악보 넘기기">${svg(EYE, 22, 1.8)}</button>` : ''}<button class="vbtn" data-v="close" aria-label="닫기">${svg('<path d="M6 6l12 12M18 6L6 18"/>', 22, 2)}</button></div>
 <div class="vstage" id="vStage"><img id="vImg" alt="" draggable="false"><div class="vedge" id="vEdge"></div></div>
 <div class="vfoot"><span id="vCount"></span><span class="vhelp">옆으로 밀면 넘어가요 · 위아래로 밀거나 가운데를 누르면 닫혀요</span></div><div class="vcam" id="vCam" hidden></div>`;
   document.body.appendChild(el); VW.el = el;
@@ -1032,66 +1034,144 @@ function bindGestures(st) {
   st.addEventListener('wheel', e => { if (!e.ctrlKey) return; e.preventDefault(); VW.scale = Math.min(4, Math.max(1, VW.scale * (e.deltaY < 0 ? 1.1 : 0.9))); if (VW.scale === 1) VW.tx = VW.ty = 0; applyT(); }, { passive: false });
 }
 
-/* 눈 깜빡임으로 넘기기 (실험) — 영상은 휴대폰 안에서만 쓰고 어디에도 보내지 않아요 */
+/* 눈으로 악보 넘기기 (v33) — 영상은 이 기기 안에서만 쓰고 저장하거나 보내지 않아요 */
+const BLK = { lm: null, loading: null, mode: (() => { try { return localStorage.getItem('jc_blinkmode') || 'long'; } catch { return 'long'; } })() };
+const BLK_LONG = 600, BLK_MAX = 2200;
+const blkModeTxt = () => BLK.mode === 'double'
+  ? '<b>빠르게 두 번 깜빡</b> → 다음 장 · <b>세 번</b> → 이전 장'
+  : '<b>눈을 1초쯤 꼭 감았다 뜨면</b> → 다음 장 (아래 막대가 다 차면 떠요)';
+const blkHint = () => BLK.mode === 'double' ? '두 번 깜빡 → 다음 · 세 번 → 이전' : '눈을 꼭 감았다 뜨면 → 다음 장';
+function blinkGuide() {
+  if (!VW.el) return;
+  const old = VW.el.querySelector('#vGuide'); if (old) old.remove();
+  const g = document.createElement('div'); g.className = 'vguide'; g.id = 'vGuide';
+  const offNow = lsGet('jc_blinkguide_off') === '1';
+  g.innerHTML = `<div class="vgbox" role="dialog" aria-modal="true">
+<div class="vgt">${svg(EYE, 26, 1.8)}<span>눈으로 악보 넘기기</span></div>
+<div class="vgseg"><button type="button" data-g="long" class="${BLK.mode !== 'double' ? 'on' : ''}">길게 감기 <small>추천</small></button><button type="button" data-g="double" class="${BLK.mode === 'double' ? 'on' : ''}">두 번 깜빡</button></div>
+<ol class="vgl">
+<li><b>휴대폰 · 패드를 얼굴 앞에</b> 세워 두세요. 앞 카메라가 눈을 봐요.</li>
+<li>켜면 <b>2초 동안 평소처럼 악보를 봐 주세요.</b> 그 눈을 기준으로 맞춰요 (아래를 보거나 안경을 써도 괜찮아요).</li>
+<li id="vgMode">${blkModeTxt()}</li>
+<li>${BLK.mode === 'double' ? '' : '이전 장은 '}화면을 옆으로 밀거나 왼쪽 · 오른쪽을 눌러도 돼요.</li>
+<li>밝은 곳에서 잘 돼요. 역광 · 어두운 곳 · 짙은 안경은 어려울 수 있어요.</li>
+<li>오른쪽 아래 작은 창 테두리: <span class="vgc vg1">초록</span> 눈이 보여요 · <span class="vgc vg2">노랑</span> 감았어요 · <span class="vgc vg3">회색</span> 얼굴을 못 찾았어요</li></ol>
+<div class="vgpriv">${svg('<rect x="5" y="11" width="14" height="10" rx="2.5"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/>', 14, 2)} 카메라 영상은 이 기기 안에서만 쓰고, 저장하거나 어디로 보내지 않아요.</div>
+<label class="vgchk"><input type="checkbox" id="vgOff" ${offNow ? 'checked' : ''}> 다음부터 이 안내 없이 바로 켜기</label>
+<div class="vgbtns"><button type="button" class="vgcancel" data-g="cancel">닫기</button><button type="button" class="vgok" data-g="start">켜기</button></div></div>`;
+  VW.el.appendChild(g);
+  ['pointerdown', 'pointerup', 'pointermove'].forEach(t => g.addEventListener(t, e => e.stopPropagation()));
+  g.addEventListener('click', e => {
+    e.stopPropagation();
+    const b = e.target.closest('[data-g]'); if (!b) return;
+    const v = b.dataset.g;
+    if (v === 'long' || v === 'double') {
+      BLK.mode = v; lsSet('jc_blinkmode', v);
+      g.querySelectorAll('.vgseg button').forEach(x => x.classList.toggle('on', x.dataset.g === v));
+      g.querySelector('#vgMode').innerHTML = blkModeTxt(); return;
+    }
+    const off = g.querySelector('#vgOff').checked; lsSet('jc_blinkguide_off', off ? '1' : '');
+    g.remove();
+    if (v === 'start') runBlink();
+  });
+}
 async function toggleBlink() {
-  if (VW.cam) { stopBlink(); toast('눈 깜빡임 넘기기를 껐어요'); return; }
+  if (VW.cam) { stopBlink(); toast('눈으로 넘기기를 껐어요'); return; }
+  if (lsGet('jc_blinkguide_off') === '1') runBlink(); else blinkGuide();
+}
+async function runBlink() {
   try { await startBlink(); }
-  catch (e) { stopBlink(); toast('카메라를 쓸 수 없어요: ' + (e && e.name === 'NotAllowedError' ? '카메라 허용이 필요해요' : (e && e.message) || '이 기기에서는 어려워요')); }
+  catch (e) { stopBlink(); toast('카메라를 쓸 수 없어요: ' + (e && e.name === 'NotAllowedError' ? '카메라 허용이 필요해요 (설정 → 이 앱 → 카메라)' : (e && e.message) || '이 기기에서는 어려워요')); }
+}
+function blkLoad() {
+  if (BLK.lm) return Promise.resolve(BLK.lm);
+  if (!BLK.loading) BLK.loading = (async () => {
+    const VER = '0.10.14', base = `https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@${VER}`;
+    const vision = await import(`${base}/vision_bundle.mjs`);
+    const files = await vision.FilesetResolver.forVisionTasks(`${base}/wasm`);
+    const opt = d => ({ baseOptions: { modelAssetPath: 'https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task', delegate: d }, outputFaceBlendshapes: true, runningMode: 'VIDEO', numFaces: 1 });
+    let lm; try { lm = await vision.FaceLandmarker.createFromOptions(files, opt('GPU')); } catch { lm = await vision.FaceLandmarker.createFromOptions(files, opt('CPU')); }
+    BLK.lm = lm; return lm;
+  })().catch(e => { BLK.loading = null; throw e; });
+  return BLK.loading;
 }
 async function startBlink() {
-  const box = $('#vCam'); box.hidden = false; box.className = 'vcam'; box.innerHTML = '<div class="vcamst">눈 인식 준비 중… (처음엔 10초쯤 걸려요)</div>';
-  const VER = '0.10.14', base = `https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@${VER}`;
-  const vision = await import(`${base}/vision_bundle.mjs`);
-  const files = await vision.FilesetResolver.forVisionTasks(`${base}/wasm`);
-  const opt = d => ({ baseOptions: { modelAssetPath: 'https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task', delegate: d }, outputFaceBlendshapes: true, runningMode: 'VIDEO', numFaces: 1 });
-  let lm; try { lm = await vision.FaceLandmarker.createFromOptions(files, opt('GPU')); } catch { lm = await vision.FaceLandmarker.createFromOptions(files, opt('CPU')); }
-  const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user', width: { ideal: 320 }, height: { ideal: 240 } }, audio: false });
+  const box = $('#vCam'); box.hidden = false; box.className = 'vcam';
+  box.innerHTML = `<div class="vcamst">${BLK.lm ? '카메라 켜는 중…' : '눈 인식 준비 중… (처음 한 번만 10초쯤)'}</div>`;
+  const lm = await blkLoad();
+  const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user', width: { ideal: 320 }, height: { ideal: 240 }, frameRate: { ideal: 30 } }, audio: false });
   if (!VW.el) { stream.getTracks().forEach(t => t.stop()); return; }
   const video = document.createElement('video'); video.playsInline = true; video.muted = true; video.srcObject = stream; await video.play();
   box.innerHTML = ''; box.appendChild(video);
+  const bar = document.createElement('i'); bar.className = 'vcbar'; box.appendChild(bar);
   const st = document.createElement('div'); st.className = 'vcamst'; box.appendChild(st);
-  const HINT = '두 번 깜빡 → 다음 · 세 번 깜빡 → 이전';
-  st.textContent = HINT;
-  const cam = VW.cam = { stream, video, lm, raf: 0, closed: false, t0: 0, last1: 0, cool: 0, lastT: -1, st, HINT };
+  const help = document.createElement('button'); help.type = 'button'; help.className = 'vchelp'; help.textContent = '?'; help.setAttribute('aria-label', '사용 안내');
+  help.addEventListener('click', e => { e.stopPropagation(); stopBlink(); blinkGuide(); });
+  box.appendChild(help);
+  const now0 = performance.now();
+  const cam = VW.cam = { stream, video, lm, raf: 0, lastT: -1, st, bar, phase: 'cal', cal: [], calEnd: now0 + 2000, closeT: 0.55, openT: 0.35, closed: false, t0: 0, cool: 0, frames: 0, f0: now0, slow: false, n: 0, lastEnd: 0, tm: 0, mode: BLK.mode, HINT: blkHint() };
+  st.textContent = '평소처럼 악보를 봐 주세요… (맞추는 중)';
   const btn = VW.el.querySelector('[data-v=blink]'); if (btn) btn.classList.add('on');
+  const setBar = p => { bar.style.width = `${Math.round(Math.max(0, Math.min(1, p)) * 100)}%`; bar.classList.toggle('full', p >= 1); };
   const loop = () => {
     if (VW.cam !== cam) return;
     const now = performance.now();
     if (video.currentTime !== cam.lastT) {
-      cam.lastT = video.currentTime;
+      cam.lastT = video.currentTime; cam.frames++;
       let r = null; try { r = lm.detectForVideo(video, now); } catch { r = null; }
       const bs = r && r.faceBlendshapes && r.faceBlendshapes[0] && r.faceBlendshapes[0].categories;
-      if (bs) {
+      if (!cam.slow && now - cam.f0 > 3500) {
+        const fps = cam.frames * 1000 / (now - cam.f0);
+        if (fps < 8) { cam.slow = true; camFlash('이 기기는 인식이 느려요 · 천천히 감아 주세요', 2500); }
+      }
+      if (!bs) { box.classList.add('noface'); box.classList.remove('closed'); if (cam.closed) { cam.closed = false; setBar(0); } }
+      else {
+        box.classList.remove('noface');
         const g = n => (bs.find(c => c.categoryName === n) || {}).score || 0;
         const sc = (g('eyeBlinkLeft') + g('eyeBlinkRight')) / 2;
-        box.classList.remove('noface'); box.classList.toggle('closed', sc > 0.5);
-        if (!cam.closed && sc > 0.55) { cam.closed = true; cam.t0 = now; }
-        else if (cam.closed && sc < 0.35) {
-          cam.closed = false; const dur = now - cam.t0;
-          if (now > cam.cool) {
-            if (dur < 500) {
-              cam.n = (now - (cam.lastEnd || 0) < 700) ? (cam.n || 0) + 1 : 1; cam.lastEnd = now;
-              clearTimeout(cam.tm);
-              cam.tm = setTimeout(() => {
-                if (VW.cam !== cam) return;
-                const n = cam.n; cam.n = 0;
-                if (n === 2) { cam.cool = performance.now() + 700; vGo(1); camFlash('다음 장 ▶'); }
-                else if (n >= 3) { cam.cool = performance.now() + 700; vGo(-1); camFlash('◀ 이전 장'); }
-              }, 650);
+        if (cam.phase === 'cal') {
+          cam.cal.push(sc); setBar((now - (cam.calEnd - 2000)) / 2000);
+          if (now >= cam.calEnd) {
+            const s = cam.cal.slice().sort((a, b) => a - b), base = s.length ? s[Math.floor(s.length / 2)] : 0.1;
+            cam.closeT = Math.min(0.92, base + Math.max(0.28, (1 - base) * 0.55));
+            cam.openT = base + (cam.closeT - base) * 0.45;
+            cam.phase = 'run'; setBar(0); st.textContent = cam.HINT;
+            camFlash('준비됐어요! ' + (cam.mode === 'double' ? '두 번 깜빡' : '꼭 감았다 뜨기'), 1400);
+          }
+        } else {
+          box.classList.toggle('closed', sc > cam.closeT);
+          if (!cam.closed && sc > cam.closeT) { cam.closed = true; cam.t0 = now; }
+          if (cam.closed && cam.mode !== 'double') { const dur = now - cam.t0; setBar(dur > BLK_MAX ? 0 : dur / BLK_LONG); }
+          if (cam.closed && sc < cam.openT) {
+            cam.closed = false; const dur = now - cam.t0; setBar(0);
+            if (now > cam.cool) {
+              if (cam.mode !== 'double') {
+                if (dur >= BLK_LONG && dur <= BLK_MAX) { cam.cool = now + 1000; vGo(1); camFlash('다음 장 ▶'); }
+              } else if (dur < 450) {
+                cam.n = (now - cam.lastEnd < 600) ? cam.n + 1 : 1; cam.lastEnd = now;
+                clearTimeout(cam.tm);
+                cam.tm = setTimeout(() => {
+                  if (VW.cam !== cam) return;
+                  const n = cam.n; cam.n = 0;
+                  if (n === 2) { cam.cool = performance.now() + 900; vGo(1); camFlash('다음 장 ▶'); }
+                  else if (n >= 3) { cam.cool = performance.now() + 900; vGo(-1); camFlash('◀ 이전 장'); }
+                }, 450);
+                if (cam.n >= 2) camFlash(`깜빡 ${cam.n}`, 500);
+              }
             }
           }
         }
-      } else box.classList.add('noface');
+      }
     }
     cam.raf = requestAnimationFrame(loop);
   };
   loop();
 }
-function camFlash(t) { const c = VW.cam; if (!c) return; c.st.textContent = t; c.st.classList.add('hit'); setTimeout(() => { if (VW.cam === c) { c.st.textContent = c.HINT; c.st.classList.remove('hit'); } }, 900); }
+function camFlash(t, ms) { const c = VW.cam; if (!c) return; c.st.textContent = t; c.st.classList.add('hit'); clearTimeout(c.ft); c.ft = setTimeout(() => { if (VW.cam === c) { c.st.textContent = c.phase === 'cal' ? '평소처럼 악보를 봐 주세요… (맞추는 중)' : c.HINT; c.st.classList.remove('hit'); } }, ms || 900); }
 function stopBlink() {
   const c = VW.cam; VW.cam = null;
-  if (c) { cancelAnimationFrame(c.raf); c.stream.getTracks().forEach(t => t.stop()); try { c.lm.close(); } catch { /* 없음 */ } }
-  const b = document.getElementById('vCam'); if (b) { b.hidden = true; b.innerHTML = ''; }
+  if (c) { cancelAnimationFrame(c.raf); clearTimeout(c.tm); clearTimeout(c.ft); c.stream.getTracks().forEach(t => t.stop()); }
+  const b = document.getElementById('vCam'); if (b) { b.hidden = true; b.innerHTML = ''; b.className = 'vcam'; }
   const btn = VW.el && VW.el.querySelector('[data-v=blink]'); if (btn) btn.classList.remove('on');
 }
 
@@ -1560,61 +1640,225 @@ function checkBadge(r) {
 
 /* 캘린더: 주일 담당 자동 표시 */
 
-/* ---------- 사용 현황 (수퍼관리자) ---------- */
-const USG = { screens: {}, acts: {}, minutes: 0, hours: {}, device: '', started: false, last: Date.now() };
+/* ---------- 사용 현황 · 접속 기록 (수퍼관리자) — v33 ----------
+   사람 한 명의 하루치가 usage 칸 하나, 앱을 한 번 열 때마다 sessions 칸 하나예요.
+   화면 이름 · 누른 기능 횟수 · 사용 분 · 시간대 · 기기 · 브라우저 · 버전 · 오류 종류만 모아요.
+   아이 이름 · 적은 글 · 위치는 모으지 않아요. */
+const USG = { screens: {}, acts: {}, minutes: 0, hours: {}, errs: {}, started: false, loadMs: 0, loaded: false, lastAct: Date.now(), hiddenAt: 0, sess: null };
 const devKind = () => /iPad|Tablet/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1) || (innerWidth >= 720 && innerWidth < 1100 && navigator.maxTouchPoints > 0) ? '패드' : (innerWidth < 720 || /iPhone|Android.+Mobile/.test(navigator.userAgent)) ? '휴대폰' : '컴퓨터';
-function usageScreen(r) { if (S.phase !== 'ready') return; USG.screens[r] = (USG.screens[r] || 0) + 1; }
-function usageAct(a) { if (S.phase !== 'ready' || !a) return; USG.acts[a] = (USG.acts[a] || 0) + 1; }
-setInterval(() => { if (S.phase === 'ready' && document.visibilityState === 'visible') { const h = pad(new Date().getHours()); USG.minutes += 0.5; USG.hours[h] = (USG.hours[h] || 0) + 0.5; } }, 30000);
-async function flushUsage() {
-  if (S.phase !== 'ready' || !db) return;
-  const has = USG.minutes || Object.keys(USG.screens).length || Object.keys(USG.acts).length || !USG.started;
-  if (!has) return;
-  const date = ymd(new Date()), id = `${S.me.email}_${date}`;
-  const data = { email: S.me.email, name: S.me.name || S.user.displayName || '', date, last: new Date().toISOString() };
-  if (USG.minutes) data.minutes = increment(USG.minutes);
-  if (Object.keys(USG.hours).length) data.hours = Object.fromEntries(Object.entries(USG.hours).map(([k, v]) => [k, increment(v)]));
-  if (Object.keys(USG.screens).length) data.screens = Object.fromEntries(Object.entries(USG.screens).map(([k, v]) => [k, increment(v)]));
-  if (Object.keys(USG.acts).length) data.acts = Object.fromEntries(Object.entries(USG.acts).map(([k, v]) => [k, increment(v)]));
-  if (!USG.started) { data.device = { [devKind()]: increment(1) }; data.opens = increment(1); }
-  const snap = { ...USG }; USG.screens = {}; USG.acts = {}; USG.minutes = 0; USG.hours = {}; USG.started = true;
-  try { await setDoc(doc(db, 'usage', id), data, { merge: true }); } catch { Object.assign(USG, { minutes: snap.minutes }); }
+function envInfo() {
+  const ua = navigator.userAgent, ios = /iPhone|iPad|iPod/.test(ua) || (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1);
+  const os = ios ? 'iOS' : /Android/.test(ua) ? '안드로이드' : /Mac OS X/.test(ua) ? '맥' : /Windows/.test(ua) ? '윈도우' : /CrOS/.test(ua) ? '크롬북' : '기타';
+  const br = /SamsungBrowser/.test(ua) ? '삼성 인터넷' : /Edg\//.test(ua) ? '엣지' : /Whale/.test(ua) ? '웨일' : /KAKAOTALK/i.test(ua) ? '카카오톡 안' : /NAVER/.test(ua) ? '네이버 앱 안'
+    : /CriOS|Chrome\//.test(ua) ? '크롬' : /FxiOS|Firefox/.test(ua) ? '파이어폭스' : /Safari/.test(ua) ? '사파리' : '기타';
+  const pwa = (window.matchMedia && matchMedia('(display-mode: standalone)').matches) || navigator.standalone === true;
+  return { os, br, pwa };
 }
-setInterval(flushUsage, 120000);
-document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') flushUsage(); });
+const usRole = () => S.me && (S.me.owner ? '수퍼' : S.me.director ? '디렉터' : S.me.role === 'admin' ? '관리자' : S.me.helper ? '헬퍼' : '교사');
+function usageScreen(r) {
+  if (S.phase !== 'ready') return;
+  USG.screens[r] = (USG.screens[r] || 0) + 1;
+  if (!USG.loaded) { USG.loaded = true; const t = Math.round(performance.now()); if (!USG.hiddenBoot && t > 0 && t < 60000) USG.loadMs = t; }
+  if (!USG.sess) usStartSess();
+  const s = USG.sess; if (s && s.screens[s.screens.length - 1] !== r && s.screens.length < 60) { s.screens.push(r); s.dirty = true; }
+}
+function usageAct(a) { if (S.phase !== 'ready' || !a) return; USG.acts[a] = (USG.acts[a] || 0) + 1; if (USG.sess) { USG.sess.acts[a] = (USG.sess.acts[a] || 0) + 1; USG.sess.dirty = true; } }
+/* 오류 — 글 내용 · 이메일 · 주소 · 문서 번호는 지우고 '어느 화면에서 어떤 종류'만 세요 */
+function usageErr(e) {
+  if (S.phase !== 'ready') return;
+  let k = String((e && (e.code || e.message)) || e || '').trim(); if (!k) return;
+  k = k.replace(/[\w.+-]+@[\w-]+\.[\w.-]+/g, '@').replace(/https?:\/\/\S+/g, '주소').replace(/[A-Za-z0-9]{16,}/g, '#')
+    .replace(/[.\/`\[\]~*\\$#]/g, '·').replace(/\s+/g, ' ').slice(0, 70).trim();
+  if (!k) return;
+  k = `${S.route || '앱'} | ${k}`;
+  USG.errSeen = USG.errSeen || new Set();
+  if (!USG.errSeen.has(k) && USG.errSeen.size >= 15) k = '앱 | 그 밖의 오류';
+  USG.errSeen.add(k); USG.errs[k] = (USG.errs[k] || 0) + 1;
+}
+window.addEventListener('error', e => { if (e && e.message) usageErr({ message: e.message }); });
+window.addEventListener('unhandledrejection', e => { usageErr(e && e.reason); });
+['pointerdown', 'keydown', 'wheel', 'touchstart'].forEach(ev => window.addEventListener(ev, () => { USG.lastAct = Date.now(); }, { passive: true, capture: true }));
+/* 실제로 손을 댄 시간만 '사용 시간' — 켜 두기만 한 시간은 세지 않아요 (1분 넘게 손을 안 대면 멈춤) */
+setInterval(() => {
+  if (S.phase !== 'ready' || document.visibilityState !== 'visible' || Date.now() - USG.lastAct > 60000) return;
+  const h = pad(new Date().getHours()); USG.minutes += 0.5; USG.hours[h] = (USG.hours[h] || 0) + 0.5;
+}, 30000);
+function usStartSess() { if (S.phase !== 'ready' || !S.me || !S.me.email || USG.sess) return; const t = Date.now(); USG.sess = { start: t, screens: S.route ? [S.route] : [], acts: {}, dirty: true }; }
+function usSaveSess() {
+  const s = USG.sess; if (!s || !s.dirty || !S.me || !S.me.email) return;
+  const E = envInfo(), end = Date.now();
+  s.dirty = false;
+  setDoc(doc(db, 'sessions', `${S.me.email}_${s.start}`), { email: S.me.email, name: (S.me.name || '').slice(0, 40), role: usRole() || '', start: s.start, end, dur: Math.round((end - s.start) / 1000), dev: devKind(), os: E.os, br: E.br, pwa: !!E.pwa, ver: APP_VERSION, screens: s.screens.slice(0, 60), acts: s.acts }).catch(() => { s.dirty = true; });
+}
+async function flushUsage() {
+  if (S.phase !== 'ready' || !db || !S.me || !S.me.email) return;
+  usSaveSess();
+  const has = USG.minutes || Object.keys(USG.screens).length || Object.keys(USG.acts).length || Object.keys(USG.errs).length || !USG.started;
+  if (!has) return;
+  const date = ymd(new Date()), id = `${S.me.email}_${date}`, E = envInfo();
+  const data = { email: S.me.email, name: S.me.name || S.user.displayName || '', role: usRole() || '', date, last: new Date().toISOString(), dev: devKind(), os: E.os, br: E.br, pwa: !!E.pwa, ver: APP_VERSION };
+  const inc = o => Object.fromEntries(Object.entries(o).map(([k, v]) => [k, increment(v)]));
+  if (USG.minutes) data.minutes = increment(USG.minutes);
+  if (Object.keys(USG.hours).length) data.hours = inc(USG.hours);
+  if (Object.keys(USG.screens).length) data.screens = inc(USG.screens);
+  if (Object.keys(USG.acts).length) data.acts = inc(USG.acts);
+  if (Object.keys(USG.errs).length) data.errs = inc(USG.errs);
+  if (!USG.started) { data.device = { [devKind()]: increment(1) }; data.opens = increment(1); }
+  if (USG.loadMs) { data.loadSum = increment(USG.loadMs); data.loadN = increment(1); }
+  const snap = { minutes: USG.minutes, hours: USG.hours, screens: USG.screens, acts: USG.acts, started: USG.started, loadMs: USG.loadMs };
+  USG.screens = {}; USG.acts = {}; USG.minutes = 0; USG.hours = {}; USG.errs = {}; USG.started = true; USG.loadMs = 0;
+  try { await setDoc(doc(db, 'usage', id), data, { merge: true }); }
+  catch {
+    const mg = (a, b) => { const o = { ...a }; Object.entries(b).forEach(([k, v]) => { o[k] = (o[k] || 0) + v; }); return o; };
+    USG.minutes += snap.minutes; USG.hours = mg(USG.hours, snap.hours); USG.screens = mg(USG.screens, snap.screens); USG.acts = mg(USG.acts, snap.acts); USG.started = snap.started; USG.loadMs = USG.loadMs || snap.loadMs;
+  }
+}
+setInterval(flushUsage, 60000);
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'hidden') { if (!USG.loaded) USG.hiddenBoot = true; USG.hiddenAt = Date.now(); flushUsage(); return; }
+  /* 30분 넘게 덮어 뒀다가 다시 열면 '한 번 더 연 것' · 새 접속 */
+  if (USG.hiddenAt && Date.now() - USG.hiddenAt > 30 * 60000) { USG.started = false; USG.sess = null; usStartSess(); }
+  USG.lastAct = Date.now();
+});
 window.addEventListener('pagehide', flushUsage);
 const SCREEN_NAME = { home: '홈', attend: '출석', friends: '친구들', kid: '아이 카드', stats: '통계', settings: '설정', worship: '예배', room: '교사실', notice: '공지', event: '일정', staff: '교사 카드', help: '도우미', usage: '사용 현황', promote: '반 올리기' };
-const ACT_NAME = { toggle: '출석 체크', allIn: '전원 출석', noteAdd: '아이 돌봄 기록', sermonSave: '설교 올림', cmAdd: '댓글', songSave: '악보 올림', songPlay: '악보 넘겨 보기', noticeSave: '공지 올림', eventSave: '일정 올림', snAdd: '교사 돌봄 기록', photo: '아이 사진', addKidSave: '새 친구 등록', schedSave: '담당 고침', dutySave: '업무 분담 고침', awayNew: '부재 알림', installNow: '앱 설치', backup: '백업' };
+const SCREEN_SKIP = new Set(['usage', 'promote']);
+const ACT_NAME = { toggle: '출석 체크', allIn: '전원 출석', noteAdd: '아이 돌봄 기록', sermonSave: '설교 올림', cmAdd: '댓글', songSave: '악보 올림', songPlay: '악보 넘겨 보기', noticeSave: '공지 올림', eventSave: '일정 올림', snAdd: '교사 돌봄 기록', photo: '아이 사진', addKidSave: '새 친구 등록', schedSave: '담당 고침', dutySave: '업무 분담 고침', awayNew: '부재 알림', installNow: '앱 설치', backup: '백업', sfSave: '안전 표시 저장', ntOn: '알림 켬', saveKid: '아이 정보 고침', tagSave: '표시 고침' };
+const usNf = n => Number(n || 0).toLocaleString('ko-KR');
+const usMin = m => !m ? '0분' : m < 60 ? `${Math.round(m)}분` : `${Math.floor(m / 60)}시간${Math.round(m % 60) ? ` ${Math.round(m % 60)}분` : ''}`;
+const usDur = s => s < 60 ? `${s}초` : usMin(Math.round(s / 60));
+const usHM = ms => { const d = new Date(ms); return `${d.getMonth() + 1}/${d.getDate()} ${pad(d.getHours())}:${pad(d.getMinutes())}`; };
+const US_PERIOD = [[7, '7일'], [30, '30일'], [90, '90일'], [180, '6개월'], [365, '1년']];
 async function vUsageLoad(force) {
   if (!S.me.owner) return;
-  R.us = R.us || { days: 30, rows: null };
+  R.us = R.us || { days: 30, rows: null, tab: 'sum', metric: 'users', sort: 'quiet', who: '', q: '' };
   if (R.us.rows && !force) return;
-  const from = addDays(ymd(new Date()), -(R.us.days - 1));
-  try { const s = await getDocs(query(collection(db, 'usage'), where('date', '>=', from))); R.us.rows = s.docs.map(d => d.data()); } catch (e) { R.us.rows = []; toast('사용 현황을 불러오지 못했어요: ' + errMsg(e)); }
+  await flushUsage();
+  const from = addDays(ymd(new Date()), -(R.us.days - 1)), fromMs = parseD(from).getTime();
+  const [u, s] = await Promise.all([
+    getDocs(query(collection(db, 'usage'), where('date', '>=', from))).then(q => q.docs.map(d => d.data())).catch(e => { toast('사용 현황을 불러오지 못했어요: ' + errMsg(e)); return []; }),
+    getDocs(query(collection(db, 'sessions'), where('start', '>=', fromMs))).then(q => q.docs.map(d => d.data())).catch(() => [])]);
+  R.us.rows = u; R.us.sess = s.sort((a, b) => b.start - a.start);
+  /* 180일 지난 접속 기록은 정리 */
+  getDocs(query(collection(db, 'sessions'), where('start', '<', Date.now() - 180 * 864e5))).then(q => q.docs.slice(0, 300).forEach(d => deleteDoc(d.ref).catch(() => { }))).catch(() => { });
   if (S.route === 'usage') paint();
 }
+const usSum = (rows, k) => rows.reduce((o, r) => { Object.entries(r[k] || {}).forEach(([a, v]) => { o[a] = (o[a] || 0) + (Number(v) || 0); }); return o; }, {});
+function usHB(m, nameOf, max = 12) {
+  const L = Object.entries(m).filter(([k]) => !SCREEN_SKIP.has(k)).sort((a, b) => b[1] - a[1]).slice(0, max), top = L.length ? L[0][1] : 1;
+  return L.length ? `<div class="ushb">${L.map(([k, v]) => `<div class="ushr"><span class="w">${esc(nameOf(k))}</span><span class="tr"><i style="width:${Math.max(2, Math.round(v / top * 100))}%"></i></span><span class="n">${usNf(Math.round(v))}</span></div>`).join('')}</div>` : '<div class="s2">아직 쌓인 게 없어요</div>';
+}
+function usStack(m, hl) {
+  const L = Object.entries(m).sort((a, b) => hl ? String(b[0]).localeCompare(String(a[0]), undefined, { numeric: true }) : b[1] - a[1]), t = L.reduce((n, x) => n + x[1], 0) || 1;
+  const col = ['#C62828', '#E07A2E', '#2E9D8F', '#3A6EA5', '#7B4FB8', '#A0703F', '#8A8A8A'];
+  return L.length ? `<div class="usst">${L.map(([k, v], i) => `<i style="width:${(v / t * 100).toFixed(2)}%;background:${hl ? (k === hl ? '#2F7D4F' : '#D9C7A8') : col[i % col.length]}" title="${esc(k)} ${v}명"></i>`).join('')}</div><div class="uslg">${L.map(([k, v], i) => `<span><i style="background:${hl ? (k === hl ? '#2F7D4F' : '#D9C7A8') : col[i % col.length]}"></i>${esc(k)} <b>${v}</b></span>`).join('')}</div>` : '<div class="s2">—</div>';
+}
+function usKpi(ic, k, v, sub, tone) { return `<div class="uskpi ${tone || ''}"><span class="ki">${svg(ic, 20, 2)}</span><span class="k">${k}</span><span class="v">${v}</span>${sub ? `<span class="s">${sub}</span>` : ''}</div>`; }
+const USI = { ppl: '<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0"/><circle cx="17" cy="9" r="2.8"/><path d="M16 14.2a5 5 0 0 1 6 4.8"/>', today: '<rect x="3.5" y="5" width="17" height="15" rx="3"/><path d="M3.5 10h17M8 3v4m8-4v4"/>', clock: '<circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/>', phone: '<rect x="7" y="3" width="10" height="18" rx="2.5"/><path d="M11 18h2"/>', ver: '<path d="M4 12a8 8 0 0 1 14-5.3M20 12a8 8 0 0 1-14 5.3"/><path d="M18 3v4h-4M6 21v-4h4"/>', bug: '<path d="M12 3 2.5 20h19z"/><path d="M12 10v4.5M12 17.2v.3"/>' };
 function vUsage() {
   if (!S.me.owner) return `<div class="scroll narrow"><div class="sub">수퍼관리자만 볼 수 있어요.</div></div>${nav('home')}`;
-  R.us = R.us || { days: 30, rows: null };
-  if (!R.us.rows) { vUsageLoad(); return `<div class="scroll narrow"><button class="back" data-act="go" data-to="settings">← 설정</button><div class="sub">불러오는 중…</div></div>${nav('home')}`; }
-  const rows = R.us.rows, sum = (o, m) => { Object.entries(m || {}).forEach(([k, v]) => { o[k] = (o[k] || 0) + (Number(v) || 0); }); return o; };
-  const per = {}; rows.forEach(r => { const p = per[r.email] = per[r.email] || { name: r.name, email: r.email, days: 0, min: 0, last: '' }; p.days++; p.min += Number(r.minutes) || 0; if ((r.last || '') > p.last) p.last = r.last; });
-  const hours = rows.reduce((o, r) => sum(o, r.hours), {}), screens = rows.reduce((o, r) => sum(o, r.screens), {}), acts = rows.reduce((o, r) => sum(o, r.acts), {}), dev = rows.reduce((o, r) => sum(o, r.device), {});
-  const totalMin = Object.values(per).reduce((s, p) => s + p.min, 0);
-  const linked = S.staff.filter(x => x.email), never = linked.filter(x => !per[x.email]);
-  const maxH = Math.max(1, ...Object.values(hours));
-  const bars = (o, names) => { const e = Object.entries(o).sort((a, b) => b[1] - a[1]).slice(0, 8); const mx = Math.max(1, ...e.map(x => x[1])); return e.length ? e.map(([k, v]) => `<div class="hb"><span class="nm w">${esc((names && names[k]) || k)}</span><div class="tr"><i style="width:${Math.round(v / mx * 100)}%"></i></div><span class="pc">${Math.round(v)}</span></div>`).join('') : '<div class="s2">아직 기록이 없어요</div>'; };
-  const minTxt = m => m < 60 ? `${Math.round(m)}분` : `${Math.floor(m / 60)}시간 ${Math.round(m % 60)}분`;
-  return `<div class="scroll cols"><div class="hd"><button class="back" data-act="go" data-to="settings">← 설정</button><button class="sec sm2" data-act="usageReload">새로 불러오기</button></div>
-<div class="ttl">사용 현황</div><div class="seg" style="max-width:360px">${[7, 30, 90].map(n => `<button class="${R.us.days === n ? 'on' : ''}" data-act="usageDays" data-id="${n}">${n}일</button>`).join('')}</div>
-<div class="s2 full">개발 개선을 위한 기록이에요. 어떤 화면을 언제 많이 쓰는지만 모으고, 접속 위치나 입력한 내용은 모으지 않아요. 수퍼관리자만 봐요.</div>
-<section class="card"><div class="lbl"><span>한눈에</span></div><div class="kv"><span>쓴 선생님</span><b>${Object.keys(per).length}명 / 연결 ${linked.length}명</b></div><div class="kv"><span>모두 쓴 시간</span><b>${minTxt(totalMin)}</b></div><div class="kv"><span>한 사람 평균</span><b>${minTxt(totalMin / Math.max(1, Object.keys(per).length))}</b></div></section>
-<section class="card"><div class="lbl"><span>시간대 (분)</span></div><div class="hours">${Array.from({ length: 24 }, (_, h) => { const v = hours[pad(h)] || 0; return `<div class="hcol" title="${h}시 ${Math.round(v)}분"><i style="height:${Math.round(v / maxH * 100)}%"></i><span>${h % 3 === 0 ? h : ''}</span></div>`; }).join('')}</div></section>
-<section class="card"><div class="lbl"><span>기기</span></div>${bars(dev)}</section>
-<section class="card"><div class="lbl"><span>많이 연 화면</span></div>${bars(screens, SCREEN_NAME)}</section>
-<section class="card"><div class="lbl"><span>많이 한 일</span></div>${bars(acts, ACT_NAME)}</section>
-<section class="card"><div class="lbl"><span>선생님별</span></div>${Object.values(per).sort((a, b) => b.min - a.min).map(p => `<div class="kv"><span>${esc(p.name || p.email)}</span><b>${p.days}일 · ${minTxt(p.min)} · ${esc((p.last || '').slice(5, 10).replace('-', '/'))}</b></div>`).join('') || '<div class="s2">아직 없어요</div>'}</section>
-${never.length ? `<section class="card"><div class="lbl"><span>이 기간에 안 들어온 선생님</span></div><div class="chips">${never.map(x => staffChip(x.name)).join('')}</div></section>` : ''}</div>${nav('home')}`;
+  R.us = R.us || { days: 30, rows: null, tab: 'sum', metric: 'users', sort: 'quiet', who: '', q: '' };
+  const U = R.us; U.tab = U.tab || 'sum'; U.metric = U.metric || 'users'; U.sort = U.sort || 'quiet';
+  if (!U.rows) { vUsageLoad(); return `<div class="scroll narrow"><button class="back" data-act="go" data-to="settings">← 설정</button><div class="sub">불러오는 중…</div></div>${nav('home')}`; }
+  const head = `<div class="ushd"><button class="back" data-act="go" data-to="settings">← 설정</button><div class="ttl">사용 현황</div>
+<div class="seg ustab">${[['sum', '한눈에'], ['sess', '접속 기록'], ['err', '오류']].map(([k, l]) => `<button class="${U.tab === k ? 'on' : ''}" data-act="usTab" data-id="${k}">${l}</button>`).join('')}</div>
+<div class="usbar"><div class="seg">${US_PERIOD.map(([n, l]) => `<button class="${U.days === n ? 'on' : ''}" data-act="usageDays" data-id="${n}">${l}</button>`).join('')}</div><span class="grow"></span><button class="sec sm" data-act="usageReload">새로 읽기</button><button class="sec sm" data-act="usCsv">CSV</button></div></div>`;
+  const priv = `<div class="uspriv">${svg('<rect x="5" y="11" width="14" height="10" rx="2.5"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/>', 18, 2)}<div><b>무엇을 모으나</b> 화면 이름 · 누른 기능 횟수 · 손을 댄 사용 분 · 시간대 · 기기 · 운영체제 · 브라우저 · 앱 버전 · 오류 종류 · 들어오고 나간 시각. <b>아이 이름 · 적은 글 · 위치는 모으지 않아요.</b> 수퍼관리자만 봐요. 접속 기록은 180일이 지나면 지워져요.</div></div>`;
+  const body = U.tab === 'sess' ? usSessView(U) : U.tab === 'err' ? usErrView(U) : usSumView(U);
+  return `<div class="scroll"><div class="usin">${head}${body}${priv}</div></div>${nav('home')}`;
+}
+function usSumView(U) {
+  const rows = U.rows, days = U.days, today = ymd(new Date()), w7 = addDays(today, -6), from = addDays(today, -(days - 1));
+  const linked = S.staff.filter(x => x.email), people = {};
+  rows.forEach(r => {
+    const p = people[r.email] = people[r.email] || { email: r.email, name: r.name, role: r.role, days: 0, min: 0, opens: 0, acts: 0, screens: {}, last: '', L: null };
+    p.days++; p.min += Number(r.minutes) || 0; p.opens += Number(r.opens) || 0; p.acts += Object.values(r.acts || {}).reduce((n, v) => n + (Number(v) || 0), 0);
+    Object.entries(r.screens || {}).forEach(([k, v]) => { p.screens[k] = (p.screens[k] || 0) + (Number(v) || 0); });
+    if (r.date >= p.last) { p.last = r.date; p.L = r; p.name = r.name || p.name; p.role = r.role || p.role; }
+  });
+  const acctN = new Set([...linked.map(x => x.email.toLowerCase()), ...Object.keys(people).map(e => String(e).toLowerCase())]).size;
+  const P = Object.values(people), latest = P.map(p => p.L).filter(Boolean), withVer = latest.filter(l => l.ver);
+  const todayN = new Set(rows.filter(r => r.date === today).map(r => r.email)).size, w7N = new Set(rows.filter(r => r.date >= w7).map(r => r.email)).size;
+  const minRows = rows.filter(r => r.minutes !== undefined), avg = minRows.length ? minRows.reduce((n, r) => n + (Number(r.minutes) || 0), 0) / minRows.length : 0;
+  const pwaN = withVer.filter(l => l.pwa).length, verN = withVer.filter(l => l.ver === APP_VERSION).length;
+  const errN = rows.reduce((n, r) => n + Object.values(r.errs || {}).reduce((a, v) => a + (Number(v) || 0), 0), 0);
+  const loadSum = rows.reduce((n, r) => n + (Number(r.loadSum) || 0), 0), loadN = rows.reduce((n, r) => n + (Number(r.loadN) || 0), 0);
+  const pct = (a, b) => b ? Math.round(a / b * 100) : 0;
+  // 날마다
+  const dl = []; for (let d = from; d <= today && dl.length < 400; d = addDays(d, 1)) dl.push(d);
+  const byDay = Object.fromEntries(dl.map(d => [d, { u: new Set(), m: 0, o: 0 }]));
+  rows.forEach(r => { const D = byDay[r.date]; if (D) { D.u.add(r.email); D.m += Number(r.minutes) || 0; D.o += Number(r.opens) || 0; } });
+  const bk = days > 120 ? 7 : 1, groups = []; for (let i = 0; i < dl.length; i += bk) groups.push(dl.slice(i, i + bk));
+  const gv = G => U.metric === 'users' ? new Set(G.flatMap(d => [...byDay[d].u])).size : G.reduce((n, d) => n + (U.metric === 'mins' ? byDay[d].m : byDay[d].o), 0);
+  const peak = Math.max(1, ...groups.map(gv)), bw = 1000 / Math.max(1, groups.length), unit = U.metric === 'users' ? '명' : U.metric === 'mins' ? '분' : '번';
+  const step = groups.length <= 7 ? 1 : groups.length <= 31 ? 7 : groups.length <= 92 ? 15 : 8;
+  const chart = `<svg class="ussvg" viewBox="0 0 1000 170" preserveAspectRatio="none">${[0.5, 1].map(f => `<line x1="0" x2="1000" y1="${165 - f * 150}" y2="${165 - f * 150}" class="gl"/>`).join('')}${groups.map((G, i) => { const v = gv(G), h = v ? Math.max(v / peak * 150, 3) : 0, sun = bk === 1 && parseD(G[0]).getDay() === 0; return `<rect x="${(i * bw + bw * 0.14).toFixed(1)}" y="${(165 - h).toFixed(1)}" width="${(bw * 0.72).toFixed(1)}" height="${h.toFixed(1)}" rx="3" class="${sun ? 'sun' : ''}${G.includes(today) ? ' now' : ''}"><title>${G[0]}${bk > 1 ? ' 주' : ''} · ${Math.round(v)}${unit}</title></rect>`; }).join('')}</svg><div class="usx">${groups.map((G, i) => (groups.length - 1 - i) % step === 0 ? `<span style="left:${((i + 0.5) * bw / 10).toFixed(2)}%">${Number(G[0].slice(5, 7))}/${Number(G[0].slice(8))}</span>` : '').join('')}</div>`;
+  // 요일 × 시간
+  const HM = Array.from({ length: 7 }, () => Array(24).fill(0)), WD = ['월', '화', '수', '목', '금', '토', '일'];
+  rows.forEach(r => { const wd = (parseD(r.date).getDay() + 6) % 7; Object.entries(r.hours || {}).forEach(([h, v]) => { if (HM[wd][+h] !== undefined) HM[wd][+h] += Number(v) || 0; }); });
+  const hp = Math.max(1, ...HM.flat()); let best = [0, 0, 0]; HM.forEach((r, i) => r.forEach((v, h) => { if (v > best[0]) best = [v, i, h]; }));
+  const heat = `<div class="ushm"><span></span>${Array.from({ length: 24 }, (_, h) => `<span class="hx">${h % 6 === 0 ? h : ''}</span>`).join('')}${HM.map((r, i) => `<span class="hy">${WD[i]}</span>${r.map((v, h) => `<i style="--a:${v ? (0.14 + 0.86 * v / hp).toFixed(2) : 0}" title="${WD[i]}요일 ${h}시 · ${Math.round(v)}분"></i>`).join('')}`).join('')}</div><div class="s2">${best[0] ? `가장 많이 쓰는 때 — <b>${WD[best[1]]}요일 ${best[2]}시</b> 무렵 · 진할수록 많이 써요` : '시간대 기록이 쌓이면 보여요'}</div>`;
+  // 기기 · 환경
+  const cnt = f => latest.reduce((o, l) => { const k = f(l); if (k) o[k] = (o[k] || 0) + 1; return o; }, {});
+  const devC = cnt(l => l.dev || Object.keys(l.device || {})[0]), osC = cnt(l => l.os), brC = cnt(l => l.br), verC = cnt(l => l.ver);
+  const scr = usSum(rows, 'screens'), act = usSum(rows, 'acts');
+  const unused = Object.keys(SCREEN_NAME).filter(k => !SCREEN_SKIP.has(k) && !scr[k]);
+  const usersOf = k => P.filter(p => p.screens[k]).length;
+  const rare = Object.keys(SCREEN_NAME).filter(k => !SCREEN_SKIP.has(k) && scr[k] && P.length >= 3 && usersOf(k) <= Math.max(1, Math.floor(P.length * 0.2)));
+  const never = linked.filter(x => !people[x.email]);
+  const since = d => { const q = Math.round((parseD(today) - parseD(d)) / 864e5); return q <= 0 ? '오늘' : q === 1 ? '어제' : `${q}일 전`; };
+  const topScr = p => Object.entries(p.screens).filter(([k]) => !['home'].includes(k) && !SCREEN_SKIP.has(k)).sort((a, b) => b[1] - a[1]).slice(0, 2).map(([k]) => SCREEN_NAME[k] || k).join(' · ');
+  const sorter = { quiet: (a, b) => a.last.localeCompare(b.last), most: (a, b) => b.min - a.min || b.days - a.days, name: (a, b) => ko(a.name || '', b.name || '') }[U.sort];
+  const ppl = [...P].sort(sorter).map(p => { const q = Math.round((parseD(today) - parseD(p.last)) / 864e5), L = p.L || {}; return `<tr class="${q >= 14 ? 'warn' : ''}"><td><b>${esc(p.name || p.email)}</b><small>${esc(p.role || '')}</small></td><td><span class="uschip ${q >= 14 ? 'warn' : q <= 1 ? 'ok' : ''}">${since(p.last)}</span></td><td class="n">${p.days}<small>/${days}일</small></td><td class="n">${usMin(p.min)}</td><td class="n">${usNf(p.acts)}</td><td>${esc(topScr(p) || '—')}</td><td>${esc(L.dev || Object.keys(L.device || {})[0] || '')}${L.pwa ? ' <span class="ustag">앱</span>' : ''}${L.ver ? ` <span class="ustag ${L.ver === APP_VERSION ? '' : 'old'}">${esc(L.ver)}</span>` : ''}</td></tr>`; }).join('');
+  const first = rows.reduce((m, r) => !m || r.date < m ? r.date : m, '');
+  return `${first && first > from ? `<div class="s2">기록은 ${first.replace(/-/g, '.')}부터 있어요. 기기 · 버전 · 오류 · 접속 기록은 v33부터 쌓여요.</div>` : ''}
+<div class="uskpis">
+${usKpi(USI.ppl, '쓰는 선생님', `${P.length}<small>/${acctN}명</small>`, `${days}일 동안 한 번이라도 · ${pct(P.length, acctN)}%`, 'main')}
+${usKpi(USI.today, '오늘 · 이번 주', `${todayN}<small> · ${w7N}명</small>`, '오늘 연 사람 · 최근 7일')}
+${usKpi(USI.clock, '하루 평균 사용', usMin(avg), '쓴 날 한 사람 기준 · 손을 댄 시간')}
+${usKpi(USI.phone, '홈 화면 앱', `${pct(pwaN, withVer.length)}%`, withVer.length ? `${pwaN}/${withVer.length}명이 앱으로` : 'v33부터 재요', withVer.length && pct(pwaN, withVer.length) < 50 ? 'warn' : '')}
+${usKpi(USI.ver, '최신 버전', `${pct(verN, withVer.length)}%`, withVer.length ? `${APP_VERSION} ${verN}/${withVer.length}명` : 'v33부터 재요', verN < withVer.length ? 'warn' : '')}
+${usKpi(USI.bug, '오류', usNf(errN), errN ? '오류 탭에서 자세히' : '문제 없어요', errN ? 'bad' : '')}</div>
+<div class="usgrid">
+<section class="card uswide"><div class="lbl"><span>날마다</span><div class="seg mini">${[['users', '사람 수'], ['mins', '사용 시간'], ['opens', '연 횟수']].map(([k, l]) => `<button class="${U.metric === k ? 'on' : ''}" data-act="usMetric" data-id="${k}">${l}</button>`).join('')}</div></div><div class="uschart">${chart}</div><div class="s2">최대 ${usNf(Math.round(peak))}${unit} · 진한 막대 = 주일</div></section>
+<section class="card"><div class="lbl"><span>언제 쓰나</span><span class="s2">요일 × 시간 (분)</span></div>${heat}</section>
+<section class="card"><div class="lbl"><span>기기 · 환경</span><span class="s2">사람마다 마지막 기록</span></div><div class="uslab">기기</div>${usStack(devC)}<div class="uslab">운영체제</div>${usStack(osC)}<div class="uslab">브라우저</div>${usStack(brC)}<div class="uslab">앱 버전</div>${usStack(verC, APP_VERSION)}<div class="s2">${loadN ? `앱 여는 데 평균 <b>${(loadSum / loadN / 1000).toFixed(1)}초</b> (${usNf(loadN)}번 잼)` : '여는 속도는 v33부터 재요'}${Object.keys(brC).some(k => /안$/.test(k)) ? ' · 카카오톡 · 네이버 앱 안에서 연 사람이 있어요 → 크롬 · 사파리로 열도록 안내해 주세요' : ''}</div></section>
+<section class="card"><div class="lbl"><span>많이 쓰는 화면</span><span class="s2">연 횟수</span></div>${usHB(scr, k => SCREEN_NAME[k] || k)}</section>
+<section class="card"><div class="lbl"><span>한 일</span><span class="s2">저장 · 누른 횟수</span></div>${usHB(act, k => ACT_NAME[k] || k)}</section>
+<section class="card uswide"><div class="lbl"><span>개선 힌트</span><span class="s2">${days}일 기준</span></div><div class="ushint">
+<div><div class="uslab">아무도 안 연 화면</div><div class="chips">${unused.map(k => `<span class="uschip">${esc(SCREEN_NAME[k])}</span>`).join('') || '<span class="s2">없어요 — 모든 화면이 쓰였어요</span>'}</div><div class="s2">모르는 기능일 수 있어요 → 교사 모임 때 소개해 보세요.</div></div>
+<div><div class="uslab">몇 사람만 쓰는 화면</div><div class="chips">${rare.map(k => `<span class="uschip">${esc(SCREEN_NAME[k])} <b>${usersOf(k)}명</b></span>`).join('') || '<span class="s2">없어요</span>'}</div><div class="s2">쓰는 선생님께 어떻게 쓰는지 물어보면 다음 개선 아이디어가 나와요.</div></div>
+<div><div class="uslab">${days}일 동안 안 들어온 선생님</div><div class="chips">${never.map(x => `<span class="uschip warn">${esc(x.name)}</span>`).join('') || '<span class="s2">없어요 — 모두 들어왔어요</span>'}</div></div></div></section>
+<section class="card uswide"><div class="lbl"><span>선생님별</span><select class="in ussort" id="usSort">${[['quiet', '오래 안 들어온 순'], ['most', '많이 쓰는 순'], ['name', '가나다순']].map(([k, l]) => `<option value="${k}" ${U.sort === k ? 'selected' : ''}>${l}</option>`).join('')}</select></div>
+<div class="ustw"><table class="ustbl"><thead><tr><th>이름</th><th>마지막</th><th class="n">쓴 날</th><th class="n">사용 시간</th><th class="n">한 일</th><th>주로 쓰는 화면</th><th>기기 · 버전</th></tr></thead><tbody>${ppl || '<tr><td colspan="7" class="s2">아직 쌓인 게 없어요</td></tr>'}</tbody></table></div></section></div>`;
+}
+function usSessView(U) {
+  const all = U.sess || [], q = (U.q || '').trim(), has = t => !q || String(t || '').includes(q);
+  const nm = s => (S.staff.find(x => x.email === s.email) || {}).name || s.name || s.email;
+  const people = [...new Map(all.map(s => [s.email, nm(s)])).entries()].sort((a, b) => ko(a[1], b[1]));
+  const rows = all.filter(s => (!U.who || s.email === U.who) && has([nm(s), s.dev, s.os, s.br, s.ver, (s.screens || []).map(k => SCREEN_NAME[k] || k).join(' ')].join(' ')));
+  const by = {}; rows.forEach(s => { const p = by[s.email] = by[s.email] || { name: nm(s), role: s.role, n: 0, dur: 0, last: 0, dev: '' }; p.n++; p.dur += s.dur || 0; if (s.start > p.last) { p.last = s.start; p.dev = [s.dev, s.os, s.br].filter(Boolean).join(' · ') + (s.pwa ? ' · 앱' : ''); } });
+  const P = Object.values(by).sort((a, b) => b.last - a.last);
+  const durs = rows.map(s => s.dur || 0), avg = durs.length ? durs.reduce((a, b) => a + b, 0) / durs.length : 0;
+  return `<div class="usfilt"><select class="in" id="usWho"><option value="">모든 선생님</option>${people.map(([e, n]) => `<option value="${esc(e)}" ${U.who === e ? 'selected' : ''}>${esc(n)}</option>`).join('')}</select><input class="search" id="usQ" type="search" placeholder="찾기 · 기기 · 화면 이름" value="${esc(U.q || '')}"></div>
+<div class="uskpis three">${usKpi(USI.today, '접속', `${usNf(rows.length)}<small>번</small>`, `${U.days}일 · ${P.length}명`, 'main')}${usKpi(USI.clock, '한 번 평균 머문 시간', usDur(Math.round(avg)), '들어와서 나갈 때까지')}${usKpi(USI.ppl, '모두 머문 시간', usDur(durs.reduce((a, b) => a + b, 0)), '이 기간 합계')}</div>
+<section class="card"><div class="lbl"><span>선생님별</span><span class="s2">${U.days}일</span></div><div class="ustw"><table class="ustbl"><thead><tr><th>이름</th><th>마지막 접속</th><th class="n">접속</th><th class="n">모두 머문 시간</th><th class="n">한 번 평균</th><th>기기</th></tr></thead><tbody>
+${P.map(p => `<tr><td><b>${esc(p.name)}</b><small>${esc(p.role || '')}</small></td><td>${usHM(p.last)}</td><td class="n">${p.n}번</td><td class="n">${usDur(p.dur)}</td><td class="n">${usDur(Math.round(p.dur / p.n))}</td><td>${esc(p.dev)}</td></tr>`).join('') || '<tr><td colspan="6" class="s2">아직 기록이 없어요 (v33부터 쌓여요)</td></tr>'}</tbody></table></div></section>
+<section class="card"><div class="lbl"><span>접속마다</span><span class="s2">${rows.length}번 · 최근 순</span></div><div class="uslog">${rows.slice(0, 300).map(s => `<div class="uslr"><div class="t1"><span class="tm">${usHM(s.start)} ~ ${pad(new Date(s.end).getHours())}:${pad(new Date(s.end).getMinutes())}</span><b>${esc(nm(s))}</b><span class="uschip">${usDur(s.dur || 0)}</span><span class="s2">${esc([s.dev, s.os, s.br].filter(Boolean).join(' · '))}${s.pwa ? ' · 앱' : ''} · ${esc(s.ver || '')}</span></div><div class="flow">${(s.screens || []).map(k => esc(SCREEN_NAME[k] || k)).join(' → ') || '—'}</div>${Object.keys(s.acts || {}).length ? `<div class="acts">${Object.entries(s.acts).map(([k, v]) => `<span class="ustag">${esc(ACT_NAME[k] || k)} ${v}</span>`).join('')}</div>` : ''}</div>`).join('') || '<div class="s2">기록이 없어요. (v33부터 쌓여요)</div>'}</div></section>`;
+}
+function usErrView(U) {
+  const errs = {}; (U.rows || []).forEach(r => Object.entries(r.errs || {}).forEach(([k, v]) => { const e = errs[k] = errs[k] || { n: 0, users: new Set(), last: '', vers: new Set() }; e.n += Number(v) || 0; e.users.add(r.name || r.email); if (r.date > e.last) e.last = r.date; if (r.ver) e.vers.add(r.ver); }));
+  const L = Object.entries(errs).sort((a, b) => b[1].n - a[1].n);
+  return `<section class="card"><div class="lbl"><span>같은 오류끼리</span><span class="s2">${L.length}가지 · ${U.days}일</span></div>${L.length ? `<div class="ustw"><table class="ustbl"><thead><tr><th>화면</th><th>오류</th><th class="n">횟수</th><th class="n">사람</th><th>마지막</th><th>버전</th></tr></thead><tbody>${L.slice(0, 100).map(([k, e]) => { const [w, ...m] = k.split(' | '); return `<tr><td>${esc(SCREEN_NAME[w] || w)}</td><td class="mono">${esc(m.join(' | '))}</td><td class="n">${usNf(e.n)}</td><td class="n">${e.users.size}</td><td>${esc(e.last.slice(5).replace('-', '/'))}</td><td>${[...e.vers].sort().slice(-3).map(v => esc(v)).join(' ')}</td></tr>`; }).join('')}</tbody></table></div>` : '<div class="s2">기록된 오류가 없어요.</div>'}<div class="s2">'권한이 없어요'가 많으면 그 선생님의 구글 계정이 교사 명단에 연결됐는지 확인해 주세요. 오류는 v33부터 모여요.</div></section>`;
+}
+function usCsv() {
+  const U = R.us; if (!U) return;
+  const q = v => `"${String(v ?? '').replace(/"/g, '""')}"`;
+  let rows;
+  if (U.tab === 'sess') rows = [['이름', '역할', '들어온 시각', '나간 시각', '머문 초', '기기', '운영체제', '브라우저', '앱', '버전', '본 화면', '한 일'], ...(U.sess || []).filter(s => !U.who || s.email === U.who).map(s => [s.name, s.role, new Date(s.start).toLocaleString('ko-KR'), new Date(s.end).toLocaleString('ko-KR'), s.dur, s.dev, s.os, s.br, s.pwa ? '앱' : '', s.ver, (s.screens || []).map(k => SCREEN_NAME[k] || k).join(' > '), Object.entries(s.acts || {}).map(([k, v]) => `${ACT_NAME[k] || k} ${v}`).join(' · ')])];
+  else { const sum = o => Object.values(o || {}).reduce((n, v) => n + (Number(v) || 0), 0); rows = [['날짜', '이름', '역할', '연 횟수', '사용 분', '화면 연 횟수', '한 일', '오류', '기기', '운영체제', '브라우저', '홈 화면 앱', '버전'], ...(U.rows || []).sort((a, b) => a.date.localeCompare(b.date) || ko(a.name || '', b.name || '')).map(x => [x.date, x.name, x.role || '', x.opens || 0, x.minutes || 0, sum(x.screens), sum(x.acts), sum(x.errs), x.dev || Object.keys(x.device || {})[0] || '', x.os || '', x.br || '', x.pwa ? '예' : x.ver ? '아니오' : '', x.ver || ''])]; }
+  const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob(['﻿' + rows.map(r => r.map(q).join(',')).join('\n')], { type: 'text/csv;charset=utf-8' }));
+  a.download = `조이코너_${U.tab === 'sess' ? '접속기록' : '사용현황'}_${ymd(new Date())}.csv`; document.body.appendChild(a); a.click(); a.remove();
 }
 
 /* ---------- 연도별 백업 ---------- */
@@ -3882,7 +4126,7 @@ function dashA() {
 }
 
 function vHomeDash() {
-  return `<div class="scroll dashwrap">${homeHeader()}${homeModeSeg()}${iosOtherNote()}${holBanner()}${gcalBanner()}${nyHomeCard()}
+  return `<div class="scroll dashwrap">${homeHeader()}${homeModeSeg()}${iosOtherNote()}${holBanner()}${gcalBanner()}${nyHomeCard()}${sfHomeCard()}
 <div class="hdash">${dashA()}</div>
 <div class="dash2">${homeNoticeCard()}${homeEventsCard()}<section class="card homedock"><div class="lbl"><span>교사실 바로 가기</span></div>${roomDock('')}</section>${versionCard()}</div></div>${nav('home')}`;
 }
@@ -5126,3 +5370,104 @@ Object.assign(ACT, {
 VIEWS.newyear = vNewYear; VIEWS.promote = vNewYear; VIEWS.grads = vGrads; VIEWS.grad = vGrad;
 Object.assign(SCREEN_NAME, { newyear: '새 학년 준비', grads: '졸업생 서랍장', grad: '졸업생 카드' });
 Object.assign(ACT_NAME, { newyear: '새 학년 시작' });
+
+/* ================= v33 · 안전 표시 (알레르기 · 건강 · 귀가 · 행동) ================= */
+const SF_CAT = [['alg', '알레르기 · 음식', '알레르기', '#C62828'], ['med', '건강 · 약', '건강', '#D9661F'], ['home', '귀가 · 보호자', '귀가', '#7B4FB8'], ['act', '행동 · 돌봄', '돌봄', '#2E6FB5'], ['etc', '기타 주의', '주의', '#6B5646']];
+const sfCat = c => SF_CAT.find(x => x[0] === c) || SF_CAT[4];
+const sfItems = k => ((k && k.safety && k.safety.items) || []).filter(x => x && String(x.t || '').trim());
+const hasSF = k => sfItems(k).length > 0;
+const SF_ICON = '<path d="M12 3 2.5 20h19z"/><path d="M12 10v4.5M12 17.2v.3"/>';
+const sfNoInfo = k => !hasSF(k) && (k.flags || []).some(f => /알레르기/.test(f));
+function sfBadge(k) { return hasSF(k) ? `<span class="sfb ${k.safety.hi ? 'hi' : ''}" title="안전 주의">!</span>` : ''; }
+function sfTags(k) {
+  const cs = [...new Set(sfItems(k).map(x => x.c))];
+  return cs.map(c => `<span class="ktag sft" style="--c:${sfCat(c)[3]}">${svg(SF_ICON, 11, 2.4)}${esc(sfCat(c)[2])}</span>`).join('');
+}
+function sfCard(k) {
+  const L = sfItems(k);
+  if (!L.length) return `<button class="sfadd full" data-act="sfEdit">${svg(SF_ICON, 16, 2.2)}<span>${sfNoInfo(k) ? "'알레르기' 표시만 있어요 — 무엇을 조심해야 하는지 적어 주세요" : '안전 표시 넣기 · 알레르기 · 건강 · 귀가 · 행동'}</span><span class="chev">›</span></button>`;
+  return `<section class="card sfcard full ${k.safety.hi ? 'hi' : ''}"><div class="lbl"><span>${svg(SF_ICON, 15, 2.4)} 안전 주의</span><button class="linkbtn" data-act="sfEdit">고치기</button></div>
+${k.safety.hi ? `<div class="sfhi">응급 대응이 필요한 친구예요 · 증상이 보이면 바로 디렉터와 부모님께</div>` : ''}
+<div class="sfl">${L.map(x => `<div class="sfi" style="--c:${sfCat(x.c)[3]}"><span class="sfc">${esc(sfCat(x.c)[1])}</span><b>${esc(x.t)}</b></div>`).join('')}</div>
+${k.safety.byName ? `<div class="s2">${esc(k.safety.byName)} 선생님 · ${esc(fmtMDs(String(k.safety.at || '').slice(0, 10)))} 고침</div>` : ''}</section>`;
+}
+function sfRows(L) {
+  return L.map((x, i) => `<div class="sfrow" data-i="${i}"><select class="in sfsel">${SF_CAT.map(c => `<option value="${c[0]}" ${x.c === c[0] ? 'selected' : ''}>${c[1]}</option>`).join('')}</select><input class="in sftx" maxlength="60" value="${esc(x.t || '')}" placeholder="${esc(SF_PH[x.c] || SF_PH.etc)}"><button type="button" class="sfdel" data-act="sfDel" data-i="${i}" aria-label="이 줄 지우기">×</button></div>`).join('');
+}
+const SF_PH = { alg: '예: 우유 · 땅콩 (간식 주의)', med: '예: 천식 흡입기 가방에 있어요', home: '예: 어머니께만 인계', act: '예: 큰 소리에 놀라요 · 화장실 도움', etc: '예: 사진 촬영 안 돼요' };
+function sfSheetRead() {
+  return [...document.querySelectorAll('#sheet .sfrow')].map(r => ({ c: r.querySelector('.sfsel').value, t: r.querySelector('.sftx').value.trim() }));
+}
+function sfSheet(k, rows, hi) {
+  const L = rows || (sfItems(k).length ? sfItems(k).map(x => ({ c: x.c, t: x.t })) : [{ c: (k.flags || []).some(f => /알레르기/.test(f)) ? 'alg' : 'alg', t: '' }]);
+  const H = hi === undefined ? !!(k.safety && k.safety.hi) : hi;
+  sheet(`<div class="ttl" style="font-size:24px">${esc(k.name)} · 안전 표시</div>
+<div class="sub">모든 선생님 출석부 · 친구 카드에 <b class="sfred">!</b> 표시로 보여요. 꼭 필요한 것만 짧게 적어 주세요.</div>
+<div class="sfrows" id="sfRows">${sfRows(L)}</div>
+<button type="button" class="ghost sm" data-act="sfAddRow" style="align-self:flex-start">+ 한 줄 더하기</button>
+<label class="nytg sfhichk"><input type="checkbox" id="sfHi" ${H ? 'checked' : ''}><span>응급 대응이 필요해요<br><small>예: 심한 알레르기 · 에피펜 · 경련 — 빨간 테두리로 크게 보여요</small></span></label>
+<div class="btns"><button class="pri" data-act="sfSave" data-id="${k.id}">저장</button><button class="sec" data-act="sheetClose">취소</button></div>`);
+}
+async function sfSave(id) {
+  const k = findKid(id); if (!k) return;
+  const items = sfSheetRead().filter(x => x.t), hi = !!($('#sfHi') && $('#sfHi').checked) && items.length > 0;
+  const safety = items.length ? { items, hi, by: S.me.email, byName: myName(), at: new Date().toISOString() } : null;
+  try {
+    await updateDoc(doc(db, 'children', k.id), { safety: safety || deleteField() });
+    if (safety) k.safety = safety; else delete k.safety;
+    closeSheet(); toast(safety ? '안전 표시를 저장했어요' : '안전 표시를 지웠어요'); paint();
+  } catch (e) { toast('저장하지 못했어요: ' + errMsg(e)); }
+}
+function sfScope(c) { return (c ? activeKids(c) : nyCls().flatMap(x => activeKids(x.id))).filter(hasSF); }
+function sfHomeCard(c) {
+  const L = sfScope(c); if (!L.length) return '';
+  const hi = L.filter(k => k.safety.hi).length, cats = SF_CAT.map(x => [x, L.filter(k => sfItems(k).some(i => i.c === x[0])).length]).filter(([, n]) => n);
+  return `<button class="sfhome full" data-act="go" data-to="safety${c ? '/' + c : ''}"><span class="ic">${svg(SF_ICON, 26, 2.2)}</span><span class="grow"><b>안전 주의 친구 ${L.length}명${hi ? ` <em>응급 ${hi}</em>` : ''}</b><small>${cats.map(([x, n]) => `${x[2]} ${n}`).join(' · ')} · 간식 · 활동 전에 확인해요</small></span><span class="sfav">${L.slice(0, 5).map(k => avatar(k, 34)).join('')}</span><span class="chev">›</span></button>`;
+}
+const SFV = { f: 'all' };
+function vSafety() {
+  const only = S.arg && S.classes[S.arg] ? S.arg : '';
+  const cls = nyCls().filter(c => !only || c.id === only);
+  const today = ymd(sundayOnOrBefore(new Date()));
+  const pick = k => SFV.f === 'all' || sfItems(k).some(i => i.c === SFV.f);
+  const row = (k, c) => {
+    const here = ((S.att[c.id] || {})[today] || {})[k.id] === 'p';
+    return `<button class="sfrowv ${k.safety.hi ? 'hi' : ''}" data-act="kid" data-id="${k.id}">${avatar(k, 52)}<span class="grow"><span class="nm">${esc(k.name)}${here ? '<span class="sfhere">오늘 왔어요</span>' : ''}</span>${sfItems(k).filter(i => SFV.f === 'all' || i.c === SFV.f).map(i => `<span class="sfline" style="--c:${sfCat(i.c)[3]}"><i>${esc(sfCat(i.c)[2])}</i>${esc(i.t)}</span>`).join('')}</span><span class="chev">›</span></button>`;
+  };
+  const miss = cls.flatMap(c => activeKids(c.id).filter(sfNoInfo));
+  const total = cls.reduce((s, c) => s + activeKids(c.id).filter(hasSF).length, 0);
+  return `<div class="scroll"><div class="nyin">${nyTopBar('home', '홈', `<span class="nypill">${total}명</span>`)}<h1 class="atitle sm">안전 주의 친구</h1>
+<div class="sub">간식 · 활동 · 귀가 전에 확인해 주세요. 친구를 누르면 카드에서 고칠 수 있어요.</div>
+<div class="seg sfseg"><button class="${SFV.f === 'all' ? 'on' : ''}" data-act="sfF" data-id="all">모두</button>${SF_CAT.slice(0, 4).map(x => `<button class="${SFV.f === x[0] ? 'on' : ''}" data-act="sfF" data-id="${x[0]}">${x[2]}</button>`).join('')}</div>
+${cls.map(c => { const L = activeKids(c.id).filter(hasSF).filter(pick).sort((a, b) => (b.safety.hi ? 1 : 0) - (a.safety.hi ? 1 : 0) || ko(a.name, b.name)); return L.length ? `<section class="card"><div class="lbl"><span style="color:${clsCol(c.id)}">${esc(c.name)}</span><span class="s2">${L.length}명</span></div><div class="sflist">${L.map(k => row(k, c)).join('')}</div></section>` : ''; }).join('') || '<div class="note soft"><span>아직 안전 표시가 있는 친구가 없어요. 친구 카드에서 [안전 표시 넣기]를 눌러 주세요.</span></div>'}
+${miss.length ? `<section class="card"><div class="lbl"><span>'알레르기' 표시만 있고 내용이 없는 친구</span><span class="nypill y">${miss.length}명</span></div><div class="nytcs">${miss.map(k => `<button class="nytc" data-act="kid" data-id="${k.id}">${avatar(k, 24)}<span>${esc(k.name)}</span><small>${esc(clsName(k.classId))}</small></button>`).join('')}</div><div class="s2">눌러서 무엇을 조심해야 하는지 적어 주세요.</div></section>` : ''}
+</div></div>${nav('home')}`;
+}
+Object.assign(ACT, {
+  sfEdit: () => { const k = findKid(S.arg); if (k) sfSheet(k); },
+  sfAddRow: () => { const k = findKid(S.arg); if (!k) return; const rows = sfSheetRead(); rows.push({ c: 'etc', t: '' }); const hi = $('#sfHi') && $('#sfHi').checked; sfSheet(k, rows, hi); },
+  sfDel: d => { const k = findKid(S.arg); if (!k) return; const rows = sfSheetRead(); rows.splice(Number(d.i), 1); const hi = $('#sfHi') && $('#sfHi').checked; sfSheet(k, rows.length ? rows : [{ c: 'alg', t: '' }], hi); },
+  sfSave: d => sfSave(d.id),
+  sfF: d => { SFV.f = d.id; paint(); }
+});
+appEl.addEventListener('change', e => { if (e.target.classList && e.target.classList.contains('sfsel')) { const inp = e.target.parentElement.querySelector('.sftx'); if (inp) inp.placeholder = SF_PH[e.target.value] || SF_PH.etc; } });
+VIEWS.safety = vSafety;
+Object.assign(SCREEN_NAME, { safety: '안전 주의 친구' });
+
+/* ---------- v33 · 사용 현황 화면 동작 ---------- */
+Object.assign(ACT, {
+  usTab: d => { R.us.tab = d.id; paint(); },
+  usMetric: d => { R.us.metric = d.id; paint(); },
+  usCsv: () => usCsv()
+});
+appEl.addEventListener('change', e => {
+  if (!R.us) return;
+  if (e.target.id === 'usSort') { R.us.sort = e.target.value; paint(); }
+  else if (e.target.id === 'usWho') { R.us.who = e.target.value; paint(); }
+});
+appEl.addEventListener('input', e => {
+  if (e.target.id !== 'usQ' || !R.us) return;
+  R.us.q = e.target.value; clearTimeout(R.us.qt);
+  R.us.qt = setTimeout(() => { paint(); const el = document.getElementById('usQ'); if (el) { el.focus(); el.setSelectionRange(el.value.length, el.value.length); } }, 350);
+});
+Object.assign(SCREEN_NAME, { newyear: '새 학년 준비', grads: '졸업생 서랍장', grad: '졸업생 카드', safety: '안전 주의 친구' });

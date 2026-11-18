@@ -248,6 +248,12 @@ service cloud.firestore {
       allow create, update: if isStaff() && request.resource.data.email == me()
                             && id == me() + '_' + request.resource.data.date;
     }
+    // 접속 기록 (v33): 본인 것만 쓰고, 보기 · 정리는 수퍼관리자만
+    match /sessions/{id} {
+      allow read, delete: if isOwner();
+      allow create, update: if isStaff() && request.resource.data.email == me()
+                            && id == me() + '_' + string(request.resource.data.start);
+    }
 
     // ───── v32 · 신입 명단 · 새 학년 기록 · 졸업 가정 연락처 ─────
     // 신입 명단: 모든 선생님이 보고 (새 반 선생님 미리 보기), 고치는 건 디렉터 · 관리자
