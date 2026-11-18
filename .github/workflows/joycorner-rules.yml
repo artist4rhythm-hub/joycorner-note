@@ -1,0 +1,30 @@
+name: 조이코너 보안 규칙 게시
+# .github/firestore.rules 가 바뀌어 main 에 올라오면 Firestore 규칙을 자동으로 게시해요.
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/firestore.rules'
+      - '.github/scripts/deploy-rules.js'
+      - '.github/workflows/joycorner-rules.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: joycorner-rules
+  cancel-in-progress: false
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: firebase-admin 설치
+        run: npm install --no-save --no-audit --no-fund firebase-admin@12
+      - name: 규칙 게시하고 확인
+        env:
+          FIREBASE_SA: ${{ secrets.FIREBASE_SA }}
+        run: node .github/scripts/deploy-rules.js
